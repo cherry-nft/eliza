@@ -6,7 +6,7 @@
 
 <div align="center">
 
-  📖 [Documentation](https://ai16z.github.io/eliza/) | 🎯 [Examples](https://github.com/thejoven/awesome-eliza)
+📖 [Documentation](https://ai16z.github.io/eliza/) | 🎯 [Examples](https://github.com/thejoven/awesome-eliza)
 
 </div>
 
@@ -26,6 +26,7 @@
 -   📦 Just works!
 
 ## Video Tutorials
+
 [AI Agent Dev School](https://www.youtube.com/watch?v=ArptLpQiKfI&list=PLx5pnFXdPTRzWla0RaOxALTSTnVq53fKL)
 
 ## 🎯 Use Cases
@@ -134,3 +135,26 @@ pnpm install --include=optional sharp
 ## Star History
 
 [![Star History Chart](https://api.star-history.com/svg?repos=ai16z/eliza&type=Date)](https://star-history.com/#ai16z/eliza&Date)
+
+# Eliza Installation Guide
+
+## Prerequisites
+
+Before getting started with Eliza, ensure you have:
+
+-   Python 2.7+
+-   Node.js 23+
+-   pnpm 9+
+-   Git for version control
+-   A code editor (VS Code or VSCodium recommended)
+-   CUDA Toolkit (optional, for GPU acceleration)
+
+## Installation
+
+### Clone and Install
+
+1. Clone the repository:
+
+```bash
+git clone https://github.com/ai16z/eliza.git
+```

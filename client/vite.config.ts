@@ -29,7 +29,12 @@ export default defineConfig({
                 target: "http://localhost:3000",
                 changeOrigin: true,
                 rewrite: (path) => path.replace(/^\/api/, ""),
+                ws: true,
             },
+        },
+        headers: {
+            "Content-Security-Policy":
+                "default-src 'self'; connect-src 'self' ws: wss: http: https:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' 'unsafe-eval';",
         },
     },
 });
