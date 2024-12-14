@@ -9,7 +9,10 @@
             "src": "agent/src/index.ts",
             "use": "@vercel/node",
             "config": {
-                "nodeVersion": "23.x"
+                "nodeVersion": "23.x",
+                "maxLambdaSize": "50mb",
+                "memory": 3008,
+                "maxDuration": 60
             }
         }
     ],
@@ -22,11 +25,5 @@
             "src": "/(.*)",
             "dest": "client/$1"
         }
-    ],
-    "functions": {
-        "agent/src/index.ts": {
-            "memory": 3008,
-            "maxDuration": 60
-        }
-    }
+    ]
 }
