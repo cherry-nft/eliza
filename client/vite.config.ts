@@ -34,7 +34,9 @@ export default defineConfig({
         },
         headers: {
             "Content-Security-Policy":
-                "default-src 'self'; connect-src 'self' ws: wss: http: https:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' 'unsafe-eval';",
+                "default-src 'self'; connect-src 'self' ws: wss: http: https: *.ngrok.io slop.wtf; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; frame-ancestors 'self' https://slop.wtf;",
         },
+        host: true,
+        cors: true,
     },
 });
