@@ -331,3 +331,85 @@ export default defineConfig({
 8. Implement message persistence and history
 9. Add support for media attachments
 10. Enhance mobile UX with haptic feedback and animations
+
+### Capabilities
+
+**Looking at the API docs and the plugins we have, here are some specific actions this system can do:**
+
+Crypto/Blockchain Actions:
+"Send me 0.1 ETH on the Ethereum network"
+"Check my Solana wallet balance"
+"Buy $100 worth of SOL tokens"
+"Track price movements on Birdeye"
+
+Social Media Integration:
+"Post this message to Twitter"
+"Reply to my latest mentions"
+"Schedule a tweet for tomorrow"
+"Monitor Twitter for specific keywords"
+
+AI-Enhanced Actions:
+"Generate an image of Trump in the Oval Office"
+"Transcribe this audio clip into text"
+"Analyze the sentiment of these tweets"
+"Generate a caption for this image"
+
+Document/Knowledge Actions:
+"Search through my PDF documents for mentions of inflation"
+"Summarize this article about the border"
+"Extract key points from this speech"
+"Create a report based on these documents"
+
+Web Interaction:
+"Search the web for recent news about me"
+"Check the latest polls on FiveThirtyEight"
+"Monitor news sites for specific topics"
+"Gather data from specified websites"
+Memory/Relationship Management:
+"Remember this fact about Hunter Biden"
+"What do you recall about our last conversation about the wall?"
+"Update your knowledge about the latest border statistics"
+"Track relationships with different users or entities"
+
+### Autonomous Trading
+
+- "Buy 1000 SOL when the price drops below $20"
+- "Set up a trailing stop loss at 5% for my BONK position"
+- "Monitor JUPITER price and alert me if it moves more than 10%"
+- "Validate this token contract for potential scams"
+- "Show me my trading performance for the last week"
+- "Automatically DCA $100 into SOL every day"
+
+### Secure TEE Integration
+
+- "Generate a new secure wallet for trading on Solana"
+- "Prove that this transaction was executed in a secure environment"
+- "Switch to production TEE mode for live trading"
+- "Verify the authenticity of this trading bot's actions"
+- "Sign this transaction securely within the TEE"
+
+### Fine-tuning & Model Management
+
+- "Use GPT-4 for complex trading analysis but Claude for chat"
+- "Switch to a faster model for quick price checks"
+- "Remember this trading pattern for future reference"
+- "Make responses more creative for social media posts"
+- "Optimize response speed for real-time market updates"
+
+### Infrastructure & Data Management
+
+- "Show me all trades where I made over 50% profit"
+- "Find similar market conditions to right now"
+- "Back up all my trading history to PostgreSQL"
+- "Scale up the system to handle 1000 concurrent traders"
+- "Give me access to only my own trading data"
+- "Check if all trading systems are running properly"
+
+### Trust Engine
+
+- "Rate this trader's token recommendations"
+- "Show me my most profitable trading patterns"
+- "What's the risk level of this new token?"
+- "Find traders with similar successful strategies"
+- "Calculate trust score for this new signal group"
+- "Verify if this token meets our safety criteria"
