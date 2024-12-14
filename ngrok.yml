@@ -1,0 +1,15 @@
+version: 3
+
+agent:
+    api_key: 2qE46fWdfk8TPrrN6e7crQNR9BK_DNGdsJ1TLpesxSDirG4X
+    authtoken: 2q6Uo3QOl2GDBqo6RnJ8jCK3jqa_7i92QEpR86wA3k5pZZRmr
+
+endpoints:
+    - name: client
+      url: https://slop.wtf
+      upstream:
+          url: 5173
+    - name: api
+      url: https://api.slop.wtf
+      upstream:
+          url: 3000
