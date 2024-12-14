@@ -78,31 +78,59 @@ pnpm start --character="characters/trump.character.json"
 
 This will:
 
--   Initialize SQLite database
--   Start the API server on port 3000
--   Load Trump character with OpenRouter/Claude 3.5
+- Initialize SQLite database
+- Start the API server on port 3000
+- Load Trump character with OpenRouter/Claude 3.5
+- Register the character with DirectClient for API access
 
 2. Start the Client (Terminal 2):
 
 ```bash
-pnpm start:client
+cd client && pnpm dev
 ```
 
 This will:
 
--   Start Vite dev server on port 5173
--   Connect to local agent API
--   Support deployment to slop.wtf
+- Start Vite dev server on port 5173
+- Connect to local agent API via proxy configuration
+- Support deployment to slop.wtf
+- Provide mobile-optimized iMessage-like interface
 
 ### Access Points
 
--   Local Development: http://localhost:5173
--   Production: https://slop.wtf
--   API Endpoint: http://localhost:3000/trump/message
+- Local Development: http://localhost:5173
+- Production: https://slop.wtf
+- API Endpoint: http://localhost:3000/api/agents (list available agents)
+- Chat Endpoint: http://localhost:3000/api/[agentId]/message
 
 ### API Usage
 
-Send POST requests to /trump/message:
+1. Get Available Agents:
+
+```bash
+GET /api/agents
+```
+
+Response:
+
+```json
+{
+    "agents": [
+        {
+            "id": "unique-agent-id",
+            "name": "trump"
+        }
+    ]
+}
+```
+
+2. Send Messages:
+
+```bash
+POST /api/[agentId]/message
+```
+
+Request body:
 
 ```json
 {
@@ -111,6 +139,41 @@ Send POST requests to /trump/message:
     "roomId": "default-room-trump"
 }
 ```
+
+### Client Configuration
+
+The client uses Vite's proxy configuration to route API requests:
+
+```typescript
+// vite.config.ts
+export default defineConfig({
+    server: {
+        proxy: {
+            "/api": {
+                target: process.env.VITE_API_URL || "http://localhost:3000",
+                changeOrigin: true,
+                rewrite: (path) => path.replace(/^\/api/, ""),
+                ws: true,
+            },
+        },
+        headers: {
+            "Content-Security-Policy":
+                "default-src 'self'; connect-src 'self' ws: wss: http: https: *.vercel.app slop.wtf; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; frame-ancestors 'self' https://slop.wtf;",
+        },
+        host: true,
+        cors: true,
+    },
+});
+```
+
+### Mobile Optimization
+
+The client interface is optimized for mobile with:
+
+- iMessage-like chat bubbles
+- Responsive design that adapts to screen size
+- Touch-friendly input controls
+- Native-feeling scrolling and animations
 
 ## Core Interfaces
 
@@ -251,6 +314,10 @@ export default defineConfig({
 6. All plugins implement proper interfaces from @ai16z/eliza
 7. Trump character works with OpenRouter/Claude 3.5
 8. Web interface supports both local and slop.wtf deployment
+9. Agent registration system properly exposes characters via API
+10. Mobile-optimized interface with iMessage-like design
+11. Vite dev server with proper API proxy configuration
+12. CORS and security headers configured for production
 
 ## Next Steps
 
@@ -260,3 +327,7 @@ export default defineConfig({
 4. Add documentation for each plugin's specific functionality
 5. Add more characters and model providers
 6. Enhance the web interface with more features
+7. Add real-time typing indicators and message status
+8. Implement message persistence and history
+9. Add support for media attachments
+10. Enhance mobile UX with haptic feedback and animations

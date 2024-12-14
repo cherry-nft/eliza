@@ -1,7 +1,7 @@
+import express, { Request as ExpressRequest } from "express";
 import bodyParser from "body-parser";
 import cors from "cors";
-import express, { Request as ExpressRequest } from "express";
-import multer, { File } from "multer";
+import multer from "multer";
 import { elizaLogger, generateCaption, generateImage } from "@ai16z/eliza";
 import { composeContext } from "@ai16z/eliza";
 import { generateMessageResponse } from "@ai16z/eliza";
@@ -19,7 +19,14 @@ import { settings } from "@ai16z/eliza";
 import { createApiRouter } from "./api.ts";
 import * as fs from "fs";
 import * as path from "path";
+
+// Initialize multer
 const upload = multer({ storage: multer.memoryStorage() });
+
+// Define custom request type with multer file
+interface CustomRequest extends ExpressRequest {
+    file?: Express.Multer.File;
+}
 
 export const messageHandlerTemplate =
     // {{goals}}
@@ -58,16 +65,32 @@ export interface SimliClientConfig {
     videoRef: any;
     audioRef: any;
 }
-export class DirectClient {
+export const DirectClientInterface: Client = {
+    start: async (runtime: IAgentRuntime) => {
+        elizaLogger.log("DirectClientInterface start");
+        const client = new DirectClient();
+        await client.start(runtime);
+        return client;
+    },
+    stop: async (runtime: IAgentRuntime, client?: any) => {
+        if (client instanceof DirectClient) {
+            await client.stop(runtime);
+        }
+    },
+};
+
+export class DirectClient implements Client {
     public app: express.Application;
     private agents: Map<string, AgentRuntime>;
-    private server: any; // Store server instance
+    private server: any;
+    private currentRuntime: IAgentRuntime | null = null;
 
     constructor() {
         elizaLogger.log("DirectClient constructor");
         this.app = express();
         this.app.use(cors());
         this.agents = new Map();
+        this.currentRuntime = null;
 
         this.app.use(bodyParser.json());
         this.app.use(bodyParser.urlencoded({ extended: true }));
@@ -75,17 +98,12 @@ export class DirectClient {
         const apiRouter = createApiRouter(this.agents);
         this.app.use(apiRouter);
 
-        // Define an interface that extends the Express Request interface
-        interface CustomRequest extends ExpressRequest {
-            file: File;
-        }
-
-        // Update the route handler to use CustomRequest instead of express.Request
+        // Update the route handler to use CustomRequest
         this.app.post(
             "/:agentId/whisper",
             upload.single("file"),
             async (req: CustomRequest, res: express.Response) => {
-                const audioFile = req.file; // Access the uploaded file using req.file
+                const audioFile = req.file;
                 const agentId = req.params.agentId;
 
                 if (!audioFile) {
@@ -95,7 +113,6 @@ export class DirectClient {
 
                 let runtime = this.agents.get(agentId);
 
-                // if runtime is null, look for runtime with the same name
                 if (!runtime) {
                     runtime = Array.from(this.agents.values()).find(
                         (a) =>
@@ -378,63 +395,60 @@ export class DirectClient {
         );
     }
 
-    public registerAgent(runtime: AgentRuntime) {
-        this.agents.set(runtime.agentId, runtime);
+    async registerRuntime(runtime: IAgentRuntime): Promise<void> {
+        elizaLogger.info(
+            `Registering runtime for agent: ${runtime.character.name}`
+        );
+        if (runtime instanceof AgentRuntime) {
+            this.agents.set(runtime.agentId, runtime);
+            this.agents.set(runtime.character.name.toLowerCase(), runtime);
+            this.currentRuntime = runtime;
+        } else {
+            throw new Error("Runtime must be an instance of AgentRuntime");
+        }
     }
 
-    public unregisterAgent(runtime: AgentRuntime) {
-        this.agents.delete(runtime.agentId);
+    async initialize(runtime: IAgentRuntime): Promise<void> {
+        await this.registerRuntime(runtime);
+        await this.start(runtime);
     }
 
-    public start(port: number) {
+    async start(runtime: IAgentRuntime): Promise<void> {
+        this.currentRuntime = runtime;
+        const port = parseInt(process.env.PORT || "3000");
         this.server = this.app.listen(port, () => {
             elizaLogger.success(`Server running at http://localhost:${port}/`);
         });
 
         // Handle graceful shutdown
-        const gracefulShutdown = () => {
+        const gracefulShutdown = async () => {
             elizaLogger.log("Received shutdown signal, closing server...");
-            this.server.close(() => {
-                elizaLogger.success("Server closed successfully");
-                process.exit(0);
-            });
-
-            // Force close after 5 seconds if server hasn't closed
-            setTimeout(() => {
-                elizaLogger.error(
-                    "Could not close connections in time, forcefully shutting down"
-                );
-                process.exit(1);
-            }, 5000);
+            if (this.currentRuntime) {
+                await this.stop(this.currentRuntime);
+            }
+            process.exit(0);
         };
 
-        // Handle different shutdown signals
         process.on("SIGTERM", gracefulShutdown);
         process.on("SIGINT", gracefulShutdown);
     }
 
-    public stop() {
+    async stop(runtime: IAgentRuntime): Promise<void> {
         if (this.server) {
-            this.server.close(() => {
-                elizaLogger.success("Server stopped");
+            await new Promise<void>((resolve, reject) => {
+                this.server.close((err?: Error) => {
+                    if (err) {
+                        elizaLogger.error("Error stopping server:", err);
+                        reject(err);
+                    } else {
+                        elizaLogger.success("Server stopped");
+                        resolve();
+                    }
+                });
             });
         }
+        this.currentRuntime = null;
     }
 }
-
-export const DirectClientInterface: Client = {
-    start: async (_runtime: IAgentRuntime) => {
-        elizaLogger.log("DirectClientInterface start");
-        const client = new DirectClient();
-        const serverPort = parseInt(settings.SERVER_PORT || "3000");
-        client.start(serverPort);
-        return client;
-    },
-    stop: async (_runtime: IAgentRuntime, client?: any) => {
-        if (client instanceof DirectClient) {
-            client.stop();
-        }
-    },
-};
 
 export default DirectClientInterface;

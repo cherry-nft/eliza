@@ -162,6 +162,12 @@ async function main() {
         // Create DirectClient
         const client = new DirectClient();
 
+        // Start the server first
+        const port = process.env.PORT || 3000;
+        client.app.listen(port, () => {
+            elizaLogger.info(`Server is running on port ${port}`);
+        });
+
         for (const character of characters) {
             elizaLogger.info("Creating runtime for character:", character.name);
 
@@ -177,7 +183,6 @@ async function main() {
             const runtime = new AgentRuntime({
                 character,
                 plugins: [bootstrapPlugin, createNodePlugin()],
-                clients: [client],
                 databaseAdapter: dbAdapter,
                 cacheManager,
                 token: token || "",
@@ -189,13 +194,10 @@ async function main() {
             elizaLogger.info("Initializing runtime...");
             await runtime.initialize();
             elizaLogger.info("Runtime initialized successfully");
-        }
 
-        // Start the server
-        const port = process.env.PORT || 3000;
-        client.app.listen(port, () => {
-            elizaLogger.info(`Server is running on port ${port}`);
-        });
+            // Register runtime with DirectClient
+            await client.registerRuntime(runtime);
+        }
     } catch (error) {
         elizaLogger.error("Error in main:", error);
         if (error instanceof Error) {
