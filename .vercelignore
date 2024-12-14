@@ -1,0 +1,40 @@
+# Dependencies
+node_modules
+.pnpm-store
+
+# Build outputs
+dist
+build
+.next
+.nuxt
+.output
+
+# Development files
+.git
+.gitignore
+.env.local
+.env.*.local
+README.md
+*.log
+
+# Test files
+__tests__
+test
+tests
+coverage
+
+# Documentation
+docs
+*.md
+
+# Cache and temporary files
+.cache
+.temp
+.tmp
+.DS_Store
+
+# Debug files
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
