@@ -9,7 +9,7 @@
             "src": "agent/src/index.ts",
             "use": "@vercel/node",
             "config": {
-                "nodeVersion": "23.x",
+                "nodeVersion": "20.x",
                 "maxLambdaSize": "50mb",
                 "memory": 3008,
                 "maxDuration": 60

@@ -1,62 +1,19 @@
-# Dependencies
+# Large directories
 node_modules
 .pnpm-store
-**/node_modules
-**/.pnpm-store
-
-# Build outputs
-dist
-build
-.next
-.nuxt
-.output
-**/dist
-**/build
+cache
+.git
+docs
+.turbo
 
 # Development files
-.git
-.gitignore
-.env.local
-.env.*.local
-README.md
-*.log
-.husky
-.github
 .vscode
-
-# Test files
-__tests__
-test
+.github
 tests
+__tests__
 coverage
-**/__tests__
-**/test
-**/tests
-**/coverage
 
-# Documentation
-docs
-*.md
-**/docs
-
-# Cache and temporary files
-.cache
-.temp
-.tmp
-.DS_Store
-**/.cache
-**/.temp
-**/.tmp
-**/.DS_Store
-
-# Debug files
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-.pnpm-debug.log*
-
-# Large directories we don't need
-packages/docs
-packages/plugin-*
-!packages/plugin-core
-!packages/plugin-node
+# Keep only essential packages
+packages/*
+!packages/core
+!packages/client-direct
