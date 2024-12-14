@@ -37,6 +37,81 @@ eliza/
 │       └── tsup.config.ts
 ```
 
+## Running Trump Character with OpenRouter
+
+### Prerequisites
+
+1. OpenRouter API key (set in `.env` as `OPENROUTER_API_KEY`)
+2. Node.js 23+ and pnpm installed
+3. SQLite installed for database functionality
+
+### Configuration Files
+
+1. Character Configuration (`characters/trump.character.json`):
+
+```json
+{
+    "name": "trump",
+    "clients": [],
+    "modelProvider": "openrouter",
+    "settings": {
+        "model": "anthropic/claude-3.5-sonnet:beta",
+        "temperature": 0.7
+    }
+}
+```
+
+2. Environment Variables (`.env`):
+
+```env
+OPENROUTER_API_KEY=your_api_key_here
+OPENROUTER_MODEL=anthropic/claude-3.5-sonnet:beta
+```
+
+### Starting the System
+
+1. Start the Agent (Terminal 1):
+
+```bash
+pnpm start --character="characters/trump.character.json"
+```
+
+This will:
+
+-   Initialize SQLite database
+-   Start the API server on port 3000
+-   Load Trump character with OpenRouter/Claude 3.5
+
+2. Start the Client (Terminal 2):
+
+```bash
+pnpm start:client
+```
+
+This will:
+
+-   Start Vite dev server on port 5173
+-   Connect to local agent API
+-   Support deployment to slop.wtf
+
+### Access Points
+
+-   Local Development: http://localhost:5173
+-   Production: https://slop.wtf
+-   API Endpoint: http://localhost:3000/trump/message
+
+### API Usage
+
+Send POST requests to /trump/message:
+
+```json
+{
+    "text": "Your message here",
+    "userId": "user",
+    "roomId": "default-room-trump"
+}
+```
+
 ## Core Interfaces
 
 ### Plugin Interface
@@ -174,6 +249,8 @@ export default defineConfig({
 4. Blockchain plugins (0G, GOAT, Aptos) have minimal working structure
 5. All plugins follow consistent build configuration
 6. All plugins implement proper interfaces from @ai16z/eliza
+7. Trump character works with OpenRouter/Claude 3.5
+8. Web interface supports both local and slop.wtf deployment
 
 ## Next Steps
 
@@ -181,4 +258,5 @@ export default defineConfig({
 2. Add tests for all plugins
 3. Add proper error handling
 4. Add documentation for each plugin's specific functionality
-5. Consider adding more services to the node plugin
+5. Add more characters and model providers
+6. Enhance the web interface with more features

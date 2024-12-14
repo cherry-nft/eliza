@@ -1,4 +1,6 @@
-import { DirectClientInterface } from "@ai16z/client-direct";
+import { DirectClient } from "@ai16z/client-direct";
+import { SqliteDatabaseAdapter } from "@ai16z/adapter-sqlite";
+import Database from "better-sqlite3";
 import {
     AgentRuntime,
     Character,
@@ -7,6 +9,8 @@ import {
     ModelProviderName,
     settings,
     validateCharacterConfig,
+    CacheManager,
+    MemoryCacheAdapter,
 } from "@ai16z/eliza";
 import { bootstrapPlugin } from "@ai16z/plugin-bootstrap";
 import { createNodePlugin } from "@ai16z/plugin-node";
@@ -136,23 +140,83 @@ function getTokenForProvider(
 }
 
 async function main() {
-    const args = parseArguments();
-    const characters = await loadCharacters(
-        args.characters || args.character || ""
-    );
+    try {
+        const args = parseArguments();
+        elizaLogger.info("Parsed arguments:", args);
 
-    for (const character of characters) {
-        const runtime = new AgentRuntime({
-            character,
-            plugins: [bootstrapPlugin, createNodePlugin()],
-            clients: [new DirectClientInterface()],
+        const characters = await loadCharacters(
+            args.characters || args.character || ""
+        );
+        elizaLogger.info("Loaded characters:", characters);
+
+        // Create SQLite database
+        const dbPath = path.join(process.cwd(), "eliza.db");
+        const db = new Database(dbPath);
+        const dbAdapter = new SqliteDatabaseAdapter(db);
+        await dbAdapter.init();
+
+        // Create cache manager
+        const cacheAdapter = new MemoryCacheAdapter();
+        const cacheManager = new CacheManager(cacheAdapter);
+
+        // Create DirectClient
+        const client = new DirectClient();
+
+        for (const character of characters) {
+            elizaLogger.info("Creating runtime for character:", character.name);
+
+            const token = getTokenForProvider(
+                character.modelProvider as ModelProviderName,
+                character
+            );
+            elizaLogger.info("Got token for provider:", {
+                provider: character.modelProvider,
+                hasToken: !!token,
+            });
+
+            const runtime = new AgentRuntime({
+                character,
+                plugins: [bootstrapPlugin, createNodePlugin()],
+                clients: [client],
+                databaseAdapter: dbAdapter,
+                cacheManager,
+                token: token || "",
+                modelProvider:
+                    (character.modelProvider as ModelProviderName) ||
+                    ModelProviderName.OPENROUTER,
+            });
+
+            elizaLogger.info("Initializing runtime...");
+            await runtime.initialize();
+            elizaLogger.info("Runtime initialized successfully");
+        }
+
+        // Start the server
+        const port = process.env.PORT || 3000;
+        client.app.listen(port, () => {
+            elizaLogger.info(`Server is running on port ${port}`);
         });
-
-        await runtime.start();
+    } catch (error) {
+        elizaLogger.error("Error in main:", error);
+        if (error instanceof Error) {
+            elizaLogger.error("Error details:", {
+                name: error.name,
+                message: error.message,
+                stack: error.stack,
+            });
+        }
+        process.exit(1);
     }
 }
 
 main().catch((error) => {
-    elizaLogger.error("Error in main:", error);
+    elizaLogger.error("Uncaught error in main:", error);
+    if (error instanceof Error) {
+        elizaLogger.error("Error details:", {
+            name: error.name,
+            message: error.message,
+            stack: error.stack,
+        });
+    }
     process.exit(1);
 });
