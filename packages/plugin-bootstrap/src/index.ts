@@ -1,33 +1,40 @@
-import { Plugin } from "@ai16z/eliza";
-import { continueAction } from "./actions/continue.ts";
-import { followRoomAction } from "./actions/followRoom.ts";
-import { ignoreAction } from "./actions/ignore.ts";
-import { muteRoomAction } from "./actions/muteRoom.ts";
-import { noneAction } from "./actions/none.ts";
-import { unfollowRoomAction } from "./actions/unfollowRoom.ts";
-import { unmuteRoomAction } from "./actions/unmuteRoom.ts";
-import { factEvaluator } from "./evaluators/fact.ts";
-import { goalEvaluator } from "./evaluators/goal.ts";
-import { boredomProvider } from "./providers/boredom.ts";
-import { factsProvider } from "./providers/facts.ts";
-import { timeProvider } from "./providers/time.ts";
+import { Action, IAgentRuntime, Plugin } from "@ai16z/eliza";
 
-export * as actions from "./actions";
-export * as evaluators from "./evaluators";
-export * as providers from "./providers";
+const CONTINUE: Action = {
+    name: "CONTINUE",
+    description: "Continue the current conversation flow",
+    similes: ["proceed", "keep going", "continue"],
+    examples: [],
+    handler: async (runtime: IAgentRuntime) => {
+        return { text: "Continuing..." };
+    },
+    validate: async () => true,
+};
+
+const IGNORE: Action = {
+    name: "IGNORE",
+    description: "Ignore specific messages",
+    similes: ["skip", "disregard", "ignore"],
+    examples: [],
+    handler: async (runtime: IAgentRuntime) => {
+        return { text: "Ignoring..." };
+    },
+    validate: async () => true,
+};
+
+const NONE: Action = {
+    name: "NONE",
+    description: "No action needed",
+    similes: ["nothing", "no action", "none"],
+    examples: [],
+    handler: async (runtime: IAgentRuntime) => {
+        return { text: "No action needed" };
+    },
+    validate: async () => true,
+};
 
 export const bootstrapPlugin: Plugin = {
     name: "bootstrap",
-    description: "Agent bootstrap with basic actions and evaluators",
-    actions: [
-        continueAction,
-        followRoomAction,
-        unfollowRoomAction,
-        ignoreAction,
-        noneAction,
-        muteRoomAction,
-        unmuteRoomAction,
-    ],
-    evaluators: [factEvaluator, goalEvaluator],
-    providers: [boredomProvider, timeProvider, factsProvider],
+    description: "Essential baseline functionality for Eliza",
+    actions: [CONTINUE, IGNORE, NONE],
 };

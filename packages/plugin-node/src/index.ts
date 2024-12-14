@@ -1,33 +1,27 @@
-export * from "./services/index.ts";
+import { IAgentRuntime, Plugin, Service, ServiceType } from "@ai16z/eliza";
 
-import { Plugin } from "@ai16z/eliza";
+class BrowserService extends Service {
+    static get serviceType(): ServiceType {
+        return ServiceType.BROWSER;
+    }
 
-import {
-    BrowserService,
-    ImageDescriptionService,
-    LlamaService,
-    PdfService,
-    SpeechService,
-    TranscriptionService,
-    VideoService,
-    AwsS3Service
-} from "./services/index.ts";
-
-export type NodePlugin = ReturnType<typeof createNodePlugin>;
-
-export function createNodePlugin() {
-    return {
-        name: "default",
-        description: "Default plugin, with basic actions and evaluators",
-        services: [
-            new BrowserService(),
-            new ImageDescriptionService(),
-            new LlamaService(),
-            new PdfService(),
-            new SpeechService(),
-            new TranscriptionService(),
-            new VideoService(),
-            new AwsS3Service()
-        ],
-    } as const satisfies Plugin;
+    async initialize(runtime: IAgentRuntime): Promise<void> {
+        // Initialize browser service
+    }
 }
+
+class TextGenerationService extends Service {
+    static get serviceType(): ServiceType {
+        return ServiceType.TEXT_GENERATION;
+    }
+
+    async initialize(runtime: IAgentRuntime): Promise<void> {
+        // Initialize text generation service
+    }
+}
+
+export const createNodePlugin = (): Plugin => ({
+    name: "node",
+    description: "Core Node.js-based services for Eliza",
+    services: [new BrowserService(), new TextGenerationService()],
+});

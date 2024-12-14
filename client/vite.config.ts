@@ -26,10 +26,17 @@ export default defineConfig({
     server: {
         proxy: {
             "/api": {
-                target: "http://localhost:3000",
+                target: process.env.VITE_API_URL || "http://localhost:3000",
                 changeOrigin: true,
                 rewrite: (path) => path.replace(/^\/api/, ""),
+                ws: true,
             },
         },
+        headers: {
+            "Content-Security-Policy":
+                "default-src 'self'; connect-src 'self' ws: wss: http: https: *.vercel.app slop.wtf; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; frame-ancestors 'self' https://slop.wtf;",
+        },
+        host: true,
+        cors: true,
     },
 });

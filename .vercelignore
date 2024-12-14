@@ -1,0 +1,19 @@
+# Large directories
+node_modules
+.pnpm-store
+cache
+.git
+docs
+.turbo
+
+# Development files
+.vscode
+.github
+tests
+__tests__
+coverage
+
+# Keep only essential packages
+packages/*
+!packages/core
+!packages/client-direct

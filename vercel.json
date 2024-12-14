@@ -1,0 +1,29 @@
+{
+    "version": 2,
+    "builds": [
+        {
+            "src": "client/**",
+            "use": "@vercel/static"
+        },
+        {
+            "src": "agent/src/index.ts",
+            "use": "@vercel/node",
+            "config": {
+                "nodeVersion": "20.x",
+                "maxLambdaSize": "50mb",
+                "memory": 3008,
+                "maxDuration": 60
+            }
+        }
+    ],
+    "routes": [
+        {
+            "src": "/api/(.*)",
+            "dest": "agent/src/index.ts"
+        },
+        {
+            "src": "/(.*)",
+            "dest": "client/$1"
+        }
+    ]
+}
