@@ -51,7 +51,33 @@ export default {
                     5: "hsl(var(--chart-5))",
                 },
             },
+            typography: {
+                DEFAULT: {
+                    css: {
+                        maxWidth: 'none',
+                        code: {
+                            backgroundColor: 'hsl(var(--muted))',
+                            padding: '0.2em 0.4em',
+                            borderRadius: '0.25rem',
+                            fontWeight: '400',
+                        },
+                        'code::before': {
+                            content: '""'
+                        },
+                        'code::after': {
+                            content: '""'
+                        },
+                        pre: {
+                            backgroundColor: 'hsl(var(--muted))',
+                            padding: '1em',
+                            borderRadius: '0.5rem',
+                            marginTop: '0.5em',
+                            marginBottom: '0.5em'
+                        }
+                    }
+                }
+            }
         },
     },
-    plugins: [],
+    plugins: [require('@tailwindcss/typography')],
 };

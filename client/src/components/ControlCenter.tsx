@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence, PanInfo } from "framer-motion";
+import { useTheme } from "@/contexts/ThemeContext";
+import { Moon, Sun } from "lucide-react";
 
 interface ControlCenterProps {
     isOpen: boolean;
@@ -7,6 +9,7 @@ interface ControlCenterProps {
 }
 
 export default function ControlCenter({ isOpen, onClose }: ControlCenterProps) {
+    const { theme, toggleTheme } = useTheme();
     const panelRef = useRef<HTMLDivElement>(null);
     const [dragY, setDragY] = useState(0);
 
@@ -66,25 +69,34 @@ export default function ControlCenter({ isOpen, onClose }: ControlCenterProps) {
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                             {/* Quick Actions */}
                             <div className="bg-white/50 dark:bg-white/10 rounded-2xl p-4 aspect-square">
-                                <h3 className="text-sm font-semibold mb-2">Quick Actions</h3>
-                                {/* Add quick action buttons here */}
+                                <h3 className="text-sm font-semibold mb-2 dark:text-white">Quick Actions</h3>
+                                <button
+                                    onClick={toggleTheme}
+                                    className="w-12 h-12 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                                >
+                                    {theme === 'dark' ? (
+                                        <Moon className="w-5 h-5 text-gray-800 dark:text-white" />
+                                    ) : (
+                                        <Sun className="w-5 h-5 text-gray-800 dark:text-white" />
+                                    )}
+                                </button>
                             </div>
 
                             {/* Crypto Controls */}
                             <div className="bg-white/50 dark:bg-white/10 rounded-2xl p-4 aspect-square">
-                                <h3 className="text-sm font-semibold mb-2">Crypto</h3>
+                                <h3 className="text-sm font-semibold mb-2 dark:text-white">Crypto</h3>
                                 {/* Add crypto controls here */}
                             </div>
 
                             {/* AI Services */}
                             <div className="bg-white/50 dark:bg-white/10 rounded-2xl p-4 aspect-square">
-                                <h3 className="text-sm font-semibold mb-2">AI Services</h3>
+                                <h3 className="text-sm font-semibold mb-2 dark:text-white">AI Services</h3>
                                 {/* Add AI service controls here */}
                             </div>
 
                             {/* Social Media */}
                             <div className="bg-white/50 dark:bg-white/10 rounded-2xl p-4 aspect-square">
-                                <h3 className="text-sm font-semibold mb-2">Social</h3>
+                                <h3 className="text-sm font-semibold mb-2 dark:text-white">Social</h3>
                                 {/* Add social media controls here */}
                             </div>
                         </div>
