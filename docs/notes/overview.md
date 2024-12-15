@@ -413,3 +413,188 @@ Memory/Relationship Management:
 - "Find traders with similar successful strategies"
 - "Calculate trust score for this new signal group"
 - "Verify if this token meets our safety criteria"
+
+## iOS Control Center Interface Plan
+
+The new interface will be modeled after iOS Control Center, providing an intuitive and modern mobile-first experience:
+
+### Core Components
+
+1. Message Thread View
+
+    - iMessage-style bubbles with dynamic sizing
+    - Smooth scrolling and animations
+    - Typing indicators and message status
+    - Pull-to-refresh for history
+
+2. Control Center Panel
+    - Swipe up from bottom gesture
+    - Grid layout of action modules
+    - 3D Touch/Haptic feedback support
+    - Collapsible/expandable modules
+
+### Action Modules
+
+1. Quick Actions Module
+
+    - Most used commands
+    - Recent actions
+    - Customizable shortcuts
+    - Visual command builder
+
+2. Crypto Controls
+
+    - Price tickers
+    - Quick trade actions
+    - Portfolio overview
+    - Market alerts
+
+3. AI Services Panel
+
+    - Model selector
+    - Temperature control
+    - Context length
+    - Memory management
+
+4. Social Media Hub
+
+    - Platform toggles
+    - Post composer
+    - Analytics view
+    - Schedule manager
+
+5. Document Center
+    - File browser
+    - Search interface
+    - Recent documents
+    - Share options
+
+### Implementation Phases
+
+1. Phase 1: Core UI Framework
+
+    - Basic Control Center gesture system
+    - Module grid layout
+    - Animation framework
+    - Theme system
+
+2. Phase 2: Essential Modules
+
+    - Quick Actions
+    - Crypto Controls
+    - Basic settings
+
+3. Phase 3: Advanced Features
+
+    - AI Services
+    - Social Media
+    - Document Management
+
+4. Phase 4: Polish
+
+    - Advanced animations
+    - Haptic feedback
+    - Performance optimization
+    - Accessibility features
+
+5. Home Screen Layout (client/src/App.tsx)
+   // New component structure:
+
+- ControlCenter/
+  ├── QuickActions/ // Swipeable tile grid
+  ├── LiveActivities/ // Dynamic Island-style alerts
+  ├── FocusModes/ // Mode switcher
+  └── Widgets/ // Customizable grid
+
+2. Quick Actions Panel
+   Maps to our existing capabilities in:
+   packages/plugin-0g/src/index.ts (Crypto)
+   packages/plugin-node/src/index.ts (AI Services)
+   packages/client-direct/src/index.ts (API Endpoints)
+   Tiles Layout:
+
+    ────────┬─────────┬─────────┐
+    │ Trading │ AI │ Social │
+    ├─────────┼─────────┼─────────┤
+    │ Docs │ Memory │ Voice │
+    └─────────┴─────────┴───────
+
+Deep Press Actions:
+Trading Tile:
+Quick buy/sell
+Price alerts
+Portfolio view
+Maps to functions in docs/docs/advanced/autonomous-trading.md
+AI Tile:
+Model selector
+Temperature control
+Context length
+Maps to settings in docs/docs/advanced/fine-tuning.md
+Social Tile:
+Quick post
+Schedule post
+Monitor mentions
+Maps to existing social integrations
+
+3. Live Activities Integration
+   Using existing endpoints from packages/client-direct/src/api.ts:
+
+// New Dynamic Island-style notifications
+interface LiveActivity {
+type: 'trade' | 'social' | 'analysis';
+status: 'active' | 'completed' | 'error';
+details: {
+progress?: number;
+result?: any;
+error?: string;
+};
+}
+
+5. Focus Modes Configuration
+   Maps to our trust engine (docs/docs/advanced/trust-engine.md):
+   Trading Focus:
+   Activates real-time price monitoring
+   Shows trading-specific widgets
+   Enables TEE for secure transactions
+   Higher risk assessment sensitivity
+   Content Focus:
+   Prioritizes social media monitoring
+   Shows engagement metrics
+   Enables media generation tools
+   Content calendar view
+   Research Focus:
+   Maximizes RAG system usage
+   Shows document analysis tools
+   Knowledge base visualization
+   Citation tracking
+
+1. Widget System
+   New components needed in client/src/components/widgets/:
+
+interface TradingWidget {
+type: 'chart' | 'portfolio' | 'alerts';
+timeframe: '1h' | '24h' | '7d';
+tokens: string[];
+refreshRate: number;
+}
+
+interface MemoryWidget {
+type: 'recent' | 'category' | 'search';
+visualization: 'grid' | 'timeline' | 'network';
+filter?: {
+dateRange?: DateRange;
+categories?: string[];
+};
+}
+┌─────────────────────────────┐
+│ Focus Mode Selector │
+├─────────────────────────────┤
+│ Live Activities Banner │
+├───────────┬───────┬────────┤
+│ Trading │ Docs │ Social │
+│ Widget │Widget │ Widget │
+├───────────┴───────┴────────┤
+│ Quick Actions Panel │
+├─────────────────────────────┤
+│ Active Agents Status │
+└─────────────────────────────┘

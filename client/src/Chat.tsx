@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import ControlCenter from "@/components/ControlCenter";
 import "./App.css";
 
 type TextResponse = {
@@ -20,7 +21,9 @@ export default function Chat() {
     const { agentId } = useParams<{ agentId: string }>();
     const [input, setInput] = useState("");
     const [messages, setMessages] = useState<TextResponse[]>([]);
+    const [isControlCenterOpen, setIsControlCenterOpen] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const touchStartY = useRef<number | null>(null);
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -29,6 +32,27 @@ export default function Chat() {
     useEffect(() => {
         scrollToBottom();
     }, [messages]);
+
+    const handleTouchStart = (e: React.TouchEvent) => {
+        touchStartY.current = e.touches[0].clientY;
+    };
+
+    const handleTouchMove = (e: React.TouchEvent) => {
+        if (!touchStartY.current) return;
+
+        const touchY = e.touches[0].clientY;
+        const deltaY = touchStartY.current - touchY;
+
+        // If user swipes up more than 50px from bottom of screen
+        if (deltaY > 50 && touchY < window.innerHeight - 100) {
+            setIsControlCenterOpen(true);
+            touchStartY.current = null;
+        }
+    };
+
+    const handleTouchEnd = () => {
+        touchStartY.current = null;
+    };
 
     const mutation = useMutation<TextResponse[], Error, string>({
         mutationFn: async (text: string) => {
@@ -74,7 +98,12 @@ export default function Chat() {
     };
 
     return (
-        <div className="flex flex-col h-[100dvh] w-full bg-[#F5F5F5]">
+        <div
+            className="flex flex-col h-[100dvh] w-full bg-[#F5F5F5]"
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+        >
             {/* Messages Container */}
             <div className="flex-1 min-h-0 overflow-y-auto p-2 sm:p-4">
                 <div className="max-w-3xl mx-auto space-y-2">
@@ -119,7 +148,9 @@ export default function Chat() {
                         <div className="flex-1 min-h-[44px]">
                             <Input
                                 value={input}
-                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setInput(e.target.value)}
+                                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                                    setInput(e.target.value)
+                                }
                                 placeholder="iMessage"
                                 className="flex-1 text-base rounded-full px-4 py-2 min-h-[44px] bg-[#E9E9EB]"
                                 disabled={mutation.isPending}
@@ -142,6 +173,12 @@ export default function Chat() {
                     </form>
                 </div>
             </div>
+
+            {/* Control Center */}
+            <ControlCenter
+                isOpen={isControlCenterOpen}
+                onClose={() => setIsControlCenterOpen(false)}
+            />
         </div>
     );
 }
