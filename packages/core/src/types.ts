@@ -605,9 +605,9 @@ export type Plugin = {
  */
 export enum Clients {
     DISCORD = "discord",
-// you can't specify this in characters
-// all characters are registered with this
-//    DIRECT = "direct",
+    // you can't specify this in characters
+    // all characters are registered with this
+    //    DIRECT = "direct",
     TWITTER = "twitter",
     TELEGRAM = "telegram",
     FARCASTER = "farcaster",
@@ -1125,6 +1125,7 @@ export interface IBrowserService extends Service {
         url: string,
         runtime: IAgentRuntime
     ): Promise<{ title: string; description: string; bodyContent: string }>;
+    setStatusEmitter(emitter: (status: string) => void): void;
 }
 
 export interface ISpeechService extends Service {
@@ -1138,12 +1139,16 @@ export interface IPdfService extends Service {
 }
 
 export interface IAwsS3Service extends Service {
-    uploadFile(imagePath: string, useSignedUrl: boolean, expiresIn: number ): Promise<{
+    uploadFile(
+        imagePath: string,
+        useSignedUrl: boolean,
+        expiresIn: number
+    ): Promise<{
         success: boolean;
         url?: string;
         error?: string;
     }>;
-    generateSignedUrl(fileName: string, expiresIn: number): Promise<string>
+    generateSignedUrl(fileName: string, expiresIn: number): Promise<string>;
 }
 
 export type SearchResult = {

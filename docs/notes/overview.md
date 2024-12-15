@@ -1,8 +1,8 @@
 # Eliza Plugin System Overview
 
-_pnpm start --character="characters/celine.character.json"_
+pnpm start --character="characters/celine.character.json"
 
-_cd client && pnpm dev_
+cd client && pnpm dev
 
 ## Directory Structure
 

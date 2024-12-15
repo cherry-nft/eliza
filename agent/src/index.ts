@@ -14,10 +14,12 @@ import {
 } from "@ai16z/eliza";
 import { bootstrapPlugin } from "@ai16z/plugin-bootstrap";
 import { createNodePlugin } from "@ai16z/plugin-node";
+import { webPlugin } from "@ai16z/plugin-web";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import yargs from "yargs";
+import routes from "./routes";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -162,6 +164,9 @@ async function main() {
         // Create DirectClient
         const client = new DirectClient();
 
+        // Add routes
+        client.app.use("/api", routes);
+
         // Start the server first
         const port = process.env.PORT || 3000;
         client.app.listen(port, () => {
@@ -182,7 +187,7 @@ async function main() {
 
             const runtime = new AgentRuntime({
                 character,
-                plugins: [bootstrapPlugin, createNodePlugin()],
+                plugins: [bootstrapPlugin, createNodePlugin(), webPlugin],
                 databaseAdapter: dbAdapter,
                 cacheManager,
                 token: token || "",

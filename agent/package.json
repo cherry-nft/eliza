@@ -25,6 +25,7 @@
         "@ai16z/plugin-bootstrap": "workspace:*",
         "@ai16z/plugin-goat": "workspace:*",
         "@ai16z/plugin-node": "workspace:*",
+        "@ai16z/plugin-web": "workspace:*",
         "better-sqlite3": "11.6.0",
         "dotenv": "16.4.5",
         "yargs": "17.7.2"

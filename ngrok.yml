@@ -6,10 +6,10 @@ agent:
 
 endpoints:
     - name: client
-      url: https://slop.wtf
+      url: slop.wtf/
       upstream:
           url: 5173
     - name: api
-      url: https://api.slop.wtf
+      url: slop.wtf/api
       upstream:
           url: 3000

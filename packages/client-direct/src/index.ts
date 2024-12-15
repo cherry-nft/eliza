@@ -13,9 +13,10 @@ import {
     ModelClass,
     Client,
     IAgentRuntime,
+    ServiceType,
+    IBrowserService,
 } from "@ai16z/eliza";
 import { stringToUuid } from "@ai16z/eliza";
-import { settings } from "@ai16z/eliza";
 import { createApiRouter } from "./api.ts";
 import * as fs from "fs";
 import * as path from "path";
@@ -84,6 +85,7 @@ export class DirectClient implements Client {
     private agents: Map<string, AgentRuntime>;
     private server: any;
     private currentRuntime: IAgentRuntime | null = null;
+    private statusConnections: Map<string, express.Response[]>;
 
     constructor() {
         elizaLogger.log("DirectClient constructor");
@@ -91,6 +93,7 @@ export class DirectClient implements Client {
         this.app.use(cors());
         this.agents = new Map();
         this.currentRuntime = null;
+        this.statusConnections = new Map();
 
         this.app.use(bodyParser.json());
         this.app.use(bodyParser.urlencoded({ extended: true }));
@@ -393,6 +396,54 @@ export class DirectClient implements Client {
                 }
             }
         );
+
+        // Add status endpoint
+        this.app.get("/api/:agentId/status", (req, res) => {
+            const agentId = req.params.agentId;
+            const headers = {
+                "Content-Type": "text/event-stream",
+                Connection: "keep-alive",
+                "Cache-Control": "no-cache",
+            };
+            res.writeHead(200, headers);
+
+            // Add this connection to our map
+            if (!this.statusConnections.has(agentId)) {
+                this.statusConnections.set(agentId, []);
+            }
+            this.statusConnections.get(agentId)?.push(res);
+
+            // Send initial status
+            const data = `data: ${JSON.stringify({ text: "Connected..." })}\n\n`;
+            res.write(data);
+
+            // Keep connection alive
+            const keepAlive = setInterval(() => {
+                res.write(": keepalive\n\n");
+            }, 20000);
+
+            // Clean up on close
+            req.on("close", () => {
+                clearInterval(keepAlive);
+                const connections = this.statusConnections.get(agentId) || [];
+                this.statusConnections.set(
+                    agentId,
+                    connections.filter((conn) => conn !== res)
+                );
+            });
+        });
+    }
+
+    private emitStatus(agentId: string, status: string) {
+        const connections = this.statusConnections.get(agentId) || [];
+        const data = `data: ${JSON.stringify({ text: status })}\n\n`;
+        connections.forEach((res) => {
+            try {
+                res.write(data);
+            } catch (error) {
+                elizaLogger.error("Error sending status update:", error);
+            }
+        });
     }
 
     async registerRuntime(runtime: IAgentRuntime): Promise<void> {
@@ -403,6 +454,16 @@ export class DirectClient implements Client {
             this.agents.set(runtime.agentId, runtime);
             this.agents.set(runtime.character.name.toLowerCase(), runtime);
             this.currentRuntime = runtime;
+
+            // Set up status emitter for browser service
+            const browserService = runtime.getService<IBrowserService>(
+                ServiceType.BROWSER
+            );
+            if (browserService?.setStatusEmitter) {
+                browserService.setStatusEmitter((status: string) => {
+                    this.emitStatus(runtime.agentId, status);
+                });
+            }
         } else {
             throw new Error("Runtime must be an instance of AgentRuntime");
         }
@@ -433,7 +494,7 @@ export class DirectClient implements Client {
         process.on("SIGINT", gracefulShutdown);
     }
 
-    async stop(runtime: IAgentRuntime): Promise<void> {
+    async stop(_runtime: IAgentRuntime): Promise<void> {
         if (this.server) {
             await new Promise<void>((resolve, reject) => {
                 this.server.close((err?: Error) => {

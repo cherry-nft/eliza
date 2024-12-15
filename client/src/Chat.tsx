@@ -11,6 +11,7 @@ import "./App.css";
 type TextResponse = {
     text: string;
     user: string;
+    status?: string;
 };
 
 type MessageRequest = {
@@ -54,6 +55,18 @@ const SeenIndicator = () => (
         <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M4.5 12.75L10.5 18.75L19.5 5.25" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
         </svg>
+    </div>
+);
+
+const StatusIndicator = ({ status }: { status: string }) => (
+    <div className="flex items-center justify-start gap-2 px-4 py-2 text-sm bg-blue-50 dark:bg-gray-800 rounded-lg mx-4 mb-2">
+        <div className="animate-spin w-4 h-4">
+            <svg className="text-blue-500 dark:text-blue-400" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+        </div>
+        <span className="text-blue-700 dark:text-blue-300">{status}</span>
     </div>
 );
 
@@ -111,6 +124,15 @@ export default function Chat() {
                 roomId: `default-room-${agentId}`,
             };
 
+            // Add a temporary status message immediately
+            setMessages((prev) => {
+                const lastMessage = prev[prev.length - 1];
+                if (lastMessage && lastMessage.user !== "user") {
+                    return [...prev.slice(0, -1), { ...lastMessage, status: "Processing your request..." }];
+                }
+                return prev;
+            });
+
             const res = await fetch(`/api/${agentId}/message`, {
                 method: "POST",
                 headers: {
@@ -123,7 +145,36 @@ export default function Chat() {
                 throw new Error(`HTTP error! status: ${res.status}`);
             }
 
-            return res.json();
+            // Create an event source for status updates
+            const eventSource = new EventSource(`/api/${agentId}/status`);
+
+            // Debug logging for SSE events
+            eventSource.onopen = () => {
+                console.log("SSE connection opened");
+            };
+
+            eventSource.onerror = (error) => {
+                console.error("SSE connection error:", error);
+            };
+
+            eventSource.onmessage = (event) => {
+                console.log("SSE status update received:", event.data);
+                const status = JSON.parse(event.data);
+                setMessages((prev) => {
+                    const lastMessage = prev[prev.length - 1];
+                    if (lastMessage && lastMessage.user !== "user") {
+                        console.log("Updating message with status:", status.text);
+                        return [...prev.slice(0, -1), { ...lastMessage, status: status.text }];
+                    }
+                    console.log("No suitable message found to update status");
+                    return prev;
+                });
+            };
+
+            const data = await res.json();
+            eventSource.close();
+            console.log("SSE connection closed, final response:", data);
+            return data;
         },
         onSuccess: (data: TextResponse[]) => {
             setMessages((prev) => [...prev, ...data]);
@@ -167,16 +218,13 @@ export default function Chat() {
                     {messages.length > 0 ? (
                         <>
                             {messages.map((message, index) => (
-                                <div
-                                    key={index}
-                                    className={`flex ${
+                                <div key={index}>
+                                    <div className={`flex ${
                                         message.user === "user"
                                             ? "justify-end"
                                             : "justify-start"
-                                    }`}
-                                >
-                                    <div
-                                        className={`max-w-[85%] sm:max-w-[75%] rounded-2xl px-4 py-2 text-base ${
+                                    }`}>
+                                        <div className={`max-w-[85%] sm:max-w-[75%] rounded-2xl px-4 py-2 text-base ${
                                             message.user === "user"
                                                 ? "bg-[#007AFF] text-white dark:bg-blue-600"
                                                 : "bg-[#E9E9EB] text-black dark:bg-gray-700 dark:text-white"
@@ -184,12 +232,15 @@ export default function Chat() {
                                             message.user === "user"
                                                 ? "rounded-br-sm"
                                                 : "rounded-bl-sm"
-                                        }`}
-                                    >
-                                        <ReactMarkdown className="prose dark:prose-invert max-w-none prose-sm sm:prose-base">
-                                            {message.text}
-                                        </ReactMarkdown>
+                                        }`}>
+                                            <ReactMarkdown className="prose dark:prose-invert max-w-none prose-sm sm:prose-base">
+                                                {message.text}
+                                            </ReactMarkdown>
+                                        </div>
                                     </div>
+                                    {message.status && (
+                                        <StatusIndicator status={message.status} />
+                                    )}
                                 </div>
                             ))}
                             {mutation.isPending && <TypingIndicator />}
