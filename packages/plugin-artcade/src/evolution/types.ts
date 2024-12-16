@@ -9,10 +9,23 @@ export interface HTMLOrganism {
 
 export interface FitnessScores {
     interactivity: number;
-    complexity: number;
+    responsiveness: number;
+    aesthetics: number;
     performance: number;
-    entertainment: number;
     novelty: number;
+    userInput: number;
+    stateManagement: number;
+    feedback: number;
+    progression: number;
+    gameElements: number;
+    socialElements: number;
+    mediaElements: number;
+    nostalgia: number;
+    playerControl: number;
+    collectibles: number;
+    scoring: number;
+    obstacles: number;
+    gameLoop: number;
     total: number;
 }
 

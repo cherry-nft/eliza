@@ -2,7 +2,7 @@ import { Action, IAgentRuntime } from "@ai16z/eliza";
 import { EvolutionEngine } from "../evolution/engine";
 import { mutationOperators } from "../evolution/mutations";
 import { crossoverOperators } from "../evolution/crossover";
-import { ArcadeFitnessEvaluator } from "../evolution/fitness";
+import { InteractiveFitnessEvaluator } from "../evolution/fitness";
 
 interface EvolutionArgs {
     html: string;
@@ -67,7 +67,7 @@ export const EVOLVE: Action<EvolutionArgs, EvolutionResult> = {
         });
 
         // Initialize fitness evaluator
-        const fitnessEvaluator = new ArcadeFitnessEvaluator();
+        const fitnessEvaluator = new InteractiveFitnessEvaluator();
         engine.setFitnessEvaluator(fitnessEvaluator);
 
         // Store original HTML

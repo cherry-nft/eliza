@@ -10,11 +10,12 @@ import {
     FitnessEvaluator,
 } from "./types";
 import { v4 as uuidv4 } from "uuid";
+import { JSDOM } from "jsdom";
 
 const DEFAULT_CONFIG: EvolutionConfig = {
     populationSize: 50,
     maxGenerations: 20,
-    mutationRate: 0.5,
+    mutationRate: 0.8,
     crossoverRate: 0.8,
     elitismCount: 2,
     tournamentSize: 3,
@@ -108,10 +109,11 @@ export class EvolutionEngine {
     ): Promise<HTMLOrganism[]> {
         const population: HTMLOrganism[] = [];
 
-        // Create initial organism
+        // Create initial organism with guaranteed interactive element
+        const baseHtml = await this.addBaseInteractivity(initialHtml);
         population.push({
             id: uuidv4(),
-            html: initialHtml,
+            html: baseHtml,
             generation: 0,
             fitness: this.createEmptyFitnessScores(),
             parentIds: [],
@@ -120,7 +122,7 @@ export class EvolutionEngine {
 
         // Create variations
         for (let i = 1; i < this.config.populationSize; i++) {
-            const mutated = await this.mutate(initialHtml);
+            const mutated = await this.mutate(baseHtml);
             population.push({
                 id: uuidv4(),
                 html: mutated,
@@ -132,6 +134,55 @@ export class EvolutionEngine {
         }
 
         return population;
+    }
+
+    private async addBaseInteractivity(html: string): Promise<string> {
+        const dom = new JSDOM(html);
+        const doc = dom.window.document;
+        const root = doc.querySelector("div");
+        if (!root) return html;
+
+        // Add a progress/score tracking element
+        const tracker = doc.createElement("div");
+        tracker.className = "progress-tracker";
+        tracker.style.position = "fixed";
+        tracker.style.top = "10px";
+        tracker.style.right = "10px";
+        tracker.style.padding = "8px";
+        tracker.style.backgroundColor = "rgba(255, 255, 255, 0.9)";
+        tracker.style.borderRadius = "4px";
+        tracker.style.boxShadow = "0 2px 4px rgba(0,0,0,0.1)";
+        tracker.innerHTML = `
+            <div class="score" style="font-weight: bold;">Score: <span>0</span></div>
+            <div class="progress" style="margin-top: 4px;">Progress: <span>0%</span></div>
+        `;
+
+        // Add interaction to increment score/progress
+        const interactiveElement = doc.createElement("div");
+        interactiveElement.className = "interactive-element";
+        interactiveElement.style.cursor = "pointer";
+        interactiveElement.style.padding = "10px";
+        interactiveElement.style.marginTop = "10px";
+        interactiveElement.style.backgroundColor = "#f0f0f0";
+        interactiveElement.style.borderRadius = "4px";
+        interactiveElement.style.transition = "transform 0.2s";
+        interactiveElement.setAttribute(
+            "onclick",
+            `
+            const score = parseInt(document.querySelector('.score span').textContent);
+            document.querySelector('.score span').textContent = score + 1;
+            const progress = Math.min(100, Math.floor((score + 1) / 10 * 100));
+            document.querySelector('.progress span').textContent = progress + '%';
+            this.style.transform = 'scale(1.05)';
+            setTimeout(() => this.style.transform = 'scale(1)', 200);
+        `
+        );
+        interactiveElement.textContent = "Click to Progress";
+
+        root.insertBefore(tracker, root.firstChild);
+        root.appendChild(interactiveElement);
+
+        return root.outerHTML;
     }
 
     private async evaluatePopulation(

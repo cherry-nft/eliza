@@ -176,6 +176,56 @@ describe("Artcade Plugin Integration", () => {
             expect(lastScore).toBeGreaterThan(firstScore);
         });
         */
+
+        it("should evaluate game-specific fitness metrics", async () => {
+            const evolveAction = artcadePlugin.actions.find(
+                (action) => action.name === "EVOLVE"
+            )!;
+
+            const result = await evolveAction.handler(runtime, {
+                html: TEST_HTML,
+                generations: 2,
+                populationSize: 4,
+            });
+
+            // Get evolution results from memory
+            const memories = await runtime
+                .getMemoryManager()
+                .searchMemories({ filter: { tableName: "evolution_result" } });
+
+            const lastMemory = memories[memories.length - 1];
+            const fitness = lastMemory.content.fitness;
+
+            // Verify all game-specific metrics are present
+            expect(fitness.playerControl).toBeDefined();
+            expect(fitness.collectibles).toBeDefined();
+            expect(fitness.scoring).toBeDefined();
+            expect(fitness.obstacles).toBeDefined();
+            expect(fitness.gameLoop).toBeDefined();
+
+            // Verify metrics are within valid range
+            expect(fitness.playerControl).toBeGreaterThanOrEqual(0);
+            expect(fitness.playerControl).toBeLessThanOrEqual(1);
+            expect(fitness.collectibles).toBeGreaterThanOrEqual(0);
+            expect(fitness.collectibles).toBeLessThanOrEqual(1);
+            expect(fitness.scoring).toBeGreaterThanOrEqual(0);
+            expect(fitness.scoring).toBeLessThanOrEqual(1);
+            expect(fitness.obstacles).toBeGreaterThanOrEqual(0);
+            expect(fitness.obstacles).toBeLessThanOrEqual(1);
+            expect(fitness.gameLoop).toBeGreaterThanOrEqual(0);
+            expect(fitness.gameLoop).toBeLessThanOrEqual(1);
+
+            // Verify at least some game elements are present
+            const evolved = result.html;
+            expect(evolved).toMatch(
+                /(game-score|score|points|tokens|rewards|interactive|onclick|onmouseover|draggable|collectible|progress|achievement|level|rank|badge)/
+            );
+
+            // Verify there's some form of state or progress tracking
+            expect(evolved).toMatch(
+                /(Score:|Points:|Progress:|Level:|Tokens:|Balance:|Collected:|Achieved:)/i
+            );
+        });
     });
 
     /* Keep pattern analysis test commented for now

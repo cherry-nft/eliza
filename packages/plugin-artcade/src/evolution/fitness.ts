@@ -1,218 +1,218 @@
-import { FitnessEvaluator, FitnessScores, HTMLOrganism } from "./types";
+import { FitnessEvaluator, HTMLOrganism, FitnessScores } from "./types";
 import { JSDOM } from "jsdom";
 
-function createDOM(html: string): JSDOM {
-    return new JSDOM(`<!DOCTYPE html><div id="root">${html}</div>`);
-}
-
-function getAllElements(dom: JSDOM): HTMLElement[] {
-    return Array.from(
-        dom.window.document.querySelectorAll("*")
-    ) as HTMLElement[];
-}
-
-export class ArcadeFitnessEvaluator implements FitnessEvaluator {
+export class InteractiveFitnessEvaluator implements FitnessEvaluator {
     async evaluate(organism: HTMLOrganism): Promise<FitnessScores> {
-        const dom = createDOM(organism.html);
-        const elements = getAllElements(dom);
+        const dom = new JSDOM(organism.html);
+        const doc = dom.window.document;
 
-        const interactivity = this.evaluateInteractivity(elements);
-        const complexity = this.evaluateComplexity(elements);
-        const performance = this.evaluatePerformance(elements);
-        const entertainment = this.evaluateEntertainment(elements);
-        const novelty = this.evaluateNovelty(elements);
-
-        const total =
-            interactivity * 0.3 +
-            complexity * 0.15 +
-            performance * 0.2 +
-            entertainment * 0.25 +
-            novelty * 0.1;
-
-        return {
-            interactivity,
-            complexity,
-            performance,
-            entertainment,
-            novelty,
-            total,
+        const scores: FitnessScores = {
+            interactivity: this.evaluateInteractivity(doc),
+            responsiveness: this.evaluateResponsiveness(doc),
+            aesthetics: this.evaluateAesthetics(doc),
+            performance: this.evaluatePerformance(doc),
+            novelty: this.evaluateNovelty(organism),
+            userInput: this.evaluateUserInput(doc),
+            stateManagement: this.evaluateStateManagement(doc),
+            feedback: this.evaluateFeedback(doc),
+            progression: this.evaluateProgression(doc),
+            gameElements: this.evaluateGameElements(doc),
+            socialElements: this.evaluateSocialElements(doc),
+            mediaElements: this.evaluateMediaElements(doc),
+            nostalgia: this.evaluateNostalgia(doc),
+            playerControl: this.evaluatePlayerControl(doc),
+            collectibles: this.evaluateCollectibles(doc),
+            scoring: this.evaluateScoring(doc),
+            obstacles: this.evaluateObstacles(doc),
+            gameLoop: this.evaluateGameLoop(doc),
+            total: 0,
         };
+
+        // Calculate weighted total
+        scores.total = this.calculateWeightedTotal(scores);
+        return scores;
     }
 
-    private evaluateInteractivity(elements: HTMLElement[]): number {
-        let score = 0;
-        const totalElements = elements.length;
+    private evaluateInteractivity(doc: Document): number {
+        const interactiveElements = doc.querySelectorAll(
+            "[onclick], [onmouseover], [ondrag], [draggable], [contenteditable], button, input, select, textarea"
+        );
+        return Math.min(1, interactiveElements.length / 5);
+    }
 
-        if (totalElements === 0) return 0;
+    private evaluateResponsiveness(doc: Document): number {
+        const responsiveElements = doc.querySelectorAll(
+            '[style*="transition"], [style*="animation"], [style*="transform"]'
+        );
+        return Math.min(1, responsiveElements.length / 3);
+    }
 
-        // Check for interactive attributes
-        const interactiveAttributes = [
-            "onclick",
-            "onmouseover",
-            "onmouseout",
-            "ondragstart",
-            "ondragend",
-            "draggable",
+    private evaluateAesthetics(doc: Document): number {
+        const styleElements = doc.querySelectorAll(
+            '[style*="color"], [style*="background"], [style*="border"], [style*="shadow"], [style*="gradient"]'
+        );
+        return Math.min(1, styleElements.length / 8);
+    }
+
+    private evaluatePerformance(doc: Document): number {
+        // Simple heuristic based on DOM complexity
+        const totalElements = doc.getElementsByTagName("*").length;
+        return Math.max(0, 1 - totalElements / 1000);
+    }
+
+    private evaluateNovelty(organism: HTMLOrganism): number {
+        // Based on unique patterns applied
+        return Math.min(1, organism.appliedPatterns.length / 5);
+    }
+
+    private evaluateUserInput(doc: Document): number {
+        const inputTypes = new Set();
+        doc.querySelectorAll("*").forEach((el) => {
+            if (el.hasAttribute("onclick")) inputTypes.add("click");
+            if (el.hasAttribute("ondrag")) inputTypes.add("drag");
+            if (el.hasAttribute("onkeydown")) inputTypes.add("keyboard");
+            if (el.hasAttribute("onmousemove")) inputTypes.add("mouse");
+        });
+        return Math.min(1, inputTypes.size / 4);
+    }
+
+    private evaluateStateManagement(doc: Document): number {
+        const stateElements = doc.querySelectorAll(
+            "[data-state], [data-score], [data-progress], .score, .progress, .state"
+        );
+        return Math.min(1, stateElements.length / 3);
+    }
+
+    private evaluateFeedback(doc: Document): number {
+        const feedbackElements = doc.querySelectorAll(
+            '[style*="transition"], [style*="animation"], .feedback, .alert, .notification'
+        );
+        return Math.min(1, feedbackElements.length / 4);
+    }
+
+    private evaluateProgression(doc: Document): number {
+        const progressElements = doc.querySelectorAll(
+            ".progress, .level, .score, .achievement, [data-progress], progress"
+        );
+        return Math.min(1, progressElements.length / 2);
+    }
+
+    private evaluateGameElements(doc: Document): number {
+        const gameElements = doc.querySelectorAll(
+            ".game, .player, .enemy, .collectible, .obstacle, .score, [data-game]"
+        );
+        return Math.min(1, gameElements.length / 5);
+    }
+
+    private evaluateSocialElements(doc: Document): number {
+        const socialElements = doc.querySelectorAll(
+            ".profile, .comment, .like, .share, .feed, .post, [data-social]"
+        );
+        return Math.min(1, socialElements.length / 4);
+    }
+
+    private evaluateMediaElements(doc: Document): number {
+        const mediaElements = doc.querySelectorAll(
+            'audio, video, canvas, [style*="3d"], [style*="transform-style: preserve-3d"]'
+        );
+        return Math.min(1, mediaElements.length / 2);
+    }
+
+    private evaluateNostalgia(doc: Document): number {
+        const nostalgicElements = doc.querySelectorAll(
+            ".window, .desktop, .icon, .taskbar, .start-menu, [data-retro], [data-classic]"
+        );
+        return Math.min(1, nostalgicElements.length / 4);
+    }
+
+    private evaluatePlayerControl(doc: Document): number {
+        const playerElements = doc.querySelectorAll(
+            '.game-player, [data-player], [data-control], [onkeydown], [onkeyup], [onkeypress], [style*="position: absolute"]'
+        );
+        const hasMovement = Array.from(playerElements).some(
+            (el) =>
+                el.hasAttribute("onkeydown") ||
+                el.hasAttribute("onkeyup") ||
+                el.hasAttribute("onkeypress") ||
+                el.getAttribute("style")?.includes("position: absolute")
+        );
+        return Math.min(1, (playerElements.length + (hasMovement ? 1 : 0)) / 3);
+    }
+
+    private evaluateCollectibles(doc: Document): number {
+        const collectibleElements = doc.querySelectorAll(
+            ".collectible, .coin, .token, .power-up, .item, [data-collectible], [data-item]"
+        );
+        return Math.min(1, collectibleElements.length / 4);
+    }
+
+    private evaluateScoring(doc: Document): number {
+        const scoreElements = doc.querySelectorAll(
+            ".score, .points, [data-score], [data-points], .high-score, .game-score"
+        );
+        const hasScoreUpdate = Array.from(scoreElements).some(
+            (el) =>
+                el.hasAttribute("onclick") ||
+                el.parentElement?.hasAttribute("onclick")
+        );
+        return Math.min(
+            1,
+            (scoreElements.length + (hasScoreUpdate ? 1 : 0)) / 3
+        );
+    }
+
+    private evaluateObstacles(doc: Document): number {
+        const obstacleElements = doc.querySelectorAll(
+            ".obstacle, .enemy, .hazard, .barrier, [data-obstacle], [data-enemy]"
+        );
+        return Math.min(1, obstacleElements.length / 3);
+    }
+
+    private evaluateGameLoop(doc: Document): number {
+        const gameLoopIndicators = [
+            doc.querySelector('[style*="animation"]') !== null,
+            doc.querySelector('[style*="transition"]') !== null,
+            doc.querySelector(".game-player") !== null,
+            doc.querySelector(".game-score") !== null,
+            doc.querySelector('[onclick*="score"]') !== null,
         ];
-
-        elements.forEach((element) => {
-            // Score interactive attributes
-            interactiveAttributes.forEach((attr) => {
-                if (element.hasAttribute(attr)) score += 1;
-            });
-
-            // Score interactive classes
-            const classes = element.classList;
-            ["interactive", "hoverable", "draggable", "clickable"].forEach(
-                (cls) => {
-                    if (classes.contains(cls)) score += 0.5;
-                }
-            );
-
-            // Score game-related elements
-            if (element.classList.contains("game-score")) score += 2;
-            if (element.classList.contains("game-player")) score += 2;
-            if (element.classList.contains("game-collectible")) score += 1;
-        });
-
-        return Math.min(score / (totalElements * 2), 1);
+        return (
+            gameLoopIndicators.filter(Boolean).length /
+            gameLoopIndicators.length
+        );
     }
 
-    private evaluateComplexity(elements: HTMLElement[]): number {
-        let score = 0;
-        const totalElements = elements.length;
+    private calculateWeightedTotal(scores: FitnessScores): number {
+        const weights = {
+            interactivity: 1.5,
+            responsiveness: 1.2,
+            aesthetics: 1.0,
+            performance: 1.0,
+            novelty: 0.8,
+            userInput: 1.2,
+            stateManagement: 1.0,
+            feedback: 1.0,
+            progression: 1.0,
+            gameElements: 1.2,
+            socialElements: 0.8,
+            mediaElements: 0.8,
+            nostalgia: 0.8,
+            playerControl: 1.5,
+            collectibles: 1.2,
+            scoring: 1.3,
+            obstacles: 1.1,
+            gameLoop: 1.4,
+        };
 
-        if (totalElements === 0) return 0;
+        let total = 0;
+        let weightSum = 0;
 
-        elements.forEach((element) => {
-            // Score element depth
-            let depth = 0;
-            let parent = element.parentElement;
-            while (parent) {
-                depth++;
-                parent = parent.parentElement;
-            }
-            score += Math.min(depth * 0.1, 0.5);
+        for (const [key, weight] of Object.entries(weights)) {
+            total += scores[key as keyof FitnessScores] * weight;
+            weightSum += weight;
+        }
 
-            // Score style complexity
-            const style = element.getAttribute("style");
-            if (style) {
-                score += style.split(";").length * 0.1;
-            }
-
-            // Score class complexity
-            score += element.classList.length * 0.1;
-
-            // Score child complexity
-            score += element.children.length * 0.1;
-        });
-
-        return Math.min(score / (totalElements * 2), 1);
-    }
-
-    private evaluatePerformance(elements: HTMLElement[]): number {
-        let score = 1;
-        const totalElements = elements.length;
-
-        if (totalElements === 0) return 0;
-
-        elements.forEach((element) => {
-            // Penalize excessive nesting
-            let depth = 0;
-            let parent = element.parentElement;
-            while (parent) {
-                depth++;
-                parent = parent.parentElement;
-            }
-            if (depth > 5) score -= 0.1;
-
-            // Penalize excessive styles
-            const style = element.getAttribute("style");
-            if (style && style.split(";").length > 10) {
-                score -= 0.1;
-            }
-
-            // Penalize excessive classes
-            if (element.classList.length > 5) {
-                score -= 0.1;
-            }
-
-            // Penalize expensive animations
-            const animation = style?.match(/animation|transform/g);
-            if (animation && animation.length > 2) {
-                score -= 0.1;
-            }
-        });
-
-        return Math.max(score, 0);
-    }
-
-    private evaluateEntertainment(elements: HTMLElement[]): number {
-        let score = 0;
-        const totalElements = elements.length;
-
-        if (totalElements === 0) return 0;
-
-        elements.forEach((element) => {
-            // Score animations
-            const style = element.getAttribute("style") || "";
-            if (style.includes("animation")) score += 1;
-            if (style.includes("transform")) score += 0.5;
-
-            // Score game elements
-            if (element.classList.contains("game-score")) score += 2;
-            if (element.classList.contains("game-player")) score += 2;
-            if (element.classList.contains("game-collectible")) score += 1;
-
-            // Score interactive elements
-            if (element.hasAttribute("onclick")) score += 0.5;
-            if (element.hasAttribute("draggable")) score += 1;
-
-            // Score visual effects
-            if (style.includes("transition")) score += 0.5;
-            if (style.includes("box-shadow")) score += 0.3;
-            if (style.includes("border-radius")) score += 0.2;
-        });
-
-        return Math.min(score / (totalElements * 3), 1);
-    }
-
-    private evaluateNovelty(elements: HTMLElement[]): number {
-        let score = 0;
-        const totalElements = elements.length;
-
-        if (totalElements === 0) return 0;
-
-        // Count unique patterns
-        const patterns = new Set<string>();
-
-        elements.forEach((element) => {
-            // Record style patterns
-            const style = element.getAttribute("style");
-            if (style) {
-                style.split(";").forEach((rule) => {
-                    patterns.add(rule.trim());
-                });
-            }
-
-            // Record class patterns
-            element.classList.forEach((cls) => {
-                patterns.add(cls);
-            });
-
-            // Record interaction patterns
-            const interactions = element
-                .getAttributeNames()
-                .filter((attr) => attr.startsWith("on"))
-                .map((attr) => element.getAttribute(attr));
-            interactions.forEach((interaction) => {
-                if (interaction) patterns.add(interaction);
-            });
-        });
-
-        // Score based on unique patterns
-        score = patterns.size / (totalElements * 2);
-
-        return Math.min(score, 1);
+        // Normalize to 0-1 range
+        return total / weightSum;
     }
 }
