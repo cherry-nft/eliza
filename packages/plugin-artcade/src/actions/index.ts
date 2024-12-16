@@ -42,15 +42,26 @@ export const EVOLVE: Action<EvolutionArgs, EvolutionResult> = {
         runtime: IAgentRuntime,
         args: EvolutionArgs
     ): Promise<EvolutionResult> => {
-        // Initialize evolution engine
-        const engine = new EvolutionEngine(runtime);
+        // Initialize evolution engine with configuration
+        const engine = new EvolutionEngine(runtime, {
+            maxGenerations: args.generations || 20,
+            populationSize: args.populationSize || 50,
+        });
 
         // Register mutation operators
+        console.log(
+            "Available mutation operators:",
+            mutationOperators.map((op) => op.name)
+        );
         mutationOperators.forEach((operator) => {
             engine.registerMutationOperator(operator);
         });
 
         // Register crossover operators
+        console.log(
+            "Available crossover operators:",
+            crossoverOperators.map((op) => op.name)
+        );
         crossoverOperators.forEach((operator) => {
             engine.registerCrossoverOperator(operator);
         });
@@ -58,12 +69,6 @@ export const EVOLVE: Action<EvolutionArgs, EvolutionResult> = {
         // Initialize fitness evaluator
         const fitnessEvaluator = new ArcadeFitnessEvaluator();
         engine.setFitnessEvaluator(fitnessEvaluator);
-
-        // Configure evolution parameters
-        const config = {
-            maxGenerations: args.generations || 20,
-            populationSize: args.populationSize || 50,
-        };
 
         // Store original HTML
         const memoryManager = runtime.getMemoryManager();
@@ -74,6 +79,9 @@ export const EVOLVE: Action<EvolutionArgs, EvolutionResult> = {
 
         // Run evolution
         const result = await engine.evolve(args.html);
+
+        // Log evolved HTML for debugging
+        console.log("Evolved HTML:", result.organism.html);
 
         // Store result
         await memoryManager.createMemory({

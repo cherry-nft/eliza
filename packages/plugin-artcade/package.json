@@ -19,7 +19,7 @@
     },
     "scripts": {
         "build": "tsup src/index.ts --format esm,cjs --dts",
-        "test": "vitest run --environment jsdom",
+        "test": "node --max-old-space-size=4096 node_modules/vitest/vitest.mjs run --environment jsdom",
         "dev": "tsup src/index.ts --format esm,cjs --watch"
     }
 }

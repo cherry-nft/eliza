@@ -14,7 +14,7 @@ import { v4 as uuidv4 } from "uuid";
 const DEFAULT_CONFIG: EvolutionConfig = {
     populationSize: 50,
     maxGenerations: 20,
-    mutationRate: 0.2,
+    mutationRate: 0.5,
     crossoverRate: 0.8,
     elitismCount: 2,
     tournamentSize: 3,
@@ -211,11 +211,33 @@ export class EvolutionEngine {
 
     private async mutate(html: string): Promise<string> {
         if (this.mutationOperators.length === 0) {
+            console.log("No mutation operators registered!");
             return html;
         }
 
+        console.log(
+            "Starting mutation process with operators:",
+            this.mutationOperators.map((op) => op.name)
+        );
+
+        // Apply at least one mutation
         const operator = this.selectRandomOperator(this.mutationOperators);
-        return await operator.apply(html);
+        console.log("Applying first mutation:", operator.name);
+        let mutatedHtml = await operator.apply(html);
+
+        // Randomly apply additional mutations
+        let mutationCount = 1;
+        while (Math.random() < this.config.mutationRate) {
+            const nextOperator = this.selectRandomOperator(
+                this.mutationOperators
+            );
+            console.log("Applying additional mutation:", nextOperator.name);
+            mutatedHtml = await nextOperator.apply(mutatedHtml);
+            mutationCount++;
+        }
+
+        console.log(`Applied ${mutationCount} mutations`);
+        return mutatedHtml;
     }
 
     private async crossover(
@@ -307,7 +329,8 @@ export class EvolutionEngine {
         population: HTMLOrganism[],
         generation: number
     ): Promise<void> {
-        await this.runtime.memoryManager.createMemory({
+        const memoryManager = this.runtime.getMemoryManager();
+        await memoryManager.createMemory({
             type: "evolution_generation",
             content: {
                 generation,
