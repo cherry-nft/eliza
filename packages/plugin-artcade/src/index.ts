@@ -1,5 +1,7 @@
-import { Plugin } from "@ai16z/eliza";
+import { Plugin, IAgentRuntime } from "@ai16z/eliza";
 import { EVOLVE, ANALYZE_PATTERN } from "./actions";
+
+export * from "./evolution/types";
 
 export const artcadePlugin: Plugin = {
     name: "artcade",
