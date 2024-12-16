@@ -14,6 +14,10 @@ export const artcadePlugin: Plugin = {
 };
 
 export class ArtcadePlugin implements Plugin {
+    name = "artcade";
+    description =
+        "A plugin for evolving HTML into interactive game-like experiences";
+
     private initializeEngine(runtime: IAgentRuntime): EvolutionEngine {
         const engine = new EvolutionEngine(runtime);
 
