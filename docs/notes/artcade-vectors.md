@@ -560,3 +560,275 @@ export class PatternOptimizer extends Service {
     }
 }
 ```
+
+## Pattern Approval System
+
+### 1. Staging Area Implementation
+
+```typescript
+// packages/plugin-artcade/src/services/PatternStaging.ts
+import { Service } from "@ai16z/eliza/plugin-node";
+
+interface StagedPattern extends GamePattern {
+    staged_at: Date;
+    evolution_source: string; // Which evolution run produced this
+    location: {
+        file: string;
+        start_line: number;
+        end_line: number;
+    };
+    pending_approval: boolean;
+}
+
+export class PatternStagingService extends Service {
+    private stagedPatterns: Map<string, StagedPattern> = new Map();
+
+    async stagePattern(
+        pattern: Partial<GamePattern>,
+        source: string,
+        location: { file: string; start_line: number; end_line: number },
+    ): Promise<string> {
+        const stagingId = crypto.randomUUID();
+
+        this.stagedPatterns.set(stagingId, {
+            ...pattern,
+            staged_at: new Date(),
+            evolution_source: source,
+            location,
+            pending_approval: true,
+        } as StagedPattern);
+
+        return stagingId;
+    }
+
+    async approvePattern(
+        stagingId: string,
+        approvalMetadata: {
+            reason: string;
+            quality_notes?: string;
+            inspiration_source?: string;
+        },
+    ): Promise<void> {
+        const pattern = this.stagedPatterns.get(stagingId);
+        if (!pattern) {
+            throw new Error(`Pattern ${stagingId} not found in staging`);
+        }
+
+        // Add approval metadata
+        const approvedPattern = {
+            ...pattern,
+            content: {
+                ...pattern.content,
+                metadata: {
+                    ...pattern.content.metadata,
+                    approval: {
+                        approved_at: new Date(),
+                        ...approvalMetadata,
+                    },
+                },
+            },
+            pending_approval: false,
+        };
+
+        // Store in vector database
+        await this.runtime
+            .getService("PatternService")
+            .storeApprovedPattern(approvedPattern);
+
+        // Remove from staging
+        this.stagedPatterns.delete(stagingId);
+    }
+
+    async rejectPattern(stagingId: string): Promise<void> {
+        this.stagedPatterns.delete(stagingId);
+    }
+
+    async listStagedPatterns(): Promise<
+        Array<{ id: string; pattern: StagedPattern }>
+    > {
+        return Array.from(this.stagedPatterns.entries()).map(
+            ([id, pattern]) => ({ id, pattern }),
+        );
+    }
+}
+```
+
+### 2. Evolution Result Tracking
+
+```typescript
+// packages/plugin-artcade/src/evolution/EvolutionTracker.ts
+export class EvolutionTracker extends Service {
+    private currentRun: {
+        id: string;
+        startTime: Date;
+        sourceFile: string;
+        patterns: Array<{
+            stagingId: string;
+            location: {
+                start_line: number;
+                end_line: number;
+            };
+            type: string;
+        }>;
+    } | null = null;
+
+    startEvolutionRun(sourceFile: string): string {
+        const runId = crypto.randomUUID();
+        this.currentRun = {
+            id: runId,
+            startTime: new Date(),
+            sourceFile,
+            patterns: [],
+        };
+        return runId;
+    }
+
+    async trackPattern(
+        runId: string,
+        pattern: Partial<GamePattern>,
+        location: { start_line: number; end_line: number },
+    ): Promise<string> {
+        if (!this.currentRun || this.currentRun.id !== runId) {
+            throw new Error("No active evolution run");
+        }
+
+        const stagingService = this.runtime.getService("PatternStagingService");
+        const stagingId = await stagingService.stagePattern(pattern, runId, {
+            file: this.currentRun.sourceFile,
+            ...location,
+        });
+
+        this.currentRun.patterns.push({
+            stagingId,
+            location,
+            type: pattern.type,
+        });
+
+        return stagingId;
+    }
+}
+```
+
+### 3. Modified Pattern Storage
+
+```typescript
+// Update VectorDatabase class
+export class VectorDatabase extends Service {
+    // ... existing code ...
+
+    async storeApprovedPattern(pattern: GamePattern): Promise<void> {
+        const { approval } = pattern.content.metadata;
+
+        await this.db.query(
+            `
+            INSERT INTO game_patterns (
+                type,
+                pattern_name,
+                content,
+                embedding,
+                effectiveness_score,
+                approval_metadata
+            ) VALUES (
+                $1, $2, $3, $4, $5, $6
+            )
+        `,
+            [
+                pattern.type,
+                pattern.pattern_name,
+                pattern.content,
+                pattern.embedding,
+                1.0, // Initial score
+                approval,
+            ],
+        );
+    }
+
+    async getPatternHistory(patternId: string): Promise<{
+        approval: any;
+        usage_history: Array<{
+            used_at: Date;
+            success_rate: number;
+        }>;
+    }> {
+        const result = await this.db.query(
+            `
+            SELECT
+                content->'metadata'->'approval' as approval,
+                usage_history
+            FROM game_patterns
+            WHERE id = $1
+        `,
+            [patternId],
+        );
+
+        return result.rows[0];
+    }
+}
+```
+
+### 4. Usage Example
+
+```typescript
+// In evolution.js
+async function evolveWithApproval() {
+    const tracker = runtime.getService("EvolutionTracker");
+    const runId = tracker.startEvolutionRun("evolved.html");
+
+    const evolved = await evolution.evolve(sourceHtml);
+
+    // Extract potential patterns
+    const patterns = await patternExtractor.extractPatterns(evolved);
+
+    // Stage all patterns for approval
+    for (const pattern of patterns) {
+        const stagingId = await tracker.trackPattern(
+            runId,
+            pattern,
+            pattern.location,
+        );
+
+        console.log(`
+Pattern staged for approval:
+ID: ${stagingId}
+Type: ${pattern.type}
+Location: Lines ${pattern.location.start_line}-${pattern.location.end_line}
+        `);
+    }
+
+    return evolved;
+}
+
+// Later, when you approve a pattern:
+async function approvePattern(stagingId: string, reason: string) {
+    const staging = runtime.getService("PatternStagingService");
+    await staging.approvePattern(stagingId, {
+        reason,
+        approved_at: new Date(),
+    });
+}
+
+// When you reject a pattern:
+async function rejectPattern(stagingId: string) {
+    const staging = runtime.getService("PatternStagingService");
+    await staging.rejectPattern(stagingId);
+}
+```
+
+This approval system ensures:
+
+1. All evolved patterns go to staging first
+2. Each pattern maintains its source location for review
+3. Only explicitly approved patterns enter the vector database
+4. Approval metadata is preserved for quality tracking
+5. Rejected patterns are cleanly removed
+6. Pattern history and usage statistics are tracked
+
+When running evolution tests, the workflow will be:
+
+1. Run evolution
+2. System shows you staged patterns with their locations
+3. You review and explicitly approve/reject each pattern
+4. Approved patterns enter the vector database with your quality notes
+5. Future evolutions can only learn from approved patterns
+
+Would you like me to implement any specific part of this approval system first?
