@@ -1,0 +1,20 @@
+{
+    "name": "@ai16z/plugin-artcade",
+    "version": "0.1.0",
+    "main": "dist/index.js",
+    "types": "dist/index.d.ts",
+    "dependencies": {
+        "@ai16z/eliza": "workspace:*"
+    },
+    "devDependencies": {
+        "typescript": "^5.0.0",
+        "tsup": "^8.0.0",
+        "vitest": "^0.34.0",
+        "@types/node": "^20.0.0"
+    },
+    "scripts": {
+        "build": "tsup src/index.ts --format esm,cjs --dts",
+        "test": "vitest run",
+        "dev": "tsup src/index.ts --format esm,cjs --watch"
+    }
+}
