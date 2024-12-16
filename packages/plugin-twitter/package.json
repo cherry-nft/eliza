@@ -1,0 +1,19 @@
+{
+    "name": "@eliza/plugin-twitter",
+    "version": "0.0.1",
+    "type": "module",
+    "main": "dist/index.js",
+    "types": "dist/index.d.ts",
+    "scripts": {
+        "build": "tsup",
+        "dev": "tsup --watch"
+    },
+    "dependencies": {
+        "@ai16z/eliza": "workspace:*",
+        "@ai16z/client-twitter": "workspace:*"
+    },
+    "devDependencies": {
+        "tsup": "8.0.2",
+        "typescript": "5.6.3"
+    }
+}

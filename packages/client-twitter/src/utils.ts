@@ -32,6 +32,11 @@ export async function buildConversationThread(
     client: ClientBase,
     maxReplies: number = 10
 ): Promise<Tweet[]> {
+    elizaLogger.log(
+        "🧵 [Twitter] Building conversation thread for tweet:",
+        tweet.id
+    );
+
     const thread: Tweet[] = [];
     const visited: Set<string> = new Set();
 

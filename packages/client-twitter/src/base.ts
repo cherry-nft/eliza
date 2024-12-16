@@ -13,9 +13,38 @@ import {
     QueryTweetsResponse,
     Scraper,
     SearchMode,
-    Tweet,
+    Tweet as AgentTweet,
 } from "agent-twitter-client";
 import { EventEmitter } from "events";
+import type { Tweet } from "./types";
+
+function convertToInternalTweet(tweet: AgentTweet): Tweet {
+    return {
+        id: tweet.id || "",
+        text: tweet.text || "",
+        userId: tweet.userId || "",
+        username: tweet.username,
+        name: tweet.name,
+        timestamp: tweet.timestamp || 0,
+        conversationId: tweet.conversationId || "",
+        inReplyToStatusId: tweet.inReplyToStatusId,
+        permanentUrl: tweet.permanentUrl || "",
+        hashtags: tweet.hashtags || [],
+        mentions: tweet.mentions || [],
+        photos: tweet.photos || [],
+        urls: tweet.urls || [],
+        videos: tweet.videos || [],
+        thread: (tweet.thread || []).map(convertToInternalTweet),
+        rest_id: tweet.id,
+        legacy: {
+            full_text: tweet.text || "",
+            created_at: new Date(tweet.timestamp * 1000).toISOString(),
+            user_id_str: tweet.userId || "",
+            conversation_id_str: tweet.conversationId || "",
+            in_reply_to_status_id_str: tweet.inReplyToStatusId || undefined,
+        },
+    };
+}
 
 export function extractAnswer(text: string): string {
     const startIndex = text.indexOf("Answer: ") + 8;
@@ -122,8 +151,9 @@ export class ClientBase extends EventEmitter {
             this.twitterClient.getTweet(tweetId)
         );
 
-        await this.cacheTweet(tweet);
-        return tweet;
+        const internalTweet = convertToInternalTweet(tweet);
+        await this.cacheTweet(internalTweet);
+        return internalTweet;
     }
 
     callback: (self: ClientBase) => any = null;
@@ -153,50 +183,75 @@ export class ClientBase extends EventEmitter {
     }
 
     async init() {
-        //test
+        console.log("🚀 [DEBUG] Starting Twitter client initialization");
+
         const username = this.runtime.getSetting("TWITTER_USERNAME");
+        console.log("🚀 [DEBUG] Twitter username from settings:", username);
 
         if (!username) {
-            throw new Error("Twitter username not configured");
+            console.log("❌ [DEBUG] No Twitter username configured");
+            throw new Error("No Twitter username configured");
         }
+
         // Check for Twitter cookies
+        console.log("🚀 [DEBUG] Checking for Twitter cookies");
         if (this.runtime.getSetting("TWITTER_COOKIES")) {
+            console.log("🚀 [DEBUG] Found cookies in settings, parsing them");
             const cookiesArray = JSON.parse(
                 this.runtime.getSetting("TWITTER_COOKIES")
             );
-
             await this.setCookiesFromArray(cookiesArray);
+            console.log("✅ [DEBUG] Cookies set from settings");
         } else {
+            console.log("🚀 [DEBUG] Checking for cached cookies");
             const cachedCookies = await this.getCachedCookies(username);
             if (cachedCookies) {
+                console.log("✅ [DEBUG] Found cached cookies, setting them");
                 await this.setCookiesFromArray(cachedCookies);
+            } else {
+                console.log("ℹ️ [DEBUG] No cached cookies found");
             }
         }
 
+        console.log("🚀 [DEBUG] Attempting Twitter login");
         elizaLogger.log("Waiting for Twitter login");
         while (true) {
-            await this.twitterClient.login(
-                username,
-                this.runtime.getSetting("TWITTER_PASSWORD"),
-                this.runtime.getSetting("TWITTER_EMAIL"),
-                this.runtime.getSetting("TWITTER_2FA_SECRET") || undefined
-            );
+            console.log("🚀 [DEBUG] Login attempt starting");
+            try {
+                await this.twitterClient.login(
+                    username,
+                    this.runtime.getSetting("TWITTER_PASSWORD"),
+                    this.runtime.getSetting("TWITTER_EMAIL"),
+                    this.runtime.getSetting("TWITTER_2FA_SECRET") || undefined
+                );
 
-            if (await this.twitterClient.isLoggedIn()) {
-                const cookies = await this.twitterClient.getCookies();
-                await this.cacheCookies(username, cookies);
-                break;
+                if (await this.twitterClient.isLoggedIn()) {
+                    console.log("✅ [DEBUG] Successfully logged in to Twitter");
+                    const cookies = await this.twitterClient.getCookies();
+                    await this.cacheCookies(username, cookies);
+                    break;
+                }
+
+                console.log("❌ [DEBUG] Login attempt failed, will retry");
+                elizaLogger.error("Failed to login to Twitter trying again...");
+
+                await new Promise((resolve) => setTimeout(resolve, 2000));
+            } catch (error) {
+                console.log("❌ [DEBUG] Error during login attempt:", error);
+                await new Promise((resolve) => setTimeout(resolve, 2000));
             }
-
-            elizaLogger.error("Failed to login to Twitter trying again...");
-
-            await new Promise((resolve) => setTimeout(resolve, 2000));
         }
 
         // Initialize Twitter profile
+        console.log("🚀 [DEBUG] Attempting to fetch Twitter profile");
         this.profile = await this.fetchProfile(username);
 
         if (this.profile) {
+            console.log("✅ [DEBUG] Twitter profile loaded:", {
+                id: this.profile.id,
+                username: this.profile.username,
+                screenName: this.profile.screenName,
+            });
             elizaLogger.log("Twitter user ID:", this.profile.id);
             elizaLogger.log(
                 "Twitter loaded:",
@@ -211,11 +266,15 @@ export class ClientBase extends EventEmitter {
                 nicknames: this.profile.nicknames,
             };
         } else {
+            console.log("❌ [DEBUG] Failed to load Twitter profile");
             throw new Error("Failed to load profile");
         }
 
+        console.log("🚀 [DEBUG] Loading latest checked tweet ID");
         await this.loadLatestCheckedTweetId();
+        console.log("🚀 [DEBUG] Populating timeline");
         await this.populateTimeline();
+        console.log("✅ [DEBUG] Twitter client initialization complete");
     }
 
     async fetchOwnPosts(count: number): Promise<Tweet[]> {
@@ -224,84 +283,30 @@ export class ClientBase extends EventEmitter {
             this.profile.id,
             count
         );
-        return homeTimeline.tweets;
+        return homeTimeline.tweets.map(convertToInternalTweet);
     }
 
     async fetchHomeTimeline(count: number): Promise<Tweet[]> {
         elizaLogger.debug("fetching home timeline");
-        const homeTimeline = await this.twitterClient.fetchHomeTimeline(count, []);
+        const homeTimeline = await this.twitterClient.fetchHomeTimeline(
+            count,
+            []
+        );
 
         elizaLogger.debug(homeTimeline, { depth: Infinity });
-        const processedTimeline = homeTimeline
-        .filter((t) => t.__typename !== "TweetWithVisibilityResults") // what's this about?
-        .map((tweet) => {
-            //console.log("tweet is", tweet);
-            const obj = {
-                id: tweet.id,
-                name:
-                    tweet.name ??
-                    tweet?.user_results?.result?.legacy.name,
-                username:
-                    tweet.username ??
-                    tweet.core?.user_results?.result?.legacy.screen_name,
-                text: tweet.text ?? tweet.legacy?.full_text,
-                inReplyToStatusId:
-                    tweet.inReplyToStatusId ??
-                    tweet.legacy?.in_reply_to_status_id_str ??
-                    null,
-                timestamp: new Date(tweet.legacy?.created_at).getTime() / 1000,
-                createdAt: tweet.createdAt ?? tweet.legacy?.created_at ?? tweet.core?.user_results?.result?.legacy.created_at,
-                userId: tweet.userId ?? tweet.legacy?.user_id_str,
-                conversationId:
-                    tweet.conversationId ??
-                    tweet.legacy?.conversation_id_str,
-                permanentUrl: `https://x.com/${tweet.core?.user_results?.result?.legacy?.screen_name}/status/${tweet.rest_id}`,
-                hashtags: tweet.hashtags ?? tweet.legacy?.entities.hashtags,
-                mentions:
-                    tweet.mentions ?? tweet.legacy?.entities.user_mentions,
-                photos:
-                    tweet.photos ??
-                    tweet.legacy?.entities.media?.filter(
-                        (media) => media.type === "photo"
-                    ) ??
-                    [],
-                thread: tweet.thread || [],
-                urls: tweet.urls ?? tweet.legacy?.entities.urls,
-                videos:
-                    tweet.videos ??
-                    tweet.legacy?.entities.media?.filter(
-                        (media) => media.type === "video"
-                    ) ??
-                    [],
-            };
-            //console.log("obj is", obj);
-            return obj;
-        });
-        //elizaLogger.debug("process homeTimeline", processedTimeline);
-        return processedTimeline;
+        return homeTimeline
+            .filter((t) => t.__typename !== "TweetWithVisibilityResults")
+            .map(convertToInternalTweet);
     }
 
     async fetchTimelineForActions(count: number): Promise<Tweet[]> {
         elizaLogger.debug("fetching timeline for actions");
-        const homeTimeline = await this.twitterClient.fetchHomeTimeline(count, []);
+        const homeTimeline = await this.twitterClient.fetchHomeTimeline(
+            count,
+            []
+        );
 
-        return homeTimeline.map(tweet => ({
-            id: tweet.rest_id,
-            name: tweet.core?.user_results?.result?.legacy?.name,
-            username: tweet.core?.user_results?.result?.legacy?.screen_name,
-            text: tweet.legacy?.full_text,
-            inReplyToStatusId: tweet.legacy?.in_reply_to_status_id_str,
-            timestamp: new Date(tweet.legacy?.created_at).getTime() / 1000,
-            userId: tweet.legacy?.user_id_str,
-            conversationId: tweet.legacy?.conversation_id_str,
-            permanentUrl: `https://twitter.com/${tweet.core?.user_results?.result?.legacy?.screen_name}/status/${tweet.rest_id}`,
-            hashtags: tweet.legacy?.entities?.hashtags || [],
-            mentions: tweet.legacy?.entities?.user_mentions || [],
-            photos: tweet.legacy?.entities?.media?.filter(media => media.type === "photo") || [],
-            thread: tweet.thread || [],
-            urls: tweet.legacy?.entities?.urls || [],
-            videos: tweet.legacy?.entities?.media?.filter(media => media.type === "video") || []
-        }));
+        return homeTimeline.map(convertToInternalTweet);
     }
 
     async fetchSearchTweets(
@@ -330,7 +335,11 @@ export class ClientBase extends EventEmitter {
                             timeoutPromise,
                         ])
                 );
-                return (result ?? { tweets: [] }) as QueryTweetsResponse;
+                return {
+                    tweets: ((result as any)?.tweets || []).map(
+                        convertToInternalTweet
+                    ),
+                };
             } catch (error) {
                 elizaLogger.error("Error fetching search tweets:", error);
                 return { tweets: [] };
@@ -720,6 +729,123 @@ export class ClientBase extends EventEmitter {
             console.error("Error fetching Twitter profile:", error);
 
             return undefined;
+        }
+    }
+
+    async fetchTweet(url: string): Promise<Tweet | null> {
+        console.log("🚀 [DEBUG] Starting fetchTweet with URL:", url);
+        elizaLogger.log(
+            "🔍 [Twitter] Attempting to fetch tweet from URL:",
+            url
+        );
+        try {
+            // Extract tweet ID from URL
+            const tweetId = this.extractTweetId(url);
+            console.log("🚀 [DEBUG] Extracted tweet ID:", tweetId);
+            elizaLogger.log("🔍 [Twitter] Extracted tweet ID:", tweetId);
+
+            if (!tweetId) {
+                console.log(
+                    "❌ [DEBUG] Failed to extract tweet ID from URL:",
+                    url
+                );
+                elizaLogger.error(
+                    "❌ [Twitter] Failed to extract tweet ID from URL:",
+                    url
+                );
+                return null;
+            }
+
+            // Check cache first
+            const cachedTweet = await this.getCachedTweet(tweetId);
+            console.log("🚀 [DEBUG] Cache check result:", !!cachedTweet);
+            if (cachedTweet) {
+                console.log("✅ [DEBUG] Found tweet in cache:", {
+                    id: cachedTweet.id,
+                    text: cachedTweet.text?.substring(0, 50) + "...",
+                    author: cachedTweet.username,
+                });
+                elizaLogger.log("✅ [Twitter] Found tweet in cache:", {
+                    id: cachedTweet.id,
+                    text: cachedTweet.text,
+                    author: cachedTweet.username,
+                });
+                return cachedTweet;
+            }
+
+            console.log(
+                "🚀 [DEBUG] Tweet not in cache, preparing to fetch from API"
+            );
+            elizaLogger.log(
+                "🔄 [Twitter] Tweet not in cache, fetching from API for ID:",
+                tweetId
+            );
+
+            // Log the state of the Twitter client
+            console.log("🚀 [DEBUG] Twitter client state:", {
+                hasClient: !!this.twitterClient,
+                hasRequestQueue: !!this.requestQueue,
+                profile: this.profile
+                    ? {
+                          username: this.profile.username,
+                          id: this.profile.id,
+                      }
+                    : null,
+            });
+
+            console.log("🚀 [DEBUG] About to call twitterClient.getTweet");
+            const tweet = await this.requestQueue.add(() =>
+                this.twitterClient.getTweet(tweetId)
+            );
+            console.log(
+                "🚀 [DEBUG] API response received:",
+                tweet ? "got data" : "null"
+            );
+
+            if (!tweet) {
+                console.log(
+                    "❌ [DEBUG] API returned null response for tweet ID:",
+                    tweetId
+                );
+                elizaLogger.error(
+                    "❌ [Twitter] API returned null response for tweet ID:",
+                    tweetId
+                );
+                return null;
+            }
+
+            const internalTweet = convertToInternalTweet(tweet);
+            await this.cacheTweet(internalTweet);
+            return internalTweet;
+        } catch (error) {
+            console.log("❌ [DEBUG] Error in fetchTweet:", error);
+            if (error instanceof Error) {
+                console.log("❌ [DEBUG] Error details:", {
+                    message: error.message,
+                    stack: error.stack,
+                });
+            }
+            elizaLogger.error("❌ [Twitter] Error fetching tweet:", error);
+            if (error instanceof Error) {
+                elizaLogger.error("Error details:", {
+                    message: error.message,
+                    stack: error.stack,
+                });
+            }
+            return null;
+        }
+    }
+
+    private extractTweetId(url: string): string | null {
+        elizaLogger.log("🔍 [Twitter] Extracting tweet ID from URL:", url);
+        try {
+            const match = url.match(/\/status\/(\d+)/);
+            const tweetId = match ? match[1] : null;
+            elizaLogger.log("✅ [Twitter] Extracted tweet ID:", tweetId);
+            return tweetId;
+        } catch (error) {
+            elizaLogger.error("❌ [Twitter] Error extracting tweet ID:", error);
+            return null;
         }
     }
 }

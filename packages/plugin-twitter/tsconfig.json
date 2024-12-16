@@ -7,23 +7,24 @@
         "declaration": true,
         "declarationDir": "dist/types",
         "composite": true,
-        "esModuleInterop": true,
-        "skipLibCheck": true,
-        "allowSyntheticDefaultImports": true,
-        "emitDeclarationOnly": true,
-        "baseUrl": ".",
         "paths": {
-            "@ai16z/*": [
-                "../*/src"
+            "@ai16z/client-twitter": [
+                "../client-twitter/src"
+            ],
+            "@ai16z/client-twitter/*": [
+                "../client-twitter/src/*"
             ]
         }
     },
     "include": [
-        "src/**/*"
+        "src/**/*.ts"
     ],
     "references": [
         {
             "path": "../core"
+        },
+        {
+            "path": "../client-twitter"
         }
     ]
 }

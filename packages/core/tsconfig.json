@@ -6,7 +6,7 @@
             "ESNext",
             "dom"
         ],
-        "moduleResolution": "Bundler",
+        "moduleResolution": "node",
         "outDir": "./dist",
         "rootDir": "./src",
         "strict": false,
@@ -15,7 +15,8 @@
         "forceConsistentCasingInFileNames": false,
         "allowImportingTsExtensions": true,
         "declaration": true,
-        "emitDeclarationOnly": true,
+        "composite": true,
+        "declarationDir": "./dist/types",
         "resolveJsonModule": true,
         "noImplicitAny": false,
         "allowJs": true,

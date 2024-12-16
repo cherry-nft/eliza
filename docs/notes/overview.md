@@ -602,3 +602,244 @@ categories?: string[];
 ├─────────────────────────────┤
 │ Active Agents Status │
 └─────────────────────────────┘
+
+## Plugin Implementation Guide: Web Plugin Case Study
+
+This guide documents the complete process of implementing a new plugin in the Eliza architecture, using the web plugin as a detailed example.
+
+### 1. Plugin Structure Setup
+
+```bash
+mkdir -p packages/plugin-web/src
+cd packages/plugin-web
+```
+
+### 2. Package Configuration
+
+Created `package.json`:
+
+```json
+{
+    "name": "@eliza/plugin-web",
+    "version": "0.0.1",
+    "main": "dist/index.js",
+    "types": "dist/index.d.ts",
+    "scripts": {
+        "build": "tsc",
+        "dev": "tsc -w"
+    },
+    "dependencies": {
+        "@eliza/core": "workspace:*",
+        "puppeteer": "^21.7.0"
+    }
+}
+```
+
+### 3. TypeScript Configuration
+
+Created `tsconfig.json`:
+
+```json
+{
+    "extends": "../../tsconfig.json",
+    "compilerOptions": {
+        "outDir": "./dist",
+        "rootDir": "./src"
+    },
+    "include": ["src/**/*"]
+}
+```
+
+### 4. Core Plugin Implementation
+
+Created `src/index.ts`:
+
+```typescript
+import { Plugin, Action } from "@eliza/core";
+import { BrowserService } from "./browser";
+
+export class WebPlugin implements Plugin {
+    private browserService: BrowserService | null = null;
+
+    async init() {
+        this.browserService = new BrowserService();
+        await this.browserService.init();
+    }
+
+    async destroy() {
+        if (this.browserService) {
+            await this.browserService.close();
+        }
+    }
+
+    getActions(): Action[] {
+        return [
+            {
+                name: "BROWSE",
+                description: "Browse the web and get real-time information",
+                parameters: {
+                    query: {
+                        type: "string",
+                        description: "What to search for or URL to visit",
+                    },
+                },
+                handler: async ({ query }, { state }) => {
+                    if (!this.browserService) {
+                        throw new Error("Browser service not initialized");
+                    }
+                    return await this.browserService.browse(query, state);
+                },
+            },
+        ];
+    }
+}
+```
+
+### 5. Browser Service Implementation
+
+Created `src/browser.ts`:
+
+```typescript
+import puppeteer from "puppeteer";
+import type { ActionState } from "@eliza/core";
+
+export class BrowserService {
+    private browser: puppeteer.Browser | null = null;
+
+    async init() {
+        this.browser = await puppeteer.launch({
+            headless: "new",
+            args: ["--no-sandbox"],
+        });
+    }
+
+    async close() {
+        if (this.browser) {
+            await this.browser.close();
+        }
+    }
+
+    async browse(query: string, state: ActionState) {
+        if (!this.browser) {
+            throw new Error("Browser not initialized");
+        }
+
+        const page = await this.browser.newPage();
+        try {
+            state.update("Opening new browser page...");
+            await page.goto("https://www.google.com");
+
+            state.update("Searching...");
+            await page.type('textarea[name="q"]', query);
+            await page.keyboard.press("Enter");
+            await page.waitForNavigation();
+
+            state.update("Reading search results...");
+            const content = await page.evaluate(() => {
+                const results = document.querySelectorAll("#search .g");
+                return Array.from(results)
+                    .slice(0, 3)
+                    .map((result) => {
+                        const title =
+                            result.querySelector("h3")?.textContent || "";
+                        const snippet =
+                            result.querySelector(".VwiC3b")?.textContent || "";
+                        return `${title}\n${snippet}`;
+                    })
+                    .join("\n\n");
+            });
+
+            return content;
+        } finally {
+            await page.close();
+        }
+    }
+}
+```
+
+### 6. Character Configuration
+
+Updated character configuration to include web browsing capabilities:
+
+```json
+{
+    "actions": [
+        {
+            "name": "BROWSE",
+            "description": "Search the web for real-time information",
+            "examples": [
+                "Let me check the latest news about {topic}",
+                "I'll search for information about {query}",
+                "Let me look that up online real quick",
+                "Lemme google that for you fam",
+                "Hold up, let me check what's trending about {topic}"
+            ]
+        }
+    ]
+}
+```
+
+### 7. Frontend Status Updates
+
+Updated `Chat.tsx` to handle status updates:
+
+```typescript
+const [status, setStatus] = useState<string>('');
+
+useEffect(() => {
+  const eventSource = new EventSource('/api/status');
+  eventSource.onmessage = (event) => {
+    const data = JSON.parse(event.data);
+    if (data.status) {
+      setStatus(data.status);
+    }
+  };
+  return () => eventSource.close();
+}, []);
+
+// Status display in JSX
+{status && (
+  <div className="status-indicator">
+    <span className="status-dot" />
+    {status}
+  </div>
+)}
+```
+
+### 8. Build Process
+
+```bash
+# Install dependencies
+cd packages/plugin-web
+pnpm install
+
+# Build the plugin
+pnpm build
+
+# Build the entire project
+cd ../..
+pnpm build
+
+# Start the agent
+pnpm start
+```
+
+### 9. Integration Testing
+
+1. Verify plugin loads on startup
+2. Test basic web searches
+3. Verify status updates appear in UI
+4. Test error handling
+5. Verify browser cleanup on shutdown
+
+### Key Learnings
+
+1. Always implement proper cleanup in plugin destroy methods
+2. Use status updates to keep users informed
+3. Handle browser initialization failures gracefully
+4. Implement proper error boundaries
+5. Consider rate limiting for web requests
+6. Cache results when appropriate
+7. Handle timeouts and connection issues
+
+This implementation demonstrates the complete plugin lifecycle, from initial setup through deployment and testing. The same pattern can be followed for implementing other plugins, adjusting the specific implementation details as needed for different functionalities.

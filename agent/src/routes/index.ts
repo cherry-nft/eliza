@@ -1,7 +1,7 @@
-import express from "express";
-import twitterRouter from "./twitter";
+import { Router } from "express";
+import twitterRouter from "./twitter.js";
 
-const router = express.Router();
+const router = Router();
 
 router.use("/twitter", twitterRouter);
 
