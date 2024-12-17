@@ -1,13 +1,10 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
-import { fileURLToPath } from "url";
-import { dirname, resolve } from "path";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+import path from "path";
+import Markdown from "vite-plugin-md";
 
 export default defineConfig({
-    plugins: [react()],
+    plugins: [react(), Markdown()],
     server: {
         port: 3000,
         open: true,
@@ -17,12 +14,18 @@ export default defineConfig({
     },
     resolve: {
         alias: {
-            "@": resolve(__dirname, "./src"),
-            "@components": resolve(__dirname, "./src/components"),
-            "@utils": resolve(__dirname, "./src/utils"),
+            "@": path.resolve(__dirname, "./src"),
+            "@components": path.resolve(__dirname, "./src/components"),
+            "@utils": path.resolve(__dirname, "./src/utils"),
         },
     },
     optimizeDeps: {
         include: ["react", "react-dom", "@mui/material", "three", "plotly.js"],
     },
+    define: {
+        "process.env.OPENROUTER_API_KEY": JSON.stringify(
+            process.env.OPENROUTER_API_KEY
+        ),
+    },
+    assetsInclude: ["**/*.md"],
 });

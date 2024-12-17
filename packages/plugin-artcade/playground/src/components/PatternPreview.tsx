@@ -15,18 +15,24 @@ const PatternPreview: React.FC<PatternPreviewProps> = ({ html = '', css = '', js
       const doc = iframeRef.current.contentDocument;
       if (doc) {
         doc.open();
-        doc.write(`
-          <!DOCTYPE html>
-          <html>
-            <head>
-              <style>${css}</style>
-            </head>
-            <body>
-              ${html}
-              <script>${js}</script>
-            </body>
-          </html>
-        `);
+        // If html contains a complete document, use it directly
+        if (html.includes('<!DOCTYPE html>') || html.includes('<html')) {
+          doc.write(html);
+        } else {
+          // Otherwise, wrap it in a document
+          doc.write(`
+            <!DOCTYPE html>
+            <html>
+              <head>
+                <style>${css}</style>
+              </head>
+              <body>
+                ${html}
+                <script>${js}</script>
+              </body>
+            </html>
+          `);
+        }
         doc.close();
       }
     }
@@ -37,12 +43,12 @@ const PatternPreview: React.FC<PatternPreviewProps> = ({ html = '', css = '', js
       <Typography variant="h6" gutterBottom>
         Pattern Preview
       </Typography>
-      <Box sx={{ flexGrow: 1, border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: 1, overflow: 'hidden' }}>
+      <Box sx={{ flexGrow: 1, border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: 1, overflow: 'hidden', minHeight: '500px' }}>
         <iframe
           ref={iframeRef}
           title="pattern-preview"
-          style={{ width: '100%', height: '100%', border: 'none' }}
-          sandbox="allow-scripts"
+          style={{ width: '100%', height: '100%', minHeight: '500px', border: 'none' }}
+          sandbox="allow-scripts allow-same-origin"
         />
       </Box>
     </Box>

@@ -1,5 +1,6 @@
 import { GamePattern } from "../../../src/types/patterns";
 import { PatternEffectivenessMetrics } from "../../../src/types/effectiveness";
+import { claudeService } from "./ClaudeService";
 
 class PlaygroundPatternService {
     private patterns: Map<string, GamePattern>;
@@ -34,17 +35,33 @@ class PlaygroundPatternService {
         return Array.from(this.patterns.values());
     }
 
-    async generateFromPrompt(prompt: string): Promise<string> {
-        // TODO: Integrate with Claude API
-        // For now, return a mock response
-        return `
-            <div class="game-container">
-                <h1>Generated Game</h1>
-                <div class="game-area">
-                    <!-- Game elements will be here -->
-                </div>
-            </div>
-        `;
+    async generateFromPrompt(prompt: string): Promise<{
+        plan: {
+            coreMechanics: string[];
+            visualElements: string[];
+            interactionFlow: string[];
+            stateManagement: string[];
+            assetRequirements: string[];
+        };
+        title: string;
+        description: string;
+        html: string;
+        thumbnail: {
+            alt: string;
+            backgroundColor: string;
+            elements: Array<{
+                type: "rect" | "circle" | "path";
+                attributes: Record<string, string>;
+            }>;
+        };
+    }> {
+        try {
+            const response = await claudeService.generatePattern(prompt);
+            return response;
+        } catch (error) {
+            console.error("Error generating pattern:", error);
+            throw error;
+        }
     }
 
     async searchSimilarPatterns(
@@ -52,10 +69,10 @@ class PlaygroundPatternService {
         limit: number = 5
     ): Promise<GamePattern[]> {
         // TODO: Implement actual similarity search using embeddings
-        // For now, return random patterns
+        // For now, return patterns of the same type
         const allPatterns = Array.from(this.patterns.values());
         return allPatterns
-            .filter((p) => p.id !== pattern.id)
+            .filter((p) => p.type === pattern.type && p.id !== pattern.id)
             .sort(() => Math.random() - 0.5)
             .slice(0, limit);
     }
@@ -64,7 +81,8 @@ class PlaygroundPatternService {
         generatedHtml: string,
         pattern: GamePattern
     ): Promise<PatternEffectivenessMetrics> {
-        // TODO: Implement actual pattern comparison
+        // TODO: Implement actual pattern comparison using embeddings
+        // For now, return mock metrics
         return {
             pattern_id: pattern.id,
             prompt_keywords: [],

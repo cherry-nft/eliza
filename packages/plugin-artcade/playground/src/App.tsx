@@ -12,7 +12,26 @@ import { PatternEffectivenessMetrics } from '../../src/types/effectiveness';
 const App: React.FC = () => {
   const [patterns, setPatterns] = useState<GamePattern[]>([]);
   const [selectedPattern, setSelectedPattern] = useState<GamePattern | null>(null);
-  const [claudeOutput, setClaudeOutput] = useState<string | null>(null);
+  const [claudeOutput, setClaudeOutput] = useState<{
+    plan: {
+      coreMechanics: string[];
+      visualElements: string[];
+      interactionFlow: string[];
+      stateManagement: string[];
+      assetRequirements: string[];
+    };
+    title: string;
+    description: string;
+    html: string;
+    thumbnail: {
+      alt: string;
+      backgroundColor: string;
+      elements: Array<{
+        type: "rect" | "circle" | "path";
+        attributes: Record<string, string>;
+      }>;
+    };
+  } | null>(null);
   const [metrics, setMetrics] = useState<PatternEffectivenessMetrics | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -31,9 +50,9 @@ const App: React.FC = () => {
   const handlePromptSubmit = async (prompt: string) => {
     setLoading(true);
     try {
-      // Generate HTML using Claude
-      const generatedHtml = await patternService.generateFromPrompt(prompt);
-      setClaudeOutput(generatedHtml);
+      // Generate pattern using Claude
+      const generatedPattern = await patternService.generateFromPrompt(prompt);
+      setClaudeOutput(generatedPattern);
 
       // Find similar patterns
       if (patterns.length > 0) {
@@ -42,7 +61,7 @@ const App: React.FC = () => {
         if (similarPatterns.length > 0) {
           setSelectedPattern(similarPatterns[0]);
           // Compare generated pattern with similar pattern
-          const metrics = await patternService.comparePatterns(generatedHtml, similarPatterns[0]);
+          const metrics = await patternService.comparePatterns(generatedPattern.html, similarPatterns[0]);
           setMetrics(metrics);
         }
       }
@@ -67,10 +86,11 @@ const App: React.FC = () => {
         <Grid item xs={12} md={6}>
           <Paper sx={{ p: 2, minHeight: '500px' }}>
             <Box sx={{ mb: 2 }}>
-              <h3>Claude Output</h3>
+              <h3>{claudeOutput?.title || 'Claude Output'}</h3>
+              <p>{claudeOutput?.description}</p>
             </Box>
             <PatternPreview
-              html={claudeOutput || '<!-- Generated HTML will appear here -->'}
+              html={claudeOutput?.html || '<!-- Generated HTML will appear here -->'}
             />
           </Paper>
         </Grid>
