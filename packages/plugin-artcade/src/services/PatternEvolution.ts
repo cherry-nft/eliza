@@ -352,100 +352,60 @@ export class PatternEvolution extends Service {
         parent1: GamePattern,
         parent2: GamePattern
     ): Promise<GamePattern> {
-        // Create new pattern combining features from both parents
-        const newPattern: GamePattern = {
-            id: uuidv4(),
-            type: parent1.type,
-            pattern_name: `${parent1.pattern_name}_${parent2.pattern_name}_offspring`,
-            content: await this.crossoverContent(
-                parent1.content,
-                parent2.content
-            ),
-            embedding: parent1.embedding.map(
-                (value, i) => (value + parent2.embedding[i]) / 2
-            ),
-            effectiveness_score:
-                (parent1.effectiveness_score + parent2.effectiveness_score) / 2,
-            usage_count: 0,
-        };
-
-        // Add game mechanics to the offspring
-        newPattern.content.html = this.addGameMechanics(
-            newPattern.content.html
-        );
-
-        // Validate through staging service
-        return await this.staging.validatePattern(newPattern);
+        const crossedPattern = await this.crossoverContent(parent1, parent2);
+        return this.staging.validatePattern(crossedPattern);
     }
 
-    private async crossoverContent(content1: any, content2: any): Promise<any> {
-        if (!content1 || !content2) return content1 || content2;
+    private async crossoverContent(
+        parent1: GamePattern,
+        parent2: GamePattern
+    ): Promise<GamePattern> {
+        const html1 = parent1.content.html;
+        const html2 = parent2.content.html;
 
-        // Extract elements from both parents
-        const elements1 = content1.html.match(/<div[^>]*>.*?<\/div>/gs) || [];
-        const elements2 = content2.html.match(/<div[^>]*>.*?<\/div>/gs) || [];
+        // Extract game elements from both parents
+        const elements1 =
+            html1.match(/<div[^>]*class="[^"]*game-[^"]*"[^>]*>.*?<\/div>/g) ||
+            [];
+        const elements2 =
+            html2.match(/<div[^>]*class="[^"]*game-[^"]*"[^>]*>.*?<\/div>/g) ||
+            [];
 
         // Combine elements from both parents
         const combinedElements = [...elements1, ...elements2];
-
-        // Select a random subset of elements
         const selectedElements = combinedElements
             .sort(() => Math.random() - 0.5)
-            .slice(0, Math.floor((elements1.length + elements2.length) / 2));
+            .slice(0, Math.floor(combinedElements.length / 2));
 
-        // Combine CSS rules and animations
-        const css1 = content1.css || "";
-        const css2 = content2.css || "";
-        const combinedCss = this.crossoverCss(css1, css2);
-
-        // Create new content
-        const newContent = {
-            html: `<div class="container">${selectedElements.join("\n")}</div>`,
-            css: combinedCss,
-            context: content1.context,
-            metadata: { ...content1.metadata },
-        };
-
-        // Merge metadata
-        if (content2.metadata) {
-            Object.entries(content2.metadata).forEach(([key, value]) => {
-                if (!newContent.metadata[key]) {
-                    newContent.metadata[key] = value;
-                }
-            });
+        // Create new HTML with combined elements
+        let newHtml = html1;
+        const insertPosition = newHtml.lastIndexOf("</div>");
+        if (insertPosition !== -1) {
+            newHtml =
+                newHtml.slice(0, insertPosition) +
+                selectedElements.join("") +
+                newHtml.slice(insertPosition);
         }
 
         // Add game mechanics
-        newContent.html = this.addGameMechanics(newContent.html);
+        newHtml = this.addGameMechanics(newHtml);
 
-        return newContent;
-    }
-
-    private crossoverCss(css1: string, css2: string): string {
-        if (!css1 || !css2) return css1 || css2;
-
-        // Extract rules and animations from both parents
-        const rules1 = css1.match(/[^@].*{[^}]*}/g) || [];
-        const rules2 = css2.match(/[^@].*{[^}]*}/g) || [];
-        const animations1 = css1.match(/@keyframes[^}]*}/g) || [];
-        const animations2 = css2.match(/@keyframes[^}]*}/g) || [];
-
-        // Combine unique rules and animations
-        const combinedRules = [...new Set([...rules1, ...rules2])];
-        const combinedAnimations = [
-            ...new Set([...animations1, ...animations2]),
-        ];
-
-        return [...combinedAnimations, ...combinedRules].join("\n");
+        return {
+            ...parent1,
+            id: uuidv4(),
+            pattern_name: `${parent1.pattern_name}_${parent2.pattern_name}_crossover`,
+            content: { ...parent1.content, html: newHtml },
+        };
     }
 
     private async mutate(
         pattern: GamePattern,
-        rate: number
+        mutationRate: number
     ): Promise<GamePattern> {
-        const mutatedPattern = { ...pattern, id: uuidv4() };
+        const mutatedPattern = { ...pattern };
+        const content = mutatedPattern.content;
 
-        // List of available mutation operators
+        // Available mutation operators
         const operators = [
             "add_interaction",
             "modify_style",
@@ -455,107 +415,213 @@ export class PatternEvolution extends Service {
         ];
 
         // Log available operators
-        this.runtime.logger.info("Available mutation operators:", operators);
+        this.runtime.logger.debug("Available mutation operators:", operators);
 
-        // Apply first mutation
-        const firstOperator =
-            operators[Math.floor(Math.random() * operators.length)];
-        this.runtime.logger.info("Applying first mutation:", firstOperator);
-        mutatedPattern.content.html = await this.applyMutation(
-            mutatedPattern.content.html,
-            firstOperator
+        // Always apply game element and layout mutations
+        content.html = this.applyGameElementMutation(content.html);
+        content.html = this.applyLayoutMutation(content.html);
+
+        // Apply additional mutations based on rate
+        let mutationCount = 2; // Start at 2 since we've already applied 2 mutations
+        while (Math.random() < mutationRate && mutationCount < 10) {
+            const operator =
+                operators[Math.floor(Math.random() * operators.length)];
+            this.runtime.logger.debug(
+                `Applying additional mutation: ${operator}`
+            );
+
+            switch (operator) {
+                case "add_game_element":
+                    content.html = this.applyGameElementMutation(content.html);
+                    break;
+                case "add_interaction":
+                    content.html = this.applyInteractionMutation(content.html);
+                    break;
+                case "modify_style":
+                    content.html = this.applyStyleMutation(content.html);
+                    break;
+                case "add_animation":
+                    content.html = this.applyAnimationMutation(content.html);
+                    break;
+                case "change_layout":
+                    content.html = this.applyLayoutMutation(content.html);
+                    break;
+            }
+            mutationCount++;
+        }
+
+        // Add game mechanics
+        content.html = this.addGameMechanics(content.html);
+
+        // Validate the mutated pattern
+        return await this.staging.validatePattern({
+            ...mutatedPattern,
+            id: uuidv4(),
+            pattern_name: `${pattern.pattern_name}_mutated_${Date.now()}`,
+            content,
+        });
+    }
+
+    private applyInteractionMutation(html: string): string {
+        const interactions = [
+            {
+                class: "interactive",
+                attr: "onclick=\"this.classList.toggle('active')\"",
+            },
+            {
+                class: "hoverable",
+                attr: "onmouseover=\"this.style.transform='scale(1.1)'\" onmouseout=\"this.style.transform='scale(1)'\"",
+            },
+            {
+                class: "draggable",
+                attr: 'draggable="true" ondragstart="event.dataTransfer.setData(\'text\', event.target.id)"',
+            },
+        ];
+
+        const interaction =
+            interactions[Math.floor(Math.random() * interactions.length)];
+        return html.replace(
+            /<div/i,
+            `<div class="${interaction.class}" ${interaction.attr}`
         );
+    }
 
-        // Potentially apply additional mutations based on rate
-        for (const operator of operators) {
-            if (Math.random() < rate) {
-                this.runtime.logger.info(
-                    "Applying additional mutation:",
-                    operator
+    private applyStyleMutation(html: string): string {
+        const styles = [
+            "border: 2px solid #333; box-shadow: 2px 2px 5px rgba(0,0,0,0.2); margin: 10px;",
+            "color: rgb(23, 23, 23); font-weight: bold; text-shadow: 1px 1px 2px rgba(0,0,0,0.1);",
+            "background-color: rgb(168, 168, 168); border-radius: 8px; padding: 10px;",
+        ];
+
+        const style = styles[Math.floor(Math.random() * styles.length)];
+        return html.replace(
+            /style="([^"]*)"/,
+            (match, p1) => `style="${p1}; ${style}"`
+        );
+    }
+
+    private applyAnimationMutation(html: string): string {
+        const animations = [
+            "animation: pulse 2s infinite; transform: scale(1);",
+            "animation: rotate 3s linear infinite; transform-origin: center;",
+            "animation: bounce 1s infinite; transform: translateY(0);",
+        ];
+
+        const animation =
+            animations[Math.floor(Math.random() * animations.length)];
+        return html.replace(
+            /style="([^"]*)"/,
+            (match, p1) => `style="${p1}; ${animation}"`
+        );
+    }
+
+    private applyLayoutMutation(html: string): string {
+        const layouts = [
+            "display: flex; flex-direction: row; gap: 10px; justify-content: space-between;",
+            "display: flex; flex-direction: column; gap: 10px; justify-content: space-between;",
+            "display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 15px;",
+        ];
+
+        const layout = layouts[Math.floor(Math.random() * layouts.length)];
+
+        // First, try to find container or game-container divs
+        const containerMatch = html.match(
+            /<div[^>]*class="[^"]*(?:container|game-container)[^"]*"[^>]*>/
+        );
+        if (containerMatch) {
+            const styleMatch = containerMatch[0].match(/style="([^"]*)"/);
+            if (styleMatch) {
+                // Preserve existing styles while adding layout
+                const existingStyles = styleMatch[1];
+                const newStyles = layout
+                    .split(";")
+                    .filter((style) => {
+                        const prop = style.split(":")[0]?.trim();
+                        return prop && !existingStyles.includes(prop + ":");
+                    })
+                    .join(";");
+                return html.replace(
+                    styleMatch[0],
+                    `style="${existingStyles}; ${newStyles}"`
                 );
-                mutatedPattern.content.html = await this.applyMutation(
-                    mutatedPattern.content.html,
-                    operator
+            } else {
+                return html.replace(
+                    containerMatch[0],
+                    containerMatch[0].slice(0, -1) + ` style="${layout}">`
                 );
             }
         }
 
-        // Add collision detection to all game elements
-        mutatedPattern.content.html = this.addCollisionDetection(
-            mutatedPattern.content.html
-        );
-
-        // Ensure we have at least one level progression element
-        if (
-            !mutatedPattern.content.html.includes("game-portal") &&
-            !mutatedPattern.content.html.includes("game-checkpoint")
-        ) {
-            mutatedPattern.content.html = this.addLevelProgression(
-                mutatedPattern.content.html
-            );
+        // If no container found, wrap the content in a container with layout
+        if (!html.includes('class="container"')) {
+            return `<div class="container" style="${layout}">${html}</div>`;
         }
 
-        // Add game mechanics
-        mutatedPattern.content.html = this.addGameMechanics(
-            mutatedPattern.content.html
+        // As a last resort, apply to the first div that doesn't have layout styles
+        const divMatch = html.match(
+            /<div(?![^>]*(?:flex|grid|gap|justify-content))[^>]*>/
         );
-
-        return this.staging.validatePattern(mutatedPattern);
-    }
-
-    private async applyMutation(
-        html: string,
-        operator: string
-    ): Promise<string> {
-        switch (operator) {
-            case "add_game_element":
-                return this.addGameElement(html);
-            case "add_interaction":
-                return this.addInteraction(html);
-            case "modify_style":
-                return this.modifyStyle(html);
-            case "add_animation":
-                return this.addAnimation(html);
-            case "change_layout":
-                return this.changeLayout(html);
-            default:
-                return html;
+        if (divMatch) {
+            const styleMatch = divMatch[0].match(/style="([^"]*)"/);
+            if (styleMatch) {
+                return html.replace(
+                    styleMatch[0],
+                    `style="${styleMatch[1]}; ${layout}"`
+                );
+            } else {
+                return html.replace(
+                    divMatch[0],
+                    divMatch[0].slice(0, -1) + ` style="${layout}">`
+                );
+            }
         }
+
+        return html;
     }
 
-    private addGameElement(html: string): string {
-        const elements = [
-            {
-                type: "player",
-                html: `<div class="game-player" data-collision="true" style="width: 32px; height: 32px; background-color: rgb(255, 0, 0); position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);" data-speed="5"></div>`,
-            },
-            {
-                type: "collectible",
-                html: `<div class="game-collectible" data-collision="true" style="width: 16px; height: 16px; background-color: rgb(255, 255, 0); position: absolute; border-radius: 50%; animation: float 2s infinite ease-in-out;" data-points="10"></div>`,
-            },
-            {
-                type: "obstacle",
-                html: `<div class="game-obstacle" data-collision="true" style="width: 24px; height: 24px; background-color: rgb(255, 0, 0); position: absolute;" data-damage="20"></div>`,
-            },
-            {
-                type: "portal",
-                html: `<div class="game-portal" data-collision="true" style="width: 40px; height: 40px; background: radial-gradient(circle, #4CAF50 0%, transparent 100%); position: absolute; animation: pulse 2s infinite;" data-next-level="true"></div>`,
-            },
-            {
-                type: "checkpoint",
-                html: `<div class="game-checkpoint" data-collision="true" style="width: 32px; height: 32px; background-color: #2196F3; position: absolute; border-radius: 4px;" data-save-point="true"></div>`,
-            },
+    private applyGameElementMutation(html: string): string {
+        const gameElements = [
+            `<div class="game-player" data-collision="true" data-speed="5" style="width: 32px; height: 32px; background-color: rgb(255, 0, 0); position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);">
+                <script>
+                    document.querySelector('.game-player').addEventListener('collision', (e) => {
+                        const target = e.target;
+                        if (target.classList.contains('game-powerup')) {
+                            window.gameState.addPowerup(target.dataset.effect, parseInt(target.dataset.duration));
+                            target.remove();
+                        } else if (target.classList.contains('game-portal')) {
+                            window.gameState.level++;
+                            document.dispatchEvent(new CustomEvent('nextLevel', { detail: { level: window.gameState.level } }));
+                        }
+                    });
+                </script>
+            </div>`,
+            `<div class="game-score" style="position: absolute; top: 10px; right: 10px; padding: 5px 10px; background-color: rgb(51, 51, 51); color: rgb(255, 255, 255); border-radius: 5px;">Score: 0</div>`,
+            `<div class="game-collectible" data-collision="true" data-points="10" style="width: 16px; height: 16px; background-color: rgb(255, 255, 0); position: absolute; border-radius: 50%; animation: float 2s infinite ease-in-out;"></div>`,
+            `<div class="game-powerup" data-collision="true" data-effect="speed" data-duration="5000" style="width: 16px; height: 16px; background-color: rgb(255, 255, 0); position: absolute; border-radius: 50%; animation: float 2s infinite ease-in-out;">
+                <script>
+                    document.querySelector('.game-powerup').addEventListener('collision', (e) => {
+                        const powerup = e.target;
+                        window.gameState.powerups.push({ effect: powerup.dataset.effect, expires: Date.now() + parseInt(powerup.dataset.duration) });
+                        powerup.remove();
+                    });
+                </script>
+            </div>`,
         ];
 
-        // Randomly select an element type
-        const element = elements[Math.floor(Math.random() * elements.length)];
+        const element =
+            gameElements[Math.floor(Math.random() * gameElements.length)];
+        const insertPoint = html.lastIndexOf("</div>");
 
-        // Insert at a suitable position (before closing tag)
-        const insertPosition = html.lastIndexOf("</div>");
-        return (
-            html.slice(0, insertPosition) +
-            element.html +
-            html.slice(insertPosition)
+        return insertPoint !== -1
+            ? html.slice(0, insertPoint) + element + html.slice(insertPoint)
+            : html + element;
+    }
+
+    private addCollisionDetection(html: string): string {
+        // Add collision detection to existing game elements if they don't have it
+        return html.replace(
+            /class="(game-player|game-collectible|game-obstacle|game-portal|game-checkpoint)"([^>]*?)(?:data-collision="true")?([^>]*?)>/g,
+            'class="$1"$2 data-collision="true"$3>'
         );
     }
 
@@ -574,137 +640,50 @@ export class PatternEvolution extends Service {
                 Math.floor(Math.random() * progressionElements.length)
             ];
         const insertPosition = html.lastIndexOf("</div>");
-        return (
-            html.slice(0, insertPosition) + element + html.slice(insertPosition)
-        );
-    }
-
-    private addCollisionDetection(html: string): string {
-        // Add collision detection to existing game elements if they don't have it
-        return html.replace(
-            /class="(game-player|game-collectible|game-obstacle|game-portal|game-checkpoint)"([^>]*?)(?:data-collision="true")?([^>]*?)>/g,
-            'class="$1"$2 data-collision="true"$3>'
-        );
-    }
-
-    private addInteraction(html: string): string {
-        const interactions = [
-            // Keyboard controls
-            `<script>
-                document.addEventListener("keydown", (e) => {
-                    const player = document.querySelector('.game-player');
-                    if (!player) return;
-                    const speed = parseInt(player.dataset.speed) || 5;
-
-                    switch(e.key) {
-                        case "ArrowLeft":
-                            player.style.left = (parseInt(player.style.left || 0) - speed) + 'px';
-                            break;
-                        case "ArrowRight":
-                            player.style.left = (parseInt(player.style.left || 0) + speed) + 'px';
-                            break;
-                        case "ArrowUp":
-                            player.style.top = (parseInt(player.style.top || 0) - speed) + 'px';
-                            break;
-                        case "ArrowDown":
-                            player.style.top = (parseInt(player.style.top || 0) + speed) + 'px';
-                            break;
-                        case " ":
-                            player.dispatchEvent(new CustomEvent('action'));
-                            break;
-                    }
-                });
-            </script>`,
-
-            // Click interaction
-            `<div class="interactive" onclick="this.classList.toggle('active'); gameState.updateScore(10);">Click me!</div>`,
-
-            // Hover effect
-            `<div class="hoverable" onmouseover="this.style.transform='scale(1.1)'; gameState.updateHealth(5);" onmouseout="this.style.transform='scale(1)'">Hover me!</div>`,
-
-            // Drag and drop
-            `<div class="draggable" draggable="true" ondragstart="event.dataTransfer.setData('text', event.target.id); gameState.addPowerup('speed', 5000);">Drag me!</div>`,
-        ];
-
-        const interaction =
-            interactions[Math.floor(Math.random() * interactions.length)];
-        return html.replace("</div>", `${interaction}</div>`);
-    }
-
-    private modifyStyle(html: string): string {
-        const styles = [
-            "background-color: rgb(168, 168, 168); border-radius: 8px; padding: 10px;",
-            "color: rgb(23, 23, 23); font-weight: bold; text-shadow: 1px 1px 2px rgba(0,0,0,0.1);",
-            "border: 2px solid #333; box-shadow: 2px 2px 5px rgba(0,0,0,0.2); margin: 10px;",
-            "display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 15px;",
-        ];
-
-        const style = styles[Math.floor(Math.random() * styles.length)];
-        return html.replace(/style="[^"]*"/, `style="${style}"`);
-    }
-
-    private addAnimation(html: string): string {
-        const animations = [
-            "animation: pulse 2s infinite; transform: scale(1);",
-            "animation: rotate 3s linear infinite; transform-origin: center;",
-            "animation: bounce 1s infinite; transform: translateY(0);",
-            "animation: float 2s infinite ease-in-out;",
-        ];
-
-        const animation =
-            animations[Math.floor(Math.random() * animations.length)];
-        return html.replace(/style="([^"]*)"/, `style="$1 ${animation}"`);
-    }
-
-    private changeLayout(html: string): string {
-        const layouts = [
-            "display: flex; flex-direction: column; gap: 10px; justify-content: space-between;",
-            "display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px;",
-            "position: relative; margin: 20px; padding: 15px;",
-            "display: flex; flex-direction: row; gap: 10px; justify-content: space-between;",
-        ];
-
-        const layout = layouts[Math.floor(Math.random() * layouts.length)];
-        return html.replace(/style="([^"]*)"/, `style="$1 ${layout}"`);
+        return insertPosition !== -1
+            ? html.slice(0, insertPosition) +
+                  element +
+                  html.slice(insertPosition)
+            : html + element;
     }
 
     private addGameMechanics(html: string): string {
-        // Add collision detection script
-        const collisionScript = `
-            <script>
-                function checkCollisions() {
-                    const player = document.querySelector('.game-player');
-                    if (!player) return;
-                    const playerRect = player.getBoundingClientRect();
-                    document.querySelectorAll('[data-collision="true"]').forEach(element => {
-                        if (element === player) return;
-                        const elementRect = element.getBoundingClientRect();
-                        if (playerRect.left < elementRect.right && playerRect.right > elementRect.left &&
-                            playerRect.top < elementRect.bottom && playerRect.bottom > elementRect.top) {
-                            element.dispatchEvent(new CustomEvent('collision', { detail: { player } }));
-                        }
-                    });
-                }
-                setInterval(checkCollisions, 16);
-            </script>
-        `;
+        // Ensure all game elements have collision detection
+        let updatedHtml = this.addCollisionDetection(html);
 
-        // Add game state management
-        const gameStateScript = `
+        // Add level progression elements if not present
+        if (
+            !updatedHtml.includes("game-portal") &&
+            !updatedHtml.includes("game-checkpoint")
+        ) {
+            updatedHtml = this.addLevelProgression(updatedHtml);
+        }
+
+        // Insert all elements before closing body tag
+        const insertPosition = updatedHtml.lastIndexOf("</div>");
+        if (insertPosition === -1) return updatedHtml;
+
+        // Add game state management and controls
+        const gameElements = `
             <script>
+                // Game state management
                 window.gameState = {
                     score: 0,
                     health: 100,
-                    powerups: [],
                     level: 1,
+                    powerups: [],
                     combo: 0,
                     updateScore: function(points) {
                         this.score += points * (this.combo + 1);
-                        document.querySelector('.game-score span').textContent = this.score;
+                        document.querySelectorAll('.game-score').forEach(el => {
+                            el.textContent = 'Score: ' + this.score;
+                        });
                     },
                     updateHealth: function(amount) {
                         this.health = Math.max(0, Math.min(100, this.health + amount));
-                        document.querySelector('.game-health span').textContent = this.health;
+                        document.querySelectorAll('.health-bar').forEach(el => {
+                            el.style.width = this.health + '%';
+                        });
                         if (this.health <= 0) this.gameOver();
                     },
                     addPowerup: function(effect, duration) {
@@ -724,50 +703,114 @@ export class PatternEvolution extends Service {
                     }
                 };
 
-                // Initialize game state display
-                document.addEventListener('DOMContentLoaded', () => {
-                    const scoreDisplay = document.createElement('div');
-                    scoreDisplay.className = 'game-score';
-                    scoreDisplay.innerHTML = '<span>0</span>';
-                    document.body.appendChild(scoreDisplay);
+                // Player controls
+                document.addEventListener('keydown', (e) => {
+                    const player = document.querySelector('.game-player');
+                    if (!player) return;
+                    const speed = parseInt(player.dataset.speed) || 5;
+                    const speedBoost = gameState.hasPowerup('speed') ? 2 : 1;
 
-                    const healthDisplay = document.createElement('div');
-                    healthDisplay.className = 'game-health';
-                    healthDisplay.innerHTML = '<span>100</span>';
-                    document.body.appendChild(healthDisplay);
-                });
-            </script>
-        `;
-
-        // Add player controls
-        const controlsHtml = `
-            <div class="game-controls" style="position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); display: flex; gap: 20px;">
-                <button class="control-left" ontouchstart="movePlayer('left')" ontouchend="stopPlayer()">←</button>
-                <button class="control-right" ontouchstart="movePlayer('right')" ontouchend="stopPlayer()">→</button>
-                <button class="control-action" ontouchstart="playerAction()">Action</button>
-            </div>
-            <script>
-                document.addEventListener("keydown", (e) => {
                     switch(e.key) {
-                        case "ArrowLeft": movePlayer('left'); break;
-                        case "ArrowRight": movePlayer('right'); break;
-                        case " ": playerAction(); break;
+                        case 'ArrowLeft':
+                            player.style.left = (parseInt(player.style.left || '0') - speed * speedBoost) + 'px';
+                            break;
+                        case 'ArrowRight':
+                            player.style.left = (parseInt(player.style.left || '0') + speed * speedBoost) + 'px';
+                            break;
+                        case 'ArrowUp':
+                            player.style.top = (parseInt(player.style.top || '0') - speed * speedBoost) + 'px';
+                            break;
+                        case 'ArrowDown':
+                            player.style.top = (parseInt(player.style.top || '0') + speed * speedBoost) + 'px';
+                            break;
+                        case ' ':
+                            player.dispatchEvent(new CustomEvent('action'));
+                            break;
                     }
+                    checkCollisions();
                 });
 
-                document.addEventListener("keyup", (e) => {
-                    if (["ArrowLeft", "ArrowRight"].includes(e.key)) {
-                        stopPlayer();
-                    }
-                });
+                // Mobile controls
+                const controls = document.createElement('div');
+                controls.className = 'game-controls';
+                controls.style.cssText = 'position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); display: flex; gap: 20px;';
+
+                // Create left button
+                const leftBtn = document.createElement('button');
+                leftBtn.className = 'control-left';
+                leftBtn.textContent = '←';
+                leftBtn.addEventListener('touchstart', () => movePlayer('left'));
+                leftBtn.addEventListener('touchend', stopPlayer);
+
+                // Create right button
+                const rightBtn = document.createElement('button');
+                rightBtn.className = 'control-right';
+                rightBtn.textContent = '→';
+                rightBtn.addEventListener('touchstart', () => movePlayer('right'));
+                rightBtn.addEventListener('touchend', stopPlayer);
+
+                // Create action button
+                const actionBtn = document.createElement('button');
+                actionBtn.className = 'control-action';
+                actionBtn.textContent = 'Action';
+                actionBtn.addEventListener('touchstart', playerAction);
+
+                // Add buttons to controls
+                controls.appendChild(leftBtn);
+                controls.appendChild(rightBtn);
+                controls.appendChild(actionBtn);
+
+                document.body.appendChild(controls);
+
+                // Game mechanics
+                function checkCollisions() {
+                    const player = document.querySelector('.game-player');
+                    if (!player) return;
+
+                    document.querySelectorAll('[data-collision="true"]').forEach(element => {
+                        if (element === player) return;
+
+                        const rect1 = player.getBoundingClientRect();
+                        const rect2 = element.getBoundingClientRect();
+
+                        if (!(rect1.right < rect2.left ||
+                            rect1.left > rect2.right ||
+                            rect1.bottom < rect2.top ||
+                            rect1.top > rect2.bottom)) {
+
+                            element.dispatchEvent(new CustomEvent('collision', { detail: { player } }));
+
+                            if (element.classList.contains('game-collectible')) {
+                                gameState.updateScore(parseInt(element.dataset.points || '10'));
+                                element.remove();
+                            } else if (element.classList.contains('game-obstacle')) {
+                                gameState.updateHealth(-parseInt(element.dataset.damage || '20'));
+                            } else if (element.classList.contains('game-portal')) {
+                                gameState.level++;
+                                document.dispatchEvent(new CustomEvent('nextLevel', { detail: { level: gameState.level } }));
+                            } else if (element.classList.contains('game-checkpoint')) {
+                                document.dispatchEvent(new CustomEvent('checkpoint'));
+                            } else if (element.classList.contains('game-powerup')) {
+                                gameState.addPowerup(element.dataset.effect, parseInt(element.dataset.duration));
+                                element.remove();
+                            }
+                        }
+                    });
+                }
 
                 function movePlayer(direction) {
                     const player = document.querySelector('.game-player');
                     if (!player) return;
                     const speed = parseInt(player.dataset.speed) || 5;
+                    const speedBoost = gameState.hasPowerup('speed') ? 2 : 1;
+
                     switch(direction) {
-                        case 'left': player.style.left = (parseInt(player.style.left || 0) - speed) + 'px'; break;
-                        case 'right': player.style.left = (parseInt(player.style.left || 0) + speed) + 'px'; break;
+                        case 'left':
+                            player.style.left = (parseInt(player.style.left || '0') - speed * speedBoost) + 'px';
+                            break;
+                        case 'right':
+                            player.style.left = (parseInt(player.style.left || '0') + speed * speedBoost) + 'px';
+                            break;
                     }
                     checkCollisions();
                 }
@@ -784,71 +827,24 @@ export class PatternEvolution extends Service {
                     player.dispatchEvent(new CustomEvent('action'));
                     checkCollisions();
                 }
-            </script>
-        `;
 
-        // Add game elements with event listeners
-        const gameElements = `
-            <div class="game-player" data-collision="true" data-speed="5" style="width: 32px; height: 32px; background-color: rgb(255, 0, 0); position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);">
-                <script>
-                    document.querySelector('.game-player').addEventListener('collision', (e) => {
-                        const target = e.target;
-                        if (target.classList.contains('game-powerup')) {
-                            window.gameState.addPowerup(target.dataset.effect, parseInt(target.dataset.duration));
-                            target.remove();
-                        } else if (target.classList.contains('game-portal')) {
-                            window.gameState.level++;
-                            document.dispatchEvent(new CustomEvent('nextLevel', { detail: { level: window.gameState.level } }));
-                        }
-                    });
-                </script>
-            </div>
-            <div class="game-powerup" data-collision="true" data-effect="speed" data-duration="5000" style="width: 16px; height: 16px; background-color: rgb(255, 255, 0); position: absolute; border-radius: 50%; animation: float 2s infinite ease-in-out;">
-                <script>
-                    document.querySelector('.game-powerup').addEventListener('collision', (e) => {
-                        const powerup = e.target;
-                        window.gameState.powerups.push({ effect: powerup.dataset.effect, expires: Date.now() + parseInt(powerup.dataset.duration) });
-                        powerup.remove();
-                    });
-                </script>
-            </div>
-            <div class="game-portal" data-collision="true" data-next-level="true" style="width: 48px; height: 48px; background: linear-gradient(45deg, #00f, #f0f); border-radius: 50%; animation: pulse 2s infinite;">
-                <script>
-                    document.querySelector('.game-portal').addEventListener('collision', () => {
-                        window.gameState.level++;
-                        document.dispatchEvent(new CustomEvent('nextLevel', { detail: { level: window.gameState.level } }));
-                    });
-                </script>
+                // Start game loop
+                setInterval(checkCollisions, 100);
+            </script>
+
+            <div class="game-player" data-collision="true" data-speed="5" style="width: 32px; height: 32px; background-color: rgb(255, 0, 0); position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);"></div>
+            <div class="game-portal" data-collision="true" data-next-level="true" style="width: 40px; height: 40px; background: radial-gradient(circle, #4CAF50 0%, transparent 100%); position: absolute; animation: pulse 2s infinite;">
+                <div class="portal-label">Next Level</div>
             </div>
             <div class="game-checkpoint" data-collision="true" data-save-point="true" style="width: 32px; height: 32px; background-color: #2196F3; position: absolute; border-radius: 4px;">
-                <script>
-                    document.querySelector('.game-checkpoint').addEventListener('collision', () => {
-                        localStorage.setItem('checkpoint', JSON.stringify({
-                            position: document.querySelector('.game-player').style.left,
-                            score: window.gameState.score,
-                            health: window.gameState.health,
-                            level: window.gameState.level
-                        }));
-                        document.dispatchEvent(new CustomEvent('checkpoint', { detail: { saved: true } }));
-                    });
-                </script>
+                <div class="checkpoint-label">Checkpoint</div>
             </div>
         `;
 
-        // Ensure all game elements have collision detection
-        let updatedHtml = this.addCollisionDetection(html);
-
-        // Insert all elements before closing body tag
-        const insertPosition = updatedHtml.lastIndexOf("</div>");
-        updatedHtml =
+        return (
             updatedHtml.slice(0, insertPosition) +
-            collisionScript +
-            gameStateScript +
-            controlsHtml +
             gameElements +
-            updatedHtml.slice(insertPosition);
-
-        // Double-check collision detection after adding new elements
-        return this.addCollisionDetection(updatedHtml);
+            updatedHtml.slice(insertPosition)
+        );
     }
 }

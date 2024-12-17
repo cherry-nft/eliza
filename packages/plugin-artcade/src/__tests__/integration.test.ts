@@ -91,29 +91,28 @@ describe("Artcade Plugin Integration", () => {
             )!;
 
             const result = await evolveAction.handler(runtime, {
-                html: `<div class="container">
-                    <div class="progress-tracker">
-                        <div class="score">Score: <span>0</span></div>
-                        <div class="progress">Progress: <span>0%</span></div>
-                    </div>
-                    <h1>Test Page</h1>
-                    <div class="content">
-                        <p>This is a test paragraph that will be evolved into something more interactive.</p>
-                        <div class="box">
-                            <span>Click me!</span>
-                        </div>
-                    </div>
-                    <div class="interactive-element">Click to Progress</div>
-                </div>`,
+                html: TEST_HTML,
                 generations: 2,
                 populationSize: 4,
-                mutationOperators: ["add_game_element"],
-                mutationCount: 1,
+                mutationOperators: [
+                    "add_game_element",
+                    "add_interaction",
+                    "modify_style",
+                    "add_animation",
+                    "change_layout",
+                ],
+                mutationCount: 3,
             });
 
-            // Check for game elements
+            // Verify different types of mutations
             expect(result.html).toMatch(
-                /(game-score|game-player|game-collectible)/
+                /(game-player|game-score|game-collectible|game-powerup|game-portal|game-checkpoint)/
+            );
+            expect(result.html).toMatch(/(interactive|hoverable|draggable)/);
+            expect(result.html).toMatch(/(animation:|transform:|transition:)/);
+            expect(result.html).toMatch(/(flex|grid|gap|justify-content)/);
+            expect(result.html).toMatch(
+                /(box-shadow|border-radius|margin|padding)/
             );
         });
 
