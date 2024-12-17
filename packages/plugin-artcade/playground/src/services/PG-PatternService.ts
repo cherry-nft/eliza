@@ -34,13 +34,60 @@ class PlaygroundPatternService {
         return Array.from(this.patterns.values());
     }
 
+    async generateFromPrompt(prompt: string): Promise<string> {
+        // TODO: Integrate with Claude API
+        // For now, return a mock response
+        return `
+            <div class="game-container">
+                <h1>Generated Game</h1>
+                <div class="game-area">
+                    <!-- Game elements will be here -->
+                </div>
+            </div>
+        `;
+    }
+
     async searchSimilarPatterns(
         pattern: GamePattern,
         limit: number = 5
     ): Promise<GamePattern[]> {
-        // Simple mock implementation that returns random patterns
+        // TODO: Implement actual similarity search using embeddings
+        // For now, return random patterns
         const allPatterns = Array.from(this.patterns.values());
-        return allPatterns.sort(() => Math.random() - 0.5).slice(0, limit);
+        return allPatterns
+            .filter((p) => p.id !== pattern.id)
+            .sort(() => Math.random() - 0.5)
+            .slice(0, limit);
+    }
+
+    async comparePatterns(
+        generatedHtml: string,
+        pattern: GamePattern
+    ): Promise<PatternEffectivenessMetrics> {
+        // TODO: Implement actual pattern comparison
+        return {
+            pattern_id: pattern.id,
+            prompt_keywords: [],
+            embedding_similarity: Math.random(),
+            claude_usage: {
+                direct_reuse: false,
+                structural_similarity: Math.random(),
+                feature_adoption: [],
+                timestamp: new Date(),
+            },
+            quality_scores: {
+                visual: Math.random(),
+                interactive: Math.random(),
+                functional: Math.random(),
+                performance: Math.random(),
+            },
+            usage_stats: {
+                total_uses: 1,
+                successful_uses: 1,
+                average_similarity: Math.random(),
+                last_used: new Date(),
+            },
+        };
     }
 
     async getPatternMetrics(

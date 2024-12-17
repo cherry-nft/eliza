@@ -4,6 +4,7 @@ import PatternPreview from './components/PatternPreview';
 import EmbeddingVisualizer from './components/EmbeddingVisualizer';
 import MetricsPanel from './components/MetricsPanel';
 import Controls from './components/Controls';
+import PromptInput from './components/PromptInput';
 import { patternService } from './services/PG-PatternService';
 import { GamePattern } from '../../src/types/patterns';
 import { PatternEffectivenessMetrics } from '../../src/types/effectiveness';
@@ -11,7 +12,9 @@ import { PatternEffectivenessMetrics } from '../../src/types/effectiveness';
 const App: React.FC = () => {
   const [patterns, setPatterns] = useState<GamePattern[]>([]);
   const [selectedPattern, setSelectedPattern] = useState<GamePattern | null>(null);
+  const [claudeOutput, setClaudeOutput] = useState<string | null>(null);
   const [metrics, setMetrics] = useState<PatternEffectivenessMetrics | null>(null);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     const initializePatterns = async () => {
@@ -25,29 +28,59 @@ const App: React.FC = () => {
     initializePatterns();
   }, []);
 
-  useEffect(() => {
-    const loadMetrics = async () => {
-      if (selectedPattern) {
-        const patternMetrics = await patternService.getPatternMetrics(selectedPattern.id);
-        setMetrics(patternMetrics);
-      }
-    };
-    loadMetrics();
-  }, [selectedPattern]);
+  const handlePromptSubmit = async (prompt: string) => {
+    setLoading(true);
+    try {
+      // Generate HTML using Claude
+      const generatedHtml = await patternService.generateFromPrompt(prompt);
+      setClaudeOutput(generatedHtml);
 
-  const handleEvolve = async () => {
-    if (selectedPattern) {
-      const similarPatterns = await patternService.searchSimilarPatterns(selectedPattern);
-      console.log('Similar patterns:', similarPatterns);
+      // Find similar patterns
+      if (patterns.length > 0) {
+        // Use the first pattern as a reference for now
+        const similarPatterns = await patternService.searchSimilarPatterns(patterns[0]);
+        if (similarPatterns.length > 0) {
+          setSelectedPattern(similarPatterns[0]);
+          // Compare generated pattern with similar pattern
+          const metrics = await patternService.comparePatterns(generatedHtml, similarPatterns[0]);
+          setMetrics(metrics);
+        }
+      }
+    } catch (error) {
+      console.error('Error processing prompt:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <Container maxWidth={false} sx={{ py: 4 }}>
       <Grid container spacing={3}>
-        {/* Pattern Preview */}
+        {/* Prompt Input */}
+        <Grid item xs={12}>
+          <Paper sx={{ p: 2 }}>
+            <PromptInput onSubmit={handlePromptSubmit} loading={loading} />
+          </Paper>
+        </Grid>
+
+        {/* Preview Section */}
         <Grid item xs={12} md={6}>
-          <Paper sx={{ p: 2, height: '500px' }}>
+          <Paper sx={{ p: 2, minHeight: '500px' }}>
+            <Box sx={{ mb: 2 }}>
+              <h3>Claude Output</h3>
+            </Box>
+            <PatternPreview
+              html={claudeOutput || '<!-- Generated HTML will appear here -->'}
+            />
+          </Paper>
+        </Grid>
+
+        {/* Similar Pattern Preview */}
+        <Grid item xs={12} md={6}>
+          <Paper sx={{ p: 2, minHeight: '500px' }}>
+            <Box sx={{ mb: 2 }}>
+              <h3>Similar Pattern</h3>
+            </Box>
             <PatternPreview
               html={selectedPattern?.content.html}
               css={selectedPattern?.content.css}
@@ -56,9 +89,9 @@ const App: React.FC = () => {
           </Paper>
         </Grid>
 
-        {/* Embedding Visualizer */}
+        {/* Pattern Space Visualization */}
         <Grid item xs={12} md={6}>
-          <Paper sx={{ p: 2, height: '500px' }}>
+          <Paper sx={{ p: 2, height: '400px' }}>
             <EmbeddingVisualizer
               embeddings={patterns.map(p => ({
                 id: p.id,
@@ -70,20 +103,7 @@ const App: React.FC = () => {
           </Paper>
         </Grid>
 
-        {/* Controls */}
-        <Grid item xs={12} md={6}>
-          <Paper sx={{ p: 2 }}>
-            <Controls
-              onEvolve={handleEvolve}
-              onReset={() => setSelectedPattern(patterns[0])}
-              onParameterChange={(param, value) => {
-                console.log('Parameter changed:', param, value);
-              }}
-            />
-          </Paper>
-        </Grid>
-
-        {/* Metrics Panel */}
+        {/* Comparison & Feedback */}
         <Grid item xs={12} md={6}>
           <Paper sx={{ p: 2 }}>
             <MetricsPanel
@@ -95,6 +115,11 @@ const App: React.FC = () => {
                 accessibility: 0.5,
                 codeQuality: 0.5
               } : undefined}
+            />
+            <Controls
+              onParameterChange={(param, value) => {
+                console.log('Parameter changed:', param, value);
+              }}
             />
           </Paper>
         </Grid>
