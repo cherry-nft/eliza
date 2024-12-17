@@ -436,375 +436,245 @@ export class PatternEvolution extends Service {
         pattern: GamePattern,
         rate: number
     ): Promise<GamePattern> {
-        const mutatedPattern: GamePattern = {
-            ...pattern,
-            id: uuidv4(),
-            pattern_name: `${pattern.pattern_name}_mutated`,
-            content: await this.mutateContent(pattern.content, rate),
-            embedding: pattern.embedding.map(
-                (value) => value + (Math.random() - 0.5) * rate
-            ),
-        };
+        const mutatedPattern = { ...pattern, id: uuidv4() };
 
-        // Validate through staging service
-        return await this.staging.validatePattern(mutatedPattern);
-    }
-
-    private async mutateContent(content: any, rate: number): Promise<any> {
-        if (!content) return content;
-
-        const mutatedContent = { ...content };
-
-        // Always apply game mechanics first
-        await this.mutateGameLogic(mutatedContent);
-
-        const operations = [
-            this.mutateHtmlElements,
-            this.mutateHtmlAttributes,
-            this.mutateHtmlClasses,
-            this.mutateCssStyles,
-            this.mutateCssAnimations,
+        // List of available mutation operators
+        const operators = [
+            "add_interaction",
+            "modify_style",
+            "add_animation",
+            "change_layout",
+            "add_game_element",
         ];
 
-        // Apply random mutations based on rate
-        for (const operation of operations) {
+        // Log available operators
+        this.runtime.logger.info("Available mutation operators:", operators);
+
+        // Apply first mutation
+        const firstOperator =
+            operators[Math.floor(Math.random() * operators.length)];
+        this.runtime.logger.info("Applying first mutation:", firstOperator);
+        mutatedPattern.content.html = await this.applyMutation(
+            mutatedPattern.content.html,
+            firstOperator
+        );
+
+        // Potentially apply additional mutations based on rate
+        for (const operator of operators) {
             if (Math.random() < rate) {
-                try {
-                    await operation.call(this, mutatedContent);
-                } catch (error) {
-                    this.runtime.logger.error(
-                        `Mutation operation failed: ${error}`
-                    );
-                }
+                this.runtime.logger.info(
+                    "Applying additional mutation:",
+                    operator
+                );
+                mutatedPattern.content.html = await this.applyMutation(
+                    mutatedPattern.content.html,
+                    operator
+                );
             }
         }
 
-        return mutatedContent;
+        return this.staging.validatePattern(mutatedPattern);
     }
 
-    private async mutateGameLogic(content: any): Promise<void> {
-        if (!content.html) content.html = "";
+    private async applyMutation(
+        html: string,
+        operator: string
+    ): Promise<string> {
+        switch (operator) {
+            case "add_game_element":
+                return this.addGameElement(html);
+            case "add_interaction":
+                return this.addInteraction(html);
+            case "modify_style":
+                return this.modifyStyle(html);
+            case "add_animation":
+                return this.addAnimation(html);
+            case "change_layout":
+                return this.changeLayout(html);
+            default:
+                return html;
+        }
+    }
 
-        // Add game state management
-        const gameStateScript = `
-            <script>
-                window.gameState = {
-                    score: 0,
-                    health: 100,
-                    level: 1,
-                    powerups: [],
-                    combo: 0,
-                    updateScore: function(points) {
-                        this.score += points * (this.combo + 1);
-                        document.querySelector('.game-score span').textContent = this.score;
-                    },
-                    updateHealth: function(amount) {
-                        this.health = Math.max(0, Math.min(100, this.health + amount));
-                        document.querySelector('.game-health span').textContent = this.health;
-                        if (this.health <= 0) this.gameOver();
-                    },
-                    addPowerup: function(effect, duration) {
-                        this.powerups.push({ effect, expires: Date.now() + duration });
-                        setTimeout(() => this.removePowerup(effect), duration);
-                    },
-                    removePowerup: function(effect) {
-                        this.powerups = this.powerups.filter(p => p.effect !== effect);
-                    },
-                    gameOver: function() {
-                        document.dispatchEvent(new CustomEvent('gameOver', { detail: { score: this.score } }));
-                    }
-                };
+    private addGameElement(html: string): string {
+        const elements = [
+            // Collision detection element
+            `<div class="game-player" data-collision="true" style="width: 32px; height: 32px; background-color: rgb(255, 0, 0); position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);">
+                <script>
+                    setInterval(() => {
+                        const player = document.querySelector('.game-player');
+                        const rect = player.getBoundingClientRect();
+                        // Collision detection logic
+                        document.querySelectorAll('[data-collision="true"]').forEach(element => {
+                            if (element === player) return;
+                            const rect2 = element.getBoundingClientRect();
+                            if (rect.left < rect2.right && rect.right > rect2.left &&
+                                rect.top < rect2.bottom && rect.bottom > rect2.top) {
+                                element.dispatchEvent(new CustomEvent('collision', { detail: { player } }));
+                            }
+                        });
+                    }, 16);
+                </script>
+            </div>`,
 
-                // Collision detection
-                setInterval(() => {
-                    const player = document.querySelector('.game-player');
-                    if (!player) return;
-                    document.querySelectorAll('[data-collision="true"]').forEach(element => {
-                        if (element === player) return;
-                        const rect1 = player.getBoundingClientRect();
-                        const rect2 = element.getBoundingClientRect();
-                        if (rect1.left < rect2.right && rect1.right > rect2.left &&
-                            rect1.top < rect2.bottom && rect1.bottom > rect2.top) {
-                            element.dispatchEvent(new CustomEvent('collision', { detail: { player } }));
+            // Power-up element with game state
+            `<div class="game-powerup" data-effect="speed" data-duration="5000" style="width: 16px; height: 16px; background-color: rgb(255, 255, 0); position: absolute; border-radius: 50%; animation: float 2s infinite ease-in-out;">
+                <script>
+                    const gameState = {
+                        score: 0,
+                        health: 100,
+                        powerups: [],
+                        level: 1,
+                        combo: 0,
+                        updateScore: function(points) {
+                            this.score += points * (this.combo + 1);
+                            document.querySelector('.game-score span').textContent = this.score;
+                        },
+                        updateHealth: function(amount) {
+                            this.health = Math.max(0, Math.min(100, this.health + amount));
+                            document.querySelector('.game-health span').textContent = this.health;
+                            if (this.health <= 0) this.gameOver();
+                        },
+                        addPowerup: function(effect, duration) {
+                            this.powerups.push({ effect, expires: Date.now() + duration });
+                            setTimeout(() => this.removePowerup(effect), duration);
+                        },
+                        removePowerup: function(effect) {
+                            this.powerups = this.powerups.filter(p => p.effect !== effect);
+                        },
+                        gameOver: function() {
+                            document.dispatchEvent(new CustomEvent('gameOver', { detail: { score: this.score } }));
                         }
-                    });
-                }, 16);
+                    };
+                </script>
+            </div>`,
 
-                // Keyboard controls
-                document.addEventListener('keydown', (e) => {
-                    const player = document.querySelector('.game-player');
-                    if (!player) return;
-                    const speed = parseInt(player.dataset.speed) || 5;
-                    switch(e.key) {
-                        case 'ArrowLeft': player.style.left = (parseInt(player.style.left || 0) - speed) + 'px'; break;
-                        case 'ArrowRight': player.style.left = (parseInt(player.style.left || 0) + speed) + 'px'; break;
-                        case 'ArrowUp': player.style.top = (parseInt(player.style.top || 0) - speed) + 'px'; break;
-                        case 'ArrowDown': player.style.top = (parseInt(player.style.top || 0) + speed) + 'px'; break;
-                        case ' ': player.dispatchEvent(new CustomEvent('action')); break;
+            // Level progression element
+            `<div class="game-portal" data-next-level="true" style="width: 48px; height: 48px; background: linear-gradient(45deg, #00f, #f0f); border-radius: 50%; animation: pulse 2s infinite;">
+                <script>
+                    function nextLevel() {
+                        gameState.level++;
+                        updateGameState();
                     }
-                });
+                </script>
+            </div>`,
 
-                // Touch controls
-                function movePlayer(direction) {
-                    const player = document.querySelector('.game-player');
-                    if (!player) return;
-                    const speed = parseInt(player.dataset.speed) || 5;
-                    switch(direction) {
-                        case 'left': player.style.left = (parseInt(player.style.left || 0) - speed) + 'px'; break;
-                        case 'right': player.style.left = (parseInt(player.style.left || 0) + speed) + 'px'; break;
-                    }
-                }
-
-                function stopPlayer() {
-                    const player = document.querySelector('.game-player');
-                    if (!player) return;
-                    player.style.transition = 'none';
-                }
-
-                function playerAction() {
-                    const player = document.querySelector('.game-player');
-                    if (!player) return;
-                    player.dispatchEvent(new CustomEvent('action'));
-                }
-            </script>
-        `;
-
-        // Add game elements
-        const gameElements = `
-            <div class="game-player" style="width: 32px; height: 32px; background: red; position: absolute;" data-collision="true" data-speed="5"></div>
-            <div class="game-collectible" style="width: 16px; height: 16px; background: yellow; border-radius: 50%; position: absolute;" data-collision="true" data-points="10"></div>
-            <div class="game-powerup speed" style="width: 20px; height: 20px; background: blue; position: absolute;" data-collision="true" data-effect="speed" data-duration="5000"></div>
-            <div class="game-portal" style="width: 40px; height: 40px; background: green; position: absolute;" data-collision="true" data-next-level="true"></div>
-        `;
-
-        // Add UI elements
-        const uiElements = `
-            <div class="game-score">Score: <span>0</span></div>
-            <div class="game-health">Health: <span>100</span></div>
-            <div class="game-level">Level: <span>1</span></div>
-        `;
-
-        // Add touch controls
-        const touchControls = `
-            <div class="game-controls" style="position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); display: flex; gap: 20px;">
+            // Game controls
+            `<div class="game-controls" style="position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); display: flex; gap: 20px;">
                 <button class="control-left" ontouchstart="movePlayer('left')" ontouchend="stopPlayer()">←</button>
                 <button class="control-right" ontouchstart="movePlayer('right')" ontouchend="stopPlayer()">→</button>
                 <button class="control-action" ontouchstart="playerAction()">Action</button>
-            </div>
-        `;
+                <script>
+                    function movePlayer(direction) {
+                        const player = document.querySelector('.game-player');
+                        if (!player) return;
+                        const speed = parseInt(player.dataset.speed) || 5;
+                        switch(direction) {
+                            case 'left': player.style.left = (parseInt(player.style.left || 0) - speed) + 'px'; break;
+                            case 'right': player.style.left = (parseInt(player.style.left || 0) + speed) + 'px'; break;
+                        }
+                    }
 
-        // Insert game elements at appropriate positions
-        const containerMatch = content.html.match(
-            /<div[^>]*class="[^"]*container[^"]*"[^>]*>/
-        );
-        if (containerMatch) {
-            const insertPosition =
-                containerMatch.index + containerMatch[0].length;
-            content.html =
-                content.html.slice(0, insertPosition) +
-                gameElements +
-                uiElements +
-                touchControls +
-                content.html.slice(insertPosition);
-        } else {
-            content.html = `<div class="container">${gameElements}${uiElements}${touchControls}${content.html}</div>`;
-        }
+                    function stopPlayer() {
+                        const player = document.querySelector('.game-player');
+                        if (!player) return;
+                        player.style.transition = 'none';
+                    }
 
-        // Add game logic script at the end
-        if (!content.html.includes("gameState")) {
-            content.html = gameStateScript + content.html;
-        }
-    }
+                    function playerAction() {
+                        const player = document.querySelector('.game-player');
+                        if (!player) return;
+                        player.dispatchEvent(new CustomEvent('action'));
+                    }
+                </script>
+            </div>`,
 
-    private async mutateHtmlElements(content: any): Promise<void> {
-        if (!content.html) return;
-
-        const gameElements = [
-            // Basic game elements
-            '<div class="game-player" style="width: 32px; height: 32px; background: red; position: absolute;" data-collision="true" data-speed="5"></div>',
-            '<div class="game-collectible" style="width: 16px; height: 16px; background: yellow; border-radius: 50%; position: absolute;" data-collision="true" data-points="10"></div>',
-            '<div class="game-obstacle" style="width: 48px; height: 16px; background: #666; position: absolute;" data-collision="true" data-damage="20"></div>',
-            '<div class="game-score">Score: <span>0</span></div>',
-            '<div class="game-health">Health: <span>100</span></div>',
-            '<div class="game-timer">Time: <span>60</span></div>',
-
-            // Power-ups
-            '<div class="game-powerup speed" style="width: 20px; height: 20px; background: blue; position: absolute;" data-collision="true" data-effect="speed" data-duration="5000"></div>',
-            '<div class="game-powerup invincible" style="width: 20px; height: 20px; background: purple; position: absolute;" data-collision="true" data-effect="invincible" data-duration="3000"></div>',
-
-            // Level elements
-            '<div class="game-portal" style="width: 40px; height: 40px; background: green; position: absolute;" data-collision="true" data-next-level="true"></div>',
-            '<div class="game-checkpoint" style="width: 24px; height: 24px; background: cyan; position: absolute;" data-collision="true" data-save-point="true"></div>',
-
-            // UI elements
-            '<div class="game-level">Level: <span>1</span></div>',
-            '<div class="game-multiplier">Multiplier: <span>1x</span></div>',
-            '<div class="game-combo">Combo: <span>0</span></div>',
+            // Score display
+            `<div class="game-score" style="position: absolute; top: 10px; right: 10px; padding: 5px 10px; background-color: rgb(51, 51, 51); color: rgb(255, 255, 255); border-radius: 5px;">Score: <span>0</span></div>`,
         ];
 
-        const gameControls = [
+        const element = elements[Math.floor(Math.random() * elements.length)];
+        return html.replace("</div>", `${element}</div>`);
+    }
+
+    private addInteraction(html: string): string {
+        const interactions = [
             // Keyboard controls
-            '<script>document.addEventListener("keydown", (e) => {' +
-                '  const player = document.querySelector(".game-player");' +
-                "  if (!player) return;" +
-                "  const speed = parseInt(player.dataset.speed) || 5;" +
-                "  switch(e.key) {" +
-                '    case "ArrowLeft": player.style.left = (parseInt(player.style.left || 0) - speed) + "px"; break;' +
-                '    case "ArrowRight": player.style.left = (parseInt(player.style.left || 0) + speed) + "px"; break;' +
-                '    case "ArrowUp": player.style.top = (parseInt(player.style.top || 0) - speed) + "px"; break;' +
-                '    case "ArrowDown": player.style.top = (parseInt(player.style.top || 0) + speed) + "px"; break;' +
-                '    case " ": player.dispatchEvent(new CustomEvent("action")); break;' +
-                "  }" +
-                "});</script>",
+            `<script>
+                document.addEventListener("keydown", (e) => {
+                    const player = document.querySelector('.game-player');
+                    if (!player) return;
+                    const speed = parseInt(player.dataset.speed) || 5;
 
-            // Touch controls
-            '<div class="game-controls" style="position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); display: flex; gap: 20px;">' +
-                '  <button class="control-left" ontouchstart="movePlayer(\'left\')" ontouchend="stopPlayer()">←</button>' +
-                '  <button class="control-right" ontouchstart="movePlayer(\'right\')" ontouchend="stopPlayer()">→</button>' +
-                '  <button class="control-action" ontouchstart="playerAction()">Action</button>' +
-                "</div>",
+                    switch(e.key) {
+                        case "ArrowLeft":
+                            player.style.left = (parseInt(player.style.left || 0) - speed) + 'px';
+                            break;
+                        case "ArrowRight":
+                            player.style.left = (parseInt(player.style.left || 0) + speed) + 'px';
+                            break;
+                        case "ArrowUp":
+                            player.style.top = (parseInt(player.style.top || 0) - speed) + 'px';
+                            break;
+                        case "ArrowDown":
+                            player.style.top = (parseInt(player.style.top || 0) + speed) + 'px';
+                            break;
+                        case " ":
+                            player.dispatchEvent(new CustomEvent('action'));
+                            break;
+                    }
+                });
+            </script>`,
+
+            // Click interaction
+            `<div class="interactive" onclick="this.classList.toggle('active'); gameState.updateScore(10);">Click me!</div>`,
+
+            // Hover effect
+            `<div class="hoverable" onmouseover="this.style.transform='scale(1.1)'; gameState.updateHealth(5);" onmouseout="this.style.transform='scale(1)'">Hover me!</div>`,
+
+            // Drag and drop
+            `<div class="draggable" draggable="true" ondragstart="event.dataTransfer.setData('text', event.target.id); gameState.addPowerup('speed', 5000);">Drag me!</div>`,
         ];
 
-        const gameLogic = [
-            // Collision detection
-            "<script>setInterval(() => {" +
-                '  const player = document.querySelector(".game-player");' +
-                "  if (!player) return;" +
-                '  document.querySelectorAll("[data-collision=true]").forEach(element => {' +
-                "    if (element === player) return;" +
-                "    const rect1 = player.getBoundingClientRect();" +
-                "    const rect2 = element.getBoundingClientRect();" +
-                "    if (rect1.left < rect2.right && rect1.right > rect2.left && " +
-                "        rect1.top < rect2.bottom && rect1.bottom > rect2.top) {" +
-                '      element.dispatchEvent(new CustomEvent("collision", { detail: { player } }));' +
-                "    }" +
-                "  });" +
-                "}, 16);</script>",
-
-            // Game state management
-            "<script>const gameState = {" +
-                "  score: 0, health: 100, level: 1, powerups: [], combo: 0," +
-                "  updateScore: function(points) {" +
-                "    this.score += points * (this.combo + 1);" +
-                '    document.querySelector(".game-score span").textContent = this.score;' +
-                "  }," +
-                "  updateHealth: function(amount) {" +
-                "    this.health = Math.max(0, Math.min(100, this.health + amount));" +
-                '    document.querySelector(".game-health span").textContent = this.health;' +
-                "    if (this.health <= 0) this.gameOver();" +
-                "  }," +
-                "  addPowerup: function(effect, duration) {" +
-                "    this.powerups.push({ effect, expires: Date.now() + duration });" +
-                "    setTimeout(() => this.removePowerup(effect), duration);" +
-                "  }," +
-                "  removePowerup: function(effect) {" +
-                "    this.powerups = this.powerups.filter(p => p.effect !== effect);" +
-                "  }," +
-                "  gameOver: function() {" +
-                '    document.dispatchEvent(new CustomEvent("gameOver", { detail: { score: this.score } }));' +
-                "  }" +
-                "};</script>",
-        ];
-
-        // Add a random game element
-        const allElements = [...gameElements, ...gameControls, ...gameLogic];
-        const randomElement =
-            allElements[Math.floor(Math.random() * allElements.length)];
-
-        // Insert at a reasonable position
-        if (randomElement.startsWith("<script>")) {
-            // Add scripts at the end
-            content.html += randomElement;
-        } else {
-            // Insert other elements after an existing div
-            const divMatch = content.html.match(/<\/div>/);
-            if (divMatch) {
-                const insertPosition = divMatch.index;
-                content.html =
-                    content.html.slice(0, insertPosition) +
-                    randomElement +
-                    content.html.slice(insertPosition);
-            }
-        }
+        const interaction =
+            interactions[Math.floor(Math.random() * interactions.length)];
+        return html.replace("</div>", `${interaction}</div>`);
     }
 
-    private async mutateHtmlAttributes(content: any): Promise<void> {
-        if (!content.html) return;
-
-        const attributes = [
-            ['draggable="true"', "onclick=\"this.classList.toggle('active')"],
-            [
-                'style="cursor: pointer;"',
-                "onmouseover=\"this.style.opacity='0.8'\"",
-            ],
-            ['data-interactive="true"', 'role="button"'],
-        ];
-
-        // Add random attributes to existing elements
-        const randomAttr =
-            attributes[Math.floor(Math.random() * attributes.length)];
-        content.html = content.html.replace(
-            /<div(?![^>]*class="game-[^"]*")[^>]*>/,
-            (match) => match.replace(">", ` ${randomAttr}>`)
-        );
-    }
-
-    private async mutateHtmlClasses(content: any): Promise<void> {
-        if (!content.html) return;
-
-        const classes = [
-            "interactive",
-            "hoverable",
-            "clickable",
-            "animated",
-            "game-element",
-            "collectible",
-            "obstacle",
-            "power-up",
-        ];
-
-        // Add a random class to an existing element
-        const randomClass = classes[Math.floor(Math.random() * classes.length)];
-        content.html = content.html.replace(
-            /<div(?![^>]*class="game-[^"]*")[^>]*>/,
-            (match) => {
-                if (match.includes('class="')) {
-                    return match.replace('class="', `class="${randomClass} `);
-                }
-                return match.replace(">", ` class="${randomClass}">`);
-            }
-        );
-    }
-
-    private async mutateCssStyles(content: any): Promise<void> {
-        if (!content.css) content.css = "";
-
+    private modifyStyle(html: string): string {
         const styles = [
-            `.interactive:hover { transform: scale(1.1); transition: transform 0.2s; }`,
-            `.clickable { cursor: pointer; user-select: none; }`,
-            `.hoverable { transition: all 0.3s ease; }`,
-            `.game-element { position: relative; overflow: hidden; }`,
-            `.animated { animation: pulse 2s infinite; }`,
+            "background-color: rgb(168, 168, 168); border-radius: 8px; padding: 10px;",
+            "color: rgb(23, 23, 23); font-weight: bold; text-shadow: 1px 1px 2px rgba(0,0,0,0.1);",
+            "border: 2px solid #333; box-shadow: 2px 2px 5px rgba(0,0,0,0.2); margin: 10px;",
+            "display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 15px;",
         ];
 
-        // Add a random style
-        const randomStyle = styles[Math.floor(Math.random() * styles.length)];
-        content.css += `\n${randomStyle}`;
+        const style = styles[Math.floor(Math.random() * styles.length)];
+        return html.replace(/style="[^"]*"/, `style="${style}"`);
     }
 
-    private async mutateCssAnimations(content: any): Promise<void> {
-        if (!content.css) content.css = "";
-
+    private addAnimation(html: string): string {
         const animations = [
-            `@keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }`,
-            `@keyframes float { 0% { transform: translateY(0); } 50% { transform: translateY(-10px); } 100% { transform: translateY(0); } }`,
-            `@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`,
-            `@keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-20px); } }`,
+            "animation: pulse 2s infinite; transform: scale(1);",
+            "animation: rotate 3s linear infinite; transform-origin: center;",
+            "animation: bounce 1s infinite; transform: translateY(0);",
+            "animation: float 2s infinite ease-in-out;",
         ];
 
-        // Add a random animation
-        const randomAnimation =
+        const animation =
             animations[Math.floor(Math.random() * animations.length)];
-        content.css += `\n${randomAnimation}`;
+        return html.replace(/style="([^"]*)"/, `style="$1 ${animation}"`);
+    }
+
+    private changeLayout(html: string): string {
+        const layouts = [
+            "display: flex; flex-direction: column; gap: 10px; justify-content: space-between;",
+            "display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px;",
+            "position: relative; margin: 20px; padding: 15px;",
+            "display: flex; flex-direction: row; gap: 10px; justify-content: space-between;",
+        ];
+
+        const layout = layouts[Math.floor(Math.random() * layouts.length)];
+        return html.replace(/style="([^"]*)"/, `style="$1 ${layout}"`);
     }
 }
