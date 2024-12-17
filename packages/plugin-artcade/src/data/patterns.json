@@ -4067,7 +4067,7 @@
                     "",
                     "  <div class='export-section'>",
                     "    <button class='export-btn svg'>Download SVG</button>",
-                    <button class='export-btn png'>Download PNG</button>",
+                    "    <button class='export-btn png'>Download PNG</button>",
                     "  </div>",
                     "</div>"
                 ],
@@ -4540,13 +4540,7 @@
             "context": "Creative integration of multiple charting libraries for meme-worthy crypto visualizations",
             "metadata": {
                 "visual_type": "financial_charts",
-                "libraries": [
-                    "tradingview",
-                    "chartjs",
-                    "d3",
-                    "jquery",
-                    "jsap"
-                ],
+                "libraries": ["tradingview", "chartjs", "d3", "jquery", "jsap"],
                 "features": [
                     "candlestick_charts",
                     "real_time_updates",
@@ -5014,7 +5008,7 @@
                     "  background: #000;",
                     "}",
                     "",
-                    video {",
+                    "video {",
                     "  width: 100%;",
                     "  height: 100%;",
                     "  object-fit: contain;",
