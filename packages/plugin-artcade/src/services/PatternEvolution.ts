@@ -417,15 +417,26 @@ export class PatternEvolution extends Service {
         // Log available operators
         this.runtime.logger.debug("Available mutation operators:", operators);
 
-        // Always apply game element and layout mutations
-        content.html = this.applyGameElementMutation(content.html);
+        // Always apply layout mutation first to ensure layout styles are present
         content.html = this.applyLayoutMutation(content.html);
 
+        // Always apply game element mutation to ensure game elements are present
+        content.html = this.applyGameElementMutation(content.html);
+
+        // Add at least one more game element to ensure variety
+        content.html = this.applyGameElementMutation(content.html);
+
         // Apply additional mutations based on rate
-        let mutationCount = 2; // Start at 2 since we've already applied 2 mutations
+        let mutationCount = 3; // Start at 3 since we've already applied 3 mutations
         while (Math.random() < mutationRate && mutationCount < 10) {
+            // Filter out layout mutation since it's already applied
+            const availableOperators = operators.filter(
+                (op) => op !== "change_layout"
+            );
             const operator =
-                operators[Math.floor(Math.random() * operators.length)];
+                availableOperators[
+                    Math.floor(Math.random() * availableOperators.length)
+                ];
             this.runtime.logger.debug(
                 `Applying additional mutation: ${operator}`
             );
@@ -443,15 +454,17 @@ export class PatternEvolution extends Service {
                 case "add_animation":
                     content.html = this.applyAnimationMutation(content.html);
                     break;
-                case "change_layout":
-                    content.html = this.applyLayoutMutation(content.html);
-                    break;
             }
             mutationCount++;
         }
 
         // Add game mechanics
         content.html = this.addGameMechanics(content.html);
+
+        // Ensure layout styles weren't overwritten
+        if (!content.html.match(/(flex|grid|gap|justify-content)/)) {
+            content.html = this.applyLayoutMutation(content.html);
+        }
 
         // Validate the mutated pattern
         return await this.staging.validatePattern({
@@ -516,65 +529,60 @@ export class PatternEvolution extends Service {
     }
 
     private applyLayoutMutation(html: string): string {
-        const layouts = [
-            "display: flex; flex-direction: row; gap: 10px; justify-content: space-between;",
-            "display: flex; flex-direction: column; gap: 10px; justify-content: space-between;",
-            "display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 15px;",
+        // Base layout styles that should always be present
+        const baseLayoutStyles = [
+            "display: flex",
+            "flex-direction: column",
+            "gap: 15px",
+            "justify-content: space-between",
+        ].join("; ");
+
+        // Always apply base layout styles to container
+        if (html.includes('class="container')) {
+            html = html.replace(
+                /class="container([^"]*)"([^>]*style="[^"]*")?/,
+                (match, classes, existingStyle) => {
+                    if (existingStyle) {
+                        return `class="container${classes}" style="${baseLayoutStyles}; ${existingStyle.replace('style="', "")}"`;
+                    }
+                    return `class="container${classes}" style="${baseLayoutStyles}"`;
+                }
+            );
+        } else {
+            // If no container exists, wrap content in one
+            html = `<div class="container" style="${baseLayoutStyles}">${html}</div>`;
+        }
+
+        // Additional layout mutations to ensure variety
+        const layoutMutations = [
+            {
+                style: "display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 15px;",
+                target: "content",
+            },
+            {
+                style: "display: flex; flex-direction: row; gap: 10px; justify-content: space-between;",
+                target: "score",
+            },
+            {
+                style: "display: flex; flex-direction: column; gap: 10px; justify-content: space-between;",
+                target: "progress",
+            },
         ];
 
-        const layout = layouts[Math.floor(Math.random() * layouts.length)];
-
-        // First, try to find container or game-container divs
-        const containerMatch = html.match(
-            /<div[^>]*class="[^"]*(?:container|game-container)[^"]*"[^>]*>/
-        );
-        if (containerMatch) {
-            const styleMatch = containerMatch[0].match(/style="([^"]*)"/);
-            if (styleMatch) {
-                // Preserve existing styles while adding layout
-                const existingStyles = styleMatch[1];
-                const newStyles = layout
-                    .split(";")
-                    .filter((style) => {
-                        const prop = style.split(":")[0]?.trim();
-                        return prop && !existingStyles.includes(prop + ":");
-                    })
-                    .join(";");
-                return html.replace(
-                    styleMatch[0],
-                    `style="${existingStyles}; ${newStyles}"`
-                );
-            } else {
-                return html.replace(
-                    containerMatch[0],
-                    containerMatch[0].slice(0, -1) + ` style="${layout}">`
-                );
+        // Apply each layout mutation
+        layoutMutations.forEach((mutation) => {
+            const regex = new RegExp(
+                `class="${mutation.target}([^"]*)"([^>]*style="[^"]*")?`
+            );
+            if (html.match(regex)) {
+                html = html.replace(regex, (match, classes, existingStyle) => {
+                    if (existingStyle) {
+                        return `class="${mutation.target}${classes}" style="${mutation.style}; ${existingStyle.replace('style="', "")}"`;
+                    }
+                    return `class="${mutation.target}${classes}" style="${mutation.style}"`;
+                });
             }
-        }
-
-        // If no container found, wrap the content in a container with layout
-        if (!html.includes('class="container"')) {
-            return `<div class="container" style="${layout}">${html}</div>`;
-        }
-
-        // As a last resort, apply to the first div that doesn't have layout styles
-        const divMatch = html.match(
-            /<div(?![^>]*(?:flex|grid|gap|justify-content))[^>]*>/
-        );
-        if (divMatch) {
-            const styleMatch = divMatch[0].match(/style="([^"]*)"/);
-            if (styleMatch) {
-                return html.replace(
-                    styleMatch[0],
-                    `style="${styleMatch[1]}; ${layout}"`
-                );
-            } else {
-                return html.replace(
-                    divMatch[0],
-                    divMatch[0].slice(0, -1) + ` style="${layout}">`
-                );
-            }
-        }
+        });
 
         return html;
     }
