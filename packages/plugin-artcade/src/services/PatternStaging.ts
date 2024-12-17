@@ -53,8 +53,23 @@ export interface ApprovalMetadata {
     approved_at: Date;
 }
 
+export interface PatternHistory {
+    id: string;
+    pattern_id: string;
+    action: "created" | "approved" | "rejected" | "modified";
+    timestamp: Date;
+    metadata: {
+        source_file?: string;
+        line_range?: { start: number; end: number };
+        approver?: string;
+        reason?: string;
+        changes?: string[];
+    };
+}
+
 export class PatternStagingService extends Service {
     private stagedPatterns: Map<string, StagedPattern> = new Map();
+    private patternHistory: Map<string, PatternHistory[]> = new Map();
     private runtime!: IAgentRuntime & { logger: typeof elizaLogger };
 
     constructor() {
@@ -86,7 +101,23 @@ export class PatternStagingService extends Service {
 
         this.stagedPatterns.set(stagingId, stagedPattern);
 
-        // Log staging for debugging
+        // Add history entry for pattern creation
+        const historyEntry: PatternHistory = {
+            id: randomUUID(),
+            pattern_id: stagingId,
+            action: "created",
+            timestamp: new Date(),
+            metadata: {
+                source_file: location.file,
+                line_range: {
+                    start: location.start_line,
+                    end: location.end_line,
+                },
+            },
+        };
+
+        this.patternHistory.set(stagingId, [historyEntry]);
+
         this.runtime.logger.debug(`Pattern staged: ${stagingId}`, {
             type: pattern.type,
             location,
@@ -127,6 +158,22 @@ export class PatternStagingService extends Service {
             }
             await patternService.storeApprovedPattern(approvedPattern);
 
+            // Add history entry for pattern approval
+            const historyEntry: PatternHistory = {
+                id: randomUUID(),
+                pattern_id: stagingId,
+                action: "approved",
+                timestamp: new Date(),
+                metadata: {
+                    approver: approvalMetadata.approver,
+                    reason: approvalMetadata.reason,
+                },
+            };
+
+            const history = this.patternHistory.get(stagingId) || [];
+            history.push(historyEntry);
+            this.patternHistory.set(stagingId, history);
+
             // Remove from staging
             this.stagedPatterns.delete(stagingId);
 
@@ -149,10 +196,25 @@ export class PatternStagingService extends Service {
         }
     }
 
-    async rejectPattern(stagingId: string): Promise<void> {
+    async rejectPattern(stagingId: string, reason: string): Promise<void> {
         if (!this.stagedPatterns.has(stagingId)) {
             throw new Error(`Pattern ${stagingId} not found in staging`);
         }
+
+        // Add history entry for pattern rejection
+        const historyEntry: PatternHistory = {
+            id: randomUUID(),
+            pattern_id: stagingId,
+            action: "rejected",
+            timestamp: new Date(),
+            metadata: {
+                reason,
+            },
+        };
+
+        const history = this.patternHistory.get(stagingId) || [];
+        history.push(historyEntry);
+        this.patternHistory.set(stagingId, history);
 
         this.stagedPatterns.delete(stagingId);
         this.runtime.logger.debug(`Pattern ${stagingId} rejected`);
@@ -173,5 +235,9 @@ export class PatternStagingService extends Service {
     async clearStaging(): Promise<void> {
         this.stagedPatterns.clear();
         this.runtime.logger.debug("Pattern staging cleared");
+    }
+
+    async getPatternHistory(stagingId: string): Promise<PatternHistory[]> {
+        return this.patternHistory.get(stagingId) || [];
     }
 }

@@ -439,4 +439,90 @@ describe("PatternStagingService", () => {
             );
         });
     });
+
+    describe("Pattern History", () => {
+        it("should track pattern creation history", async () => {
+            const stagingId = await stagingService.stagePattern(
+                mockPattern,
+                "test_evolution",
+                mockLocation
+            );
+
+            const history = await stagingService.getPatternHistory(stagingId);
+            expect(history).toHaveLength(1);
+            expect(history[0].action).toBe("created");
+            expect(history[0].metadata.source_file).toBe(mockLocation.file);
+            expect(history[0].metadata.line_range).toEqual({
+                start: mockLocation.start_line,
+                end: mockLocation.end_line,
+            });
+        });
+
+        it("should track pattern approval history", async () => {
+            const stagingId = await stagingService.stagePattern(
+                mockPattern,
+                "test_evolution",
+                mockLocation
+            );
+
+            const approvalMetadata = {
+                reason: "Good pattern",
+                approver: "test_user",
+                quality_notes: "High quality implementation",
+            };
+
+            await stagingService.approvePattern(stagingId, approvalMetadata);
+
+            const history = await stagingService.getPatternHistory(stagingId);
+            expect(history).toHaveLength(2);
+            expect(history[1].action).toBe("approved");
+            expect(history[1].metadata.approver).toBe("test_user");
+            expect(history[1].metadata.reason).toBe("Good pattern");
+        });
+
+        it("should track pattern rejection history", async () => {
+            const stagingId = await stagingService.stagePattern(
+                mockPattern,
+                "test_evolution",
+                mockLocation
+            );
+
+            await stagingService.rejectPattern(
+                stagingId,
+                "Low quality implementation"
+            );
+
+            const history = await stagingService.getPatternHistory(stagingId);
+            expect(history).toHaveLength(2);
+            expect(history[1].action).toBe("rejected");
+            expect(history[1].metadata.reason).toBe(
+                "Low quality implementation"
+            );
+        });
+
+        it("should maintain chronological order in history", async () => {
+            const stagingId = await stagingService.stagePattern(
+                mockPattern,
+                "test_evolution",
+                mockLocation
+            );
+
+            // Add some delay between actions
+            await new Promise((resolve) => setTimeout(resolve, 10));
+            await stagingService.rejectPattern(stagingId, "First rejection");
+            await new Promise((resolve) => setTimeout(resolve, 10));
+
+            const history = await stagingService.getPatternHistory(stagingId);
+            expect(history).toHaveLength(2);
+            expect(history[0].timestamp.getTime()).toBeLessThan(
+                history[1].timestamp.getTime()
+            );
+        });
+
+        it("should handle missing history gracefully", async () => {
+            const history =
+                await stagingService.getPatternHistory("non-existent");
+            expect(history).toEqual([]);
+        });
+    });
 });
