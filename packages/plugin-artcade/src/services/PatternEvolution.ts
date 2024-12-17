@@ -582,8 +582,8 @@ export class PatternEvolution extends Service {
     private addCollisionDetection(html: string): string {
         // Add collision detection to existing game elements if they don't have it
         return html.replace(
-            /class="(game-player|game-collectible|game-obstacle|game-portal|game-checkpoint)"/g,
-            'class="$1" data-collision="true"'
+            /class="(game-player|game-collectible|game-obstacle|game-portal|game-checkpoint)"([^>]*?)(?:data-collision="true")?([^>]*?)>/g,
+            'class="$1"$2 data-collision="true"$3>'
         );
     }
 
@@ -787,8 +787,22 @@ export class PatternEvolution extends Service {
             </script>
         `;
 
-        // Add power-up element
-        const powerupHtml = `
+        // Add game elements with event listeners
+        const gameElements = `
+            <div class="game-player" data-collision="true" data-speed="5" style="width: 32px; height: 32px; background-color: rgb(255, 0, 0); position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);">
+                <script>
+                    document.querySelector('.game-player').addEventListener('collision', (e) => {
+                        const target = e.target;
+                        if (target.classList.contains('game-powerup')) {
+                            window.gameState.addPowerup(target.dataset.effect, parseInt(target.dataset.duration));
+                            target.remove();
+                        } else if (target.classList.contains('game-portal')) {
+                            window.gameState.level++;
+                            document.dispatchEvent(new CustomEvent('nextLevel', { detail: { level: window.gameState.level } }));
+                        }
+                    });
+                </script>
+            </div>
             <div class="game-powerup" data-collision="true" data-effect="speed" data-duration="5000" style="width: 16px; height: 16px; background-color: rgb(255, 255, 0); position: absolute; border-radius: 50%; animation: float 2s infinite ease-in-out;">
                 <script>
                     document.querySelector('.game-powerup').addEventListener('collision', (e) => {
@@ -798,10 +812,6 @@ export class PatternEvolution extends Service {
                     });
                 </script>
             </div>
-        `;
-
-        // Add level progression elements
-        const portalHtml = `
             <div class="game-portal" data-collision="true" data-next-level="true" style="width: 48px; height: 48px; background: linear-gradient(45deg, #00f, #f0f); border-radius: 50%; animation: pulse 2s infinite;">
                 <script>
                     document.querySelector('.game-portal').addEventListener('collision', () => {
@@ -810,9 +820,6 @@ export class PatternEvolution extends Service {
                     });
                 </script>
             </div>
-        `;
-
-        const checkpointHtml = `
             <div class="game-checkpoint" data-collision="true" data-save-point="true" style="width: 32px; height: 32px; background-color: #2196F3; position: absolute; border-radius: 4px;">
                 <script>
                     document.querySelector('.game-checkpoint').addEventListener('collision', () => {
@@ -828,17 +835,20 @@ export class PatternEvolution extends Service {
             </div>
         `;
 
+        // Ensure all game elements have collision detection
+        let updatedHtml = this.addCollisionDetection(html);
+
         // Insert all elements before closing body tag
-        const insertPosition = html.lastIndexOf("</div>");
-        return (
-            html.slice(0, insertPosition) +
+        const insertPosition = updatedHtml.lastIndexOf("</div>");
+        updatedHtml =
+            updatedHtml.slice(0, insertPosition) +
             collisionScript +
             gameStateScript +
             controlsHtml +
-            powerupHtml +
-            portalHtml +
-            checkpointHtml +
-            html.slice(insertPosition)
-        );
+            gameElements +
+            updatedHtml.slice(insertPosition);
+
+        // Double-check collision detection after adding new elements
+        return this.addCollisionDetection(updatedHtml);
     }
 }
