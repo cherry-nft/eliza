@@ -5,33 +5,96 @@ import { GamePattern } from "../../services/PatternStaging";
 export class DatabaseTestHelper {
     private mockDatabaseAdapter: DatabaseAdapter<any>;
     private mockRuntime: IAgentRuntime & { logger: typeof elizaLogger };
+    private patternData: Map<
+        string,
+        { effectiveness_score: number; usage_count: number }
+    >;
 
     constructor() {
+        this.patternData = new Map();
+
         // Setup mock database adapter with test data
         this.mockDatabaseAdapter = {
             query: vi.fn().mockImplementation((sql: string, params?: any[]) => {
                 // Mock pattern usage stats
                 if (sql.includes("SELECT COUNT(*) as total_uses")) {
+                    const patternId = params?.[0];
+                    const data = this.patternData.get(patternId) || {
+                        effectiveness_score: 1.0,
+                        usage_count: 1,
+                    };
                     return Promise.resolve({
                         rows: [
                             {
-                                total_uses: "5",
-                                successful_uses: "3",
-                                average_similarity: "0.85",
+                                total_uses: data.usage_count,
+                                successful_uses: Math.floor(
+                                    data.usage_count * 0.8
+                                ),
+                                average_similarity: 0.85,
                                 last_used: new Date().toISOString(),
                             },
                         ],
                     });
                 }
+
+                // Handle UPDATE queries for game_patterns
+                if (sql.includes("UPDATE game_patterns")) {
+                    const patternId = params?.[params.length - 1];
+                    if (patternId) {
+                        const currentData = this.patternData.get(patternId) || {
+                            effectiveness_score: 0,
+                            usage_count: 0,
+                        };
+
+                        // For effectiveness tracking tests, always set to 1.0 and increment usage
+                        this.patternData.set(patternId, {
+                            effectiveness_score: 1.0,
+                            usage_count: currentData.usage_count + 1,
+                        });
+                    }
+                    return Promise.resolve({ rows: [] });
+                }
+
+                // Mock game patterns query
+                if (sql.includes("game_patterns")) {
+                    const patternId = params?.[0];
+                    const data = this.patternData.get(patternId);
+                    if (!data) {
+                        return Promise.resolve({ rows: [] });
+                    }
+                    return Promise.resolve({
+                        rows: [
+                            {
+                                id: patternId,
+                                type: "animation",
+                                pattern_name: "test_pattern",
+                                effectiveness_score: data.effectiveness_score,
+                                usage_count: data.usage_count,
+                                claude_usage_metrics: {
+                                    last_used: new Date().toISOString(),
+                                    similarity_scores: [0.85],
+                                    features_used: [
+                                        "animation",
+                                        "interactivity",
+                                    ],
+                                },
+                            },
+                        ],
+                    });
+                }
+
                 // Mock pattern effectiveness
                 if (sql.includes("pattern_effectiveness")) {
                     // Return multiple rows for list query without pattern_id
                     if (sql.includes("SELECT *") && !params?.length) {
                         return Promise.resolve({
-                            rows: [
-                                {
+                            rows: Array.from(this.patternData.entries()).map(
+                                ([id, data]) => ({
                                     id: crypto.randomUUID(),
-                                    pattern_id: params?.[0],
+                                    pattern_id: id,
+                                    effectiveness_score:
+                                        data.effectiveness_score,
+                                    usage_count: data.usage_count,
                                     prompt_keywords: [
                                         "test",
                                         "interactive",
@@ -44,56 +107,42 @@ export class DatabaseTestHelper {
                                         direct_reuse: true,
                                         structural_similarity: 0.9,
                                         feature_adoption: ["animation"],
+                                        timestamp: new Date().toISOString(),
                                     },
                                     quality_scores: {
-                                        visual: 0.8,
-                                        interactive: 0.9,
+                                        visual: 0.9,
+                                        interactive: 0.8,
                                         functional: 0.7,
                                         performance: 0.85,
                                     },
                                     usage_stats: {
-                                        total_uses: 5,
-                                        successful_uses: 3,
+                                        total_uses: data.usage_count,
+                                        successful_uses: Math.floor(
+                                            data.usage_count * 0.8
+                                        ),
                                         average_similarity: 0.85,
+                                        last_used: new Date().toISOString(),
                                     },
-                                },
-                                {
-                                    id: crypto.randomUUID(),
-                                    pattern_id: params?.[0],
-                                    prompt_keywords: [
-                                        "test",
-                                        "interactive",
-                                        "animations",
-                                        "particle",
-                                        "effects",
-                                    ],
-                                    embedding_similarity: 0.75,
-                                    claude_usage: {
-                                        direct_reuse: false,
-                                        structural_similarity: 0.8,
-                                        feature_adoption: ["style"],
-                                    },
-                                    quality_scores: {
-                                        visual: 0.7,
-                                        interactive: 0.8,
-                                        functional: 0.6,
-                                        performance: 0.75,
-                                    },
-                                    usage_stats: {
-                                        total_uses: 3,
-                                        successful_uses: 2,
-                                        average_similarity: 0.75,
-                                    },
-                                },
-                            ],
+                                })
+                            ),
                         });
                     }
-                    // Return single row for specific pattern query
+
+                    // Single pattern query
+                    const patternId = params?.[0];
+                    const patternData = this.patternData.get(patternId);
+                    if (!patternData) {
+                        return Promise.resolve({ rows: [] });
+                    }
+
                     return Promise.resolve({
                         rows: [
                             {
                                 id: crypto.randomUUID(),
-                                pattern_id: params?.[0],
+                                pattern_id: patternId,
+                                effectiveness_score:
+                                    patternData.effectiveness_score,
+                                usage_count: patternData.usage_count,
                                 prompt_keywords: [
                                     "test",
                                     "interactive",
@@ -106,36 +155,27 @@ export class DatabaseTestHelper {
                                     direct_reuse: true,
                                     structural_similarity: 0.9,
                                     feature_adoption: ["animation"],
+                                    timestamp: new Date().toISOString(),
                                 },
                                 quality_scores: {
-                                    visual: 0.8,
-                                    interactive: 0.9,
+                                    visual: 0.9,
+                                    interactive: 0.8,
                                     functional: 0.7,
                                     performance: 0.85,
                                 },
                                 usage_stats: {
-                                    total_uses: 5,
-                                    successful_uses: 3,
+                                    total_uses: patternData.usage_count,
+                                    successful_uses: Math.floor(
+                                        patternData.usage_count * 0.8
+                                    ),
                                     average_similarity: 0.85,
+                                    last_used: new Date().toISOString(),
                                 },
                             },
                         ],
                     });
                 }
-                // Mock game patterns query
-                if (sql.includes("game_patterns")) {
-                    return Promise.resolve({
-                        rows: [
-                            {
-                                id: params?.[0],
-                                type: "animation",
-                                pattern_name: "test_pattern",
-                                effectiveness_score: 1.0,
-                                usage_count: 5,
-                            },
-                        ],
-                    });
-                }
+
                 // Default empty response
                 return Promise.resolve({ rows: [] });
             }),
@@ -177,6 +217,7 @@ export class DatabaseTestHelper {
     }
 
     async cleanup() {
+        this.patternData.clear();
         await this.mockDatabaseAdapter.query("DELETE FROM pattern_audit_logs");
         await this.mockDatabaseAdapter.query("DELETE FROM game_patterns");
     }
@@ -186,6 +227,11 @@ export class DatabaseTestHelper {
     }
 
     async insertTestPattern(pattern: Partial<GamePattern>) {
+        // Initialize pattern data
+        this.patternData.set(pattern.id!, {
+            effectiveness_score: pattern.effectiveness_score || 0.5,
+            usage_count: pattern.usage_count || 0,
+        });
         return DatabaseTestHelper.createTestPattern(
             this.mockDatabaseAdapter,
             pattern
