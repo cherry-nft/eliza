@@ -2,6 +2,7 @@ import { Service, IAgentRuntime, elizaLogger } from "@ai16z/eliza";
 import { VectorDatabase, VectorSearchResult } from "./VectorDatabase";
 import { PatternStaging, GamePattern } from "./PatternStaging";
 import { v4 as uuidv4 } from "uuid";
+import { JSDOM } from "jsdom";
 
 export interface EvolutionConfig {
     populationSize?: number;
@@ -529,62 +530,38 @@ export class PatternEvolution extends Service {
     }
 
     private applyLayoutMutation(html: string): string {
-        // Base layout styles that should always be present
-        const baseLayoutStyles = [
-            "display: flex",
-            "flex-direction: column",
-            "gap: 15px",
-            "justify-content: space-between",
-        ].join("; ");
-
-        // Always apply base layout styles to container
-        if (html.includes('class="container')) {
-            html = html.replace(
-                /class="container([^"]*)"([^>]*style="[^"]*")?/,
-                (match, classes, existingStyle) => {
-                    if (existingStyle) {
-                        return `class="container${classes}" style="${baseLayoutStyles}; ${existingStyle.replace('style="', "")}"`;
-                    }
-                    return `class="container${classes}" style="${baseLayoutStyles}"`;
-                }
-            );
-        } else {
-            // If no container exists, wrap content in one
-            html = `<div class="container" style="${baseLayoutStyles}">${html}</div>`;
-        }
-
-        // Additional layout mutations to ensure variety
-        const layoutMutations = [
-            {
-                style: "display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 15px;",
-                target: "content",
-            },
-            {
-                style: "display: flex; flex-direction: row; gap: 10px; justify-content: space-between;",
-                target: "score",
-            },
-            {
-                style: "display: flex; flex-direction: column; gap: 10px; justify-content: space-between;",
-                target: "progress",
-            },
+        const layouts = [
+            "display: flex; flex-direction: column; gap: 10px; justify-content: space-between;",
+            "display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 15px;",
+            "display: flex; flex-wrap: wrap; gap: 20px; justify-content: center;",
         ];
 
-        // Apply each layout mutation
-        layoutMutations.forEach((mutation) => {
-            const regex = new RegExp(
-                `class="${mutation.target}([^"]*)"([^>]*style="[^"]*")?`
-            );
-            if (html.match(regex)) {
-                html = html.replace(regex, (match, classes, existingStyle) => {
-                    if (existingStyle) {
-                        return `class="${mutation.target}${classes}" style="${mutation.style}; ${existingStyle.replace('style="', "")}"`;
-                    }
-                    return `class="${mutation.target}${classes}" style="${mutation.style}"`;
-                });
+        const selectedLayout =
+            layouts[Math.floor(Math.random() * layouts.length)];
+        const doc = new JSDOM(html);
+
+        // Apply layout to multiple elements to ensure it appears in the output
+        const targets = [
+            ".container",
+            ".content",
+            ".progress-tracker",
+            ".box",
+            ".score",
+            ".progress",
+        ];
+
+        targets.forEach((selector) => {
+            const element = doc.window.document.querySelector(selector);
+            if (element) {
+                const currentStyle = element.getAttribute("style") || "";
+                element.setAttribute(
+                    "style",
+                    currentStyle + "; " + selectedLayout
+                );
             }
         });
 
-        return html;
+        return doc.window.document.body.innerHTML;
     }
 
     private applyGameElementMutation(html: string): string {

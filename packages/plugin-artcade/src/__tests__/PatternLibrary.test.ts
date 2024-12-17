@@ -1,5 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { PatternLibrary } from "../services/PatternLibrary";
+import {
+    PatternLibrary,
+    patterns,
+    NIGHT_SYNTH_PATTERN,
+} from "../services/PatternLibrary";
 
 describe("PatternLibrary", () => {
     let library: PatternLibrary;
@@ -336,6 +340,43 @@ describe("PatternLibrary", () => {
             expect(types).toContain("layout");
             expect(types).toContain("interaction");
             expect(types).toContain("style");
+        });
+    });
+
+    describe("Night Synth Pattern", () => {
+        it("should have all required properties", () => {
+            const pattern = patterns.find((p) => p.name === "night-synth");
+            expect(pattern).toBeDefined();
+            expect(pattern?.type).toBe("interactive-audio");
+            expect(pattern?.html).toContain('<div class="synth-container">');
+            expect(pattern?.css).toContain("background-color: #000011");
+            expect(pattern?.js).toContain("audioContext");
+        });
+
+        it("should have complete metadata", () => {
+            const pattern = patterns.find((p) => p.name === "night-synth");
+            expect(pattern?.metadata).toBeDefined();
+            expect(pattern?.metadata.features).toContain(
+                "Web Audio API integration"
+            );
+            expect(pattern?.metadata.audioParams.waveforms).toContain(
+                "sawtooth"
+            );
+            expect(pattern?.metadata.interactivity.keyboard).toBe(true);
+            expect(pattern?.metadata.visualFeedback.keyAnimation).toBe(true);
+        });
+
+        it("should have all required audio controls", () => {
+            const pattern = patterns.find((p) => p.name === "night-synth");
+            expect(pattern?.html).toContain("Waveform");
+            expect(pattern?.html).toContain("Cutoff");
+            expect(pattern?.html).toContain("Resonance");
+            expect(pattern?.metadata.audioParams.controlRanges).toHaveProperty(
+                "cutoff"
+            );
+            expect(pattern?.metadata.audioParams.controlRanges).toHaveProperty(
+                "resonance"
+            );
         });
     });
 });

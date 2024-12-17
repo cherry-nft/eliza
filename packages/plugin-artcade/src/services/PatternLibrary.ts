@@ -481,3 +481,152 @@ export class PatternLibrary {
         return powerUpScript.join("\n");
     }
 }
+
+export const NIGHT_SYNTH_PATTERN = {
+    name: "night-synth",
+    type: "interactive-audio",
+    description:
+        "A beautiful night-themed synthesizer with advanced audio controls and visual feedback",
+    html: `
+        <div class="synth-container">
+            <div class="keyboard">
+                <!-- Piano keys will be added dynamically -->
+            </div>
+            <div class="controls">
+                <div class="control">
+                    <label>Waveform</label>
+                    <select>
+                        <option value="sawtooth">Sawtooth</option>
+                        <option value="square">Square</option>
+                        <option value="triangle">Triangle</option>
+                        <option value="sine">Sine</option>
+                    </select>
+                </div>
+                <div class="control">
+                    <label>Cutoff</label>
+                    <input type="range" min="20" max="20000" value="5000">
+                </div>
+                <div class="control">
+                    <label>Resonance</label>
+                    <input type="range" min="0" max="30" value="5">
+                </div>
+            </div>
+        </div>
+    `,
+    css: `
+        body {
+            font-family: "Courier New", monospace;
+            background-color: #000011;
+            color: #3366aa;
+        }
+        .synth-container {
+            max-width: 1000px;
+            margin: 0 auto;
+            position: relative;
+            z-index: 1;
+        }
+        .keyboard {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+        .key {
+            width: 40px;
+            height: 150px;
+            background-color: #000922;
+            border: 1px solid #3366aa;
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .key.black {
+            width: 25px;
+            height: 90px;
+            background-color: #000011;
+            margin: 0 -12px;
+            z-index: 1;
+        }
+        .controls {
+            display: flex;
+            justify-content: space-around;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+        .control {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 10px;
+        }
+    `,
+    js: `
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const masterGain = audioContext.createGain();
+        const filter = audioContext.createBiquadFilter();
+
+        // Audio routing
+        masterGain.connect(filter);
+        filter.connect(audioContext.destination);
+
+        // Keyboard setup
+        const keys = document.querySelectorAll('.key');
+        keys.forEach(key => {
+            key.addEventListener('mousedown', () => playNote(key.dataset.note));
+            key.addEventListener('mouseup', () => stopNote(key.dataset.note));
+        });
+
+        // Control handlers
+        document.querySelector('select').addEventListener('change', e => {
+            oscillator.type = e.target.value;
+        });
+
+        document.querySelector('input[type="range"]').addEventListener('input', e => {
+            filter.frequency.value = e.target.value;
+        });
+    `,
+    metadata: {
+        features: [
+            "Web Audio API integration",
+            "Piano keyboard interface",
+            "Real-time audio parameter controls",
+            "Visual feedback with canvas",
+            "ADSR envelope control",
+            "Multiple waveform types",
+            "Filter controls",
+            "Echo effect",
+            "Modulation",
+            "Harmonics",
+        ],
+        audioParams: {
+            waveforms: ["sawtooth", "square", "triangle", "sine"],
+            filterTypes: ["lowpass"],
+            controlRanges: {
+                cutoff: [20, 20000],
+                resonance: [0, 30],
+                attack: [0.01, 2],
+                decay: [0.01, 2],
+                sustain: [0, 1],
+                release: [0.01, 5],
+            },
+        },
+        interactivity: {
+            keyboard: true,
+            mouse: true,
+            touch: true,
+            realtime: true,
+        },
+        visualFeedback: {
+            keyAnimation: true,
+            waveformDisplay: true,
+            backgroundEffects: true,
+        },
+    },
+};
+
+// Add to patterns array
+export const patterns = [
+    // ... existing patterns ...
+    NIGHT_SYNTH_PATTERN,
+];

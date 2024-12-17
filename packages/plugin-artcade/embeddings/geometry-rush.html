@@ -1,0 +1,1503 @@
+<html><head><base href="." /><meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+body {
+  margin: 0;
+  overflow: hidden;
+  background: #111;
+}
+
+.game-container {
+  position: fixed;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.game-world {
+  position: absolute;
+  width: 4000px; /* Much larger than viewport */
+  height: 4000px;
+  transform-origin: top left;
+  background: #111;
+  background-image: radial-gradient(rgba(50, 50, 50, 0.3) 2px, transparent 2px);
+  background-size: 50px 50px;
+}
+
+.player {
+  position: absolute;
+  width: 30px;
+  height: 15px;
+  background: var(--car-color, #0f0);
+  border-radius: 3px;
+  pointer-events: none;
+  transform-origin: center;
+  transition: transform 0.2s ease-out;
+}
+
+.player.boosting::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 20%;
+  width: 60%;
+  height: 100%;
+  background: var(--car-color, #0f0);
+  border-radius: 2px;
+  box-shadow: 0 0 15px var(--car-color, #0f0);
+}
+
+.player::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  width: 0;
+  height: 2px;
+  background: var(--trail-color-transparent, rgba(0, 255, 0, 0.3));
+  transform-origin: right;
+  pointer-events: none;
+  transition: width 0.1s;
+}
+
+.player::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 20%;
+  width: 60%;
+  height: 100%;
+  background: var(--car-color-dark, #0a0);
+  border-radius: 2px;
+}
+
+.player-trail {
+  position: absolute;
+  background: linear-gradient(90deg, var(--trail-color-semi, rgba(0, 255, 0, 0.4)), transparent);
+  height: 3px;
+  pointer-events: none;
+  transform-origin: center;
+  border-radius: 1px;
+  opacity: 0.8;
+  transition: opacity 0.5s;
+}
+
+.cop {
+  position: absolute;
+  width: 30px;
+  height: 30px;
+  background: #00f;
+  border-radius: 5px;
+  transform-origin: center;
+  transition: transform 0.3s ease-out;
+  animation: sirenFlash 1s infinite;
+  box-shadow: 0 0 15px rgba(0, 0, 255, 0.5);
+}
+
+@keyframes sirenFlash {
+  0% {
+    background: #00f;
+    box-shadow: 0 0 15px rgba(0, 0, 255, 0.5);
+  }
+  50% {
+    background: #f00;
+    box-shadow: 0 0 15px rgba(255, 0, 0, 0.5);
+  }
+  100% {
+    background: #00f;
+    box-shadow: 0 0 15px rgba(0, 0, 255, 0.5);
+  }
+}
+
+.cop::after {
+  content: '';
+  position: absolute;
+  top: 15%;
+  left: 20%;
+  width: 60%;
+  height: 20%;
+  background: #fff;
+  border-radius: 2px;
+  box-shadow: 0 0 5px #fff;
+}
+
+.obstacle {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  background: #666;
+  border-radius: 3px;
+  transform: rotate(45deg);
+}
+
+.obstacle-triangle {
+  position: absolute;
+  width: 0;
+  height: 0;
+  border-left: 15px solid transparent;
+  border-right: 15px solid transparent;
+  border-bottom: 25px solid #666;
+}
+
+.obstacle-circle {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  background: #666;
+  border-radius: 50%;
+}
+
+.obstacle-plus {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  background: #666;
+  transform: rotate(45deg);
+}
+
+.obstacle-plus:before,
+.obstacle-plus:after {
+  content: '';
+  position: absolute;
+  background: #666;
+}
+
+.obstacle-plus:before {
+  left: -5px;
+  top: 5px;
+  width: 30px;
+  height: 10px;
+}
+
+.obstacle-plus:after {
+  top: -5px;
+  left: 5px;
+  width: 10px;
+  height: 30px;
+}
+
+.obstacle-barrier {
+  position: absolute;
+  width: 60px;
+  height: 10px;
+  background: #666;
+  border-radius: 2px;
+}
+
+.explosion {
+  position: absolute;
+  width: 100px;
+  height: 100px;
+  pointer-events: none;
+}
+
+@keyframes explode {
+  0% { transform: scale(0); opacity: 1; }
+  100% { transform: scale(2); opacity: 0; }
+}
+
+.score {
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  color: white;
+  font-family: Arial;
+  font-size: 24px;
+  z-index: 100;
+}
+
+.timer {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: white;
+  font-family: Arial;
+  font-size: 24px;
+  z-index: 100;
+}
+
+.high-score {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  color: white;
+  font-family: Arial;
+  font-size: 24px;
+  z-index: 100;
+}
+
+.speed-boost {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: #0f0;
+  font-family: Arial;
+  font-size: 24px;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.combo-text {
+  position: fixed;
+  left: 50%;
+  bottom: 60px;
+  transform: translateX(-50%);
+  color: #0f0;
+  font-family: Arial;
+  font-size: 36px;
+  text-shadow: 0 0 10px #0f0;
+  opacity: 0;
+  transition: opacity 0.3s, transform 0.3s;
+}
+
+.game-over {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: red;
+  font-family: Arial;
+  font-size: 48px;
+  z-index: 1000; /* Increased z-index to be above other elements */
+  display: none;
+  background: rgba(0, 0, 0, 0.9);
+  padding: 40px 60px;
+  border-radius: 15px;
+  text-align: center;
+  opacity: 0;
+  transition: opacity 0.5s;
+}
+
+.game-over.visible {
+  opacity: 1;
+}
+
+.return-menu-btn {
+  background: #0f0;
+  color: black;
+  border: none;
+  padding: 15px 30px;
+  font-size: 24px;
+  border-radius: 5px;
+  cursor: pointer;
+  margin-top: 20px;
+  transition: all 0.3s;
+}
+
+.return-menu-btn:hover {
+  background: #0c0;
+  transform: scale(1.1);
+  box-shadow: 0 0 20px #0f0;
+}
+
+.color-customizer {
+  position: fixed;
+  bottom: 20px;
+  left: 20px;
+  background: rgba(0, 0, 0, 0.7);
+  padding: 15px;
+  border-radius: 10px;
+  z-index: 100;
+  transition: transform 0.3s ease-out;
+  transform: translateX(-200px); /* Hide by default */
+}
+
+.color-customizer.visible {
+  transform: translateX(0);
+}
+
+.customize-toggle {
+  position: fixed;
+  bottom: 20px;
+  left: 20px;
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  border: none;
+  padding: 10px 15px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-family: Arial;
+  z-index: 101;
+  transition: background-color 0.2s;
+}
+
+.customize-toggle:hover {
+  background: rgba(0, 0, 0, 0.9);
+}
+
+.title-screen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.9);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  color: white;
+  font-family: Arial, sans-serif;
+  transition: opacity 0.5s;
+}
+
+.title-screen h1 {
+  font-size: 64px;
+  margin: 0;
+  color: #0f0;
+  text-shadow: 0 0 20px #0f0;
+  animation: glow 2s infinite;
+  font-family: 'Arial Black', Arial, sans-serif;
+  letter-spacing: 2px;
+}
+
+.title-screen p {
+  font-size: 24px;
+  margin: 20px 0;
+  color: #aaa;
+}
+
+.start-button {
+  padding: 15px 40px;
+  font-size: 24px;
+  background: #0f0;
+  border: none;
+  border-radius: 5px;
+  color: black;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.start-button:hover {
+  background: #0c0;
+  transform: scale(1.1);
+  box-shadow: 0 0 20px #0f0;
+}
+
+@keyframes glow {
+  0%, 100% { text-shadow: 0 0 20px #0f0; }
+  50% { text-shadow: 0 0 40px #0f0; }
+}
+
+.leaderboard {
+  background: rgba(0, 0, 0, 0.7);
+  padding: 20px;
+  border-radius: 10px;
+  margin-top: 20px;
+  text-align: center;
+  min-width: 300px;
+}
+
+.leaderboard h2 {
+  color: #0f0;
+  font-size: 24px;
+  margin: 0 0 15px 0;
+  text-shadow: 0 0 10px #0f0;
+}
+
+.leaderboard p {
+  font-size: 20px !important;
+  margin: 10px 0 !important;
+  color: white !important;
+}
+
+.high-score-value {
+  color: #0f0 !important;
+  font-weight: bold;
+}
+
+/* Add styles for game mode selection */
+.gamemodes-screen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.9);
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  color: white;
+  font-family: Arial, sans-serif;
+  transition: opacity 0.5s;
+}
+
+.gamemodes-screen h1 {
+  font-size: 48px;
+  margin: 0 0 30px 0;
+  color: #0f0;
+  text-shadow: 0 0 20px #0f0;
+}
+
+.back-button {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  padding: 10px 20px;
+  font-size: 18px;
+  background: #0f0;
+  border: none;
+  border-radius: 5px;
+  color: black;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.back-button:hover {
+  background: #0c0;
+  transform: scale(1.1);
+  box-shadow: 0 0 20px #0f0;
+}
+
+.view-modes-btn {
+  padding: 15px 40px;
+  font-size: 24px;
+  background: #0f0;
+  border: none;
+  border-radius: 5px;
+  color: black;
+  cursor: pointer;
+  transition: all 0.3s;
+  margin: 20px 0;
+}
+
+.view-modes-btn:hover {
+  background: #0c0;
+  transform: scale(1.1);
+  box-shadow: 0 0 20px #0f0;
+}
+
+/* New styles for mode buttons */
+.mode-button {
+  padding: 20px 30px;
+  margin: 10px;
+  font-size: 20px;
+  background: rgba(0, 255, 0, 0.2);
+  border: 2px solid #0f0;
+  border-radius: 10px;
+  color: white;
+  cursor: pointer;
+  transition: all 0.3s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 300px;
+}
+
+.mode-button:hover {
+  background: rgba(0, 255, 0, 0.3);
+  transform: scale(1.05);
+}
+
+.mode-button.selected {
+  background: rgba(0, 255, 0, 0.4);
+  box-shadow: 0 0 20px #0f0;
+}
+
+.mode-description {
+  font-size: 14px;
+  opacity: 0.8;
+  margin-top: 5px;
+}
+
+.game-modes {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin: 20px 0;
+}
+</style>
+</head>
+<body>
+<div class="title-screen" id="titleScreen">
+  <h1>GEOMETRY RUSH</h1>
+  <p>Avoid the cops and survive as long as possible!</p>
+  <p>Use arrow keys to drive</p>
+  
+  <button class="view-modes-btn" id="viewModesBtn">View Game Modes</button>
+
+  <button class="start-button" id="startButton">START GAME</button>
+  <div class="leaderboard">
+    <h2>High Score</h2>
+    <p>Best: <span class="high-score-value" id="menuHighScore">0</span></p>
+    <p>Last Score: <span class="high-score-value" id="menuLastScore">0</span></p>
+  </div>
+</div>
+
+<div class="gamemodes-screen" id="gamemodesScreen">
+  <button class="back-button" onclick="returnToTitleScreen()">Back</button>
+  <h1>GAME MODES</h1>
+  <div class="game-modes">
+    <div class="mode-buttons">
+      <button class="mode-button selected" data-mode="classic">
+        Classic Mode
+        <span class="mode-description">The original chase experience!</span>
+      </button>
+      <button class="mode-button" data-mode="survival">
+        Survival Mode
+        <span class="mode-description">Double the cops, double the score!</span>  
+      </button>
+      <button class="mode-button" data-mode="maze">
+        Maze Mode
+        <span class="mode-description">Navigate through a complex maze of barriers!</span>
+      </button>
+      <button class="mode-button" data-mode="time-trial">
+        Time Trial
+        <span class="mode-description">Race against the clock! Each cop adds time!</span>
+      </button>
+      <button class="mode-button" data-mode="stealth">
+        Stealth Mode
+        <span class="mode-description">Limited visibility, stay hidden to survive!</span>
+      </button>
+      <button class="mode-button" data-mode="chaos">
+        Chaos Mode
+        <span class="mode-description">Random events, power-ups, and crazy cop behavior!</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="game-container">
+  <div class="game-world">
+    <div class="player" id="player"></div>
+    <!-- Other game elements will be added here dynamically -->
+  </div>
+</div>
+<div class="score">Score: <span id="score">0</span></div>
+<div class="high-score">High Score: <span id="highScore">0</span></div>
+<div class="timer">Time: <span id="timer">0:00</span></div>
+<div class="speed-boost" id="speedBoost">SPEED BOOST!</div>
+<div class="game-over" id="gameOver">
+  <h2>GAME OVER</h2>
+  <p>Score: <span id="scoreOver">0</span></p>
+  <p>High Score: <span id="highScoreOver">0</span></p>
+  <p>Time: <span id="timerOver">0:00</span></p>
+  <button class="return-menu-btn" onclick="returnToMenu()">Return to Menu</button>
+</div>
+<button class="customize-toggle" id="customizeToggle">Customize</button>
+<div class="color-customizer">
+  <div class="color-picker">
+    <label>Car Color: 
+      <input type="color" id="carColor" value="#00ff00">
+    </label>
+    <label>Trail Color:
+      <input type="color" id="trailColor" value="#00ff00">
+    </label>
+  </div>
+</div>
+
+<script>
+const titleScreen = document.getElementById('titleScreen');
+const startButton = document.getElementById('startButton');
+const player = document.getElementById('player');
+const scoreElement = document.getElementById('score');
+const timerElement = document.getElementById('timer');
+const gameOverElement = document.getElementById('gameOver');
+const highScoreElement = document.getElementById('highScore');
+const speedBoostElement = document.getElementById('speedBoost');
+const carColorPicker = document.getElementById('carColor');
+const trailColorPicker = document.getElementById('trailColor');
+const customizeToggle = document.getElementById('customizeToggle');
+const colorCustomizer = document.querySelector('.color-customizer');
+const gamemodesScreen = document.getElementById('gamemodesScreen');
+let score = 0;
+let highScore = 0;
+let lastScore = 0;
+let scoreMultiplier = 1;
+let lastKillTime = 0;
+let startTime;
+let timerInterval;
+let cops = [];
+let obstacles = [];
+let copSpeed = 3; // Changed from 5
+const initialSpawnInterval = 3500; // Changed from 2000 to 3500
+let spawnInterval = initialSpawnInterval;
+let gameLoop;
+let spawnLoop;
+let speedIncreaseInterval;
+let copIncreaseInterval;
+let gameIsOver = false;
+let playerX = 2000; // Start in the middle of the world
+let playerY = 2000; // Start in the middle of the world
+let playerAngle = 0;
+let playerSpeed = 6; // Reduced from 8
+let playerVelX = 0;
+let playerVelY = 0;
+const friction = 0.93; // Increased friction from 0.95 (lower value = more friction)
+const turnSpeed = 4; // Reduced from 5
+let audioContext;
+
+let cameraX = 0;
+let cameraY = 0;
+const WORLD_WIDTH = 4000;
+const WORLD_HEIGHT = 4000;
+
+const keys = {
+  ArrowLeft: false,
+  ArrowRight: false,
+  ArrowUp: false,
+  ArrowDown: false
+};
+
+let gameStarted = false;
+let currentGameMode = 'classic';
+
+// Add event listeners for game mode buttons
+document.querySelectorAll('.mode-button').forEach(button => {
+  button.addEventListener('click', () => {
+    document.querySelectorAll('.mode-button').forEach(b => b.classList.remove('selected'));
+    button.classList.add('selected');
+    currentGameMode = button.dataset.mode;
+  });
+});
+
+function initAudio() {
+  audioContext = new (window.AudioContext || window.webkitAudioContext)();
+}
+
+function playSound(freq, type, duration) {
+  if (!audioContext) return;
+  
+  const oscillator = audioContext.createOscillator();
+  const gainNode = audioContext.createGain();
+  
+  oscillator.type = type;
+  oscillator.frequency.setValueAtTime(freq, audioContext.currentTime);
+  
+  gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+  gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
+  
+  oscillator.connect(gainNode);
+  gainNode.connect(audioContext.destination);
+  
+  oscillator.start();
+  oscillator.stop(audioContext.currentTime + duration);
+}
+
+function createObstacles() {
+  const numObstacles = 100; // Increased number for more objects
+  const types = ['square', 'triangle', 'circle', 'plus', 'barrier'];
+  
+  for(let i = 0; i < numObstacles; i++) {
+    const obstacle = document.createElement('div');
+    const type = types[Math.floor(Math.random() * types.length)];
+    
+    // Set class based on type
+    obstacle.className = type === 'square' ? 'obstacle' : `obstacle-${type}`;
+    
+    // Random position avoiding center spawn area
+    let x, y;
+    do {
+      x = Math.random() * (WORLD_WIDTH - 60) + 30;
+      y = Math.random() * (WORLD_HEIGHT - 60) + 30;
+    } while (
+      // Avoid center spawn area
+      (x > WORLD_WIDTH/2 - 200 && x < WORLD_WIDTH/2 + 200) &&
+      (y > WORLD_HEIGHT/2 - 200 && y < WORLD_HEIGHT/2 + 200)
+    );
+    
+    obstacle.style.left = x + 'px';
+    obstacle.style.top = y + 'px';
+    
+    // Random rotation for variety
+    if (type !== 'circle') {
+      const rotation = Math.random() * 360;
+      obstacle.style.transform = `rotate(${rotation}deg)`;
+    }
+    
+    // Create walls/barriers along the edges
+    if (type === 'barrier' && i < 40) {
+      // Place barriers along edges
+      const edge = Math.floor(i / 10);
+      switch(edge) {
+        case 0: // Top
+          x = (i % 10) * (WORLD_WIDTH/10);
+          y = 0;
+          obstacle.style.transform = 'rotate(0deg)';
+          break;
+        case 1: // Right
+          x = WORLD_WIDTH - 10;
+          y = (i % 10) * (WORLD_HEIGHT/10);
+          obstacle.style.transform = 'rotate(90deg)';
+          break;
+        case 2: // Bottom
+          x = (i % 10) * (WORLD_WIDTH/10);
+          y = WORLD_HEIGHT - 10;
+          obstacle.style.transform = 'rotate(0deg)';
+          break;
+        case 3: // Left
+          x = 0;
+          y = (i % 10) * (WORLD_HEIGHT/10);
+          obstacle.style.transform = 'rotate(90deg)';
+          break;
+      }
+      obstacle.style.left = x + 'px';
+      obstacle.style.top = y + 'px';
+    }
+    
+    document.querySelector('.game-world').appendChild(obstacle);
+    obstacles.push({
+      element: obstacle,
+      x: x,
+      y: y,
+      type: type
+    });
+  }
+}
+
+function showScorePopup(x, y, points) {
+  const popup = document.createElement('div');
+  popup.style.cssText = `
+    position: absolute;
+    left: ${x}px;
+    top: ${y}px;
+    color: #0f0;
+    font-family: Arial;
+    font-size: 24px;
+    font-weight: bold;
+    text-shadow: 0 0 10px #0f0;
+    pointer-events: none;
+    z-index: 1000;
+    animation: scorePopup 1s forwards;
+  `;
+  popup.textContent = `+${points}`;
+  document.querySelector('.game-world').appendChild(popup);
+  
+  // Add the animation style if it doesn't exist
+  if (!document.querySelector('#score-popup-style')) {
+    const style = document.createElement('style');
+    style.id = 'score-popup-style';
+    style.textContent = `
+      @keyframes scorePopup {
+        0% {
+          transform: translate(-50%, 0) scale(0.5);
+          opacity: 1;
+        }
+        100% {
+          transform: translate(-50%, -50px) scale(1.5);
+          opacity: 0;
+        }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  // Remove the popup element after animation
+  setTimeout(() => {
+    document.querySelector('.game-world').removeChild(popup);
+  }, 1000);
+}
+
+function updateTimer() {
+  if (!gameIsOver) {
+    const currentTime = new Date().getTime();
+    const elapsedTime = Math.floor((currentTime - startTime) / 1000);
+    const minutes = Math.floor(elapsedTime / 60);
+    const seconds = elapsedTime % 60;
+    timerElement.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  }
+}
+
+function increaseCopSpeed() {
+  if (!gameIsOver) {
+    copSpeed += 0.2; // Changed from 0.5 to make speed increase more gradual
+  }
+}
+
+function increaseCopSpawnRate() {
+  if (!gameIsOver) {
+    // Changed minimum interval from 500 to 1000 and made reduction more gradual
+    spawnInterval = Math.max(spawnInterval * 0.9, 1000);
+    clearInterval(spawnLoop);
+    spawnLoop = setInterval(createCop, spawnInterval);
+  }
+}
+
+function getSineWaveOffset(timestamp, amplitude = 20, frequency = 0.002) {
+  return Math.sin(timestamp * frequency) * amplitude;
+}
+
+function getCircularOffset(timestamp, radius = 30, speed = 0.003) {
+  return {
+    x: Math.cos(timestamp * speed) * radius,
+    y: Math.sin(timestamp * speed) * radius
+  };
+}
+
+document.addEventListener('keydown', (e) => {
+  if (keys.hasOwnProperty(e.key)) {
+    keys[e.key] = true;
+  }
+  if (!audioContext) initAudio();
+});
+
+document.addEventListener('keyup', (e) => {
+  if (keys.hasOwnProperty(e.key)) {
+    keys[e.key] = false;
+  }
+});
+
+function createTrail(x, y, angle, width) {
+  const trail = document.createElement('div');
+  trail.className = 'player-trail';
+  trail.style.left = x + 'px';
+  trail.style.top = y + 'px';
+  trail.style.width = width + 'px';
+  trail.style.transform = `rotate(${angle}deg)`;
+  
+  const randomOffset = (Math.random() - 0.5) * 2;
+  trail.style.height = (3 + randomOffset) + 'px';
+  trail.style.opacity = 0.8 + (Math.random() * 0.2);
+  
+  document.querySelector('.game-world').appendChild(trail);
+  
+  requestAnimationFrame(() => {
+    trail.style.opacity = '0';
+    trail.style.width = (width * 0.7) + 'px';
+  });
+  
+  setTimeout(() => {
+    document.querySelector('.game-world').removeChild(trail);
+  }, 1000);
+}
+
+function shakeScreen() {
+  document.body.style.transform = `translate(${Math.random() * 10 - 5}px, ${Math.random() * 10 - 5}px)`;
+  setTimeout(() => {
+    document.body.style.transform = 'none';
+  }, 50);
+}
+
+function showCombo(multiplier) {
+  const combo = document.createElement('div');
+  combo.className = 'combo-text';
+  combo.textContent = `${multiplier}x COMBO!`;
+  document.body.appendChild(combo);
+  
+  requestAnimationFrame(() => {
+    combo.style.opacity = '1';
+    combo.style.transform = 'translateX(-50%) scale(1.2)';
+    setTimeout(() => {
+      combo.style.opacity = '0';
+      combo.style.transform = 'translateX(-50%) scale(0.8)';
+      setTimeout(() => document.body.removeChild(combo), 300);
+    }, 700);
+  });
+}
+
+function updatePlayer() {
+  if (!gameIsOver) {
+    if (keys.ArrowLeft) playerAngle -= turnSpeed;
+    if (keys.ArrowRight) playerAngle += turnSpeed;
+    
+    const angleRad = playerAngle * Math.PI / 180;
+    
+    if (keys.ArrowUp) {
+      playerVelX += Math.cos(angleRad) * 0.4; // Reduced from 0.5
+      playerVelY += Math.sin(angleRad) * 0.4; // Reduced from 0.5
+    }
+    if (keys.ArrowDown) {
+      playerVelX -= Math.cos(angleRad) * 0.2; // Reduced from 0.3
+      playerVelY -= Math.sin(angleRad) * 0.2; // Reduced from 0.3
+    }
+    
+    playerVelX *= friction;
+    playerVelY *= friction;
+    
+    playerX += playerVelX;
+    playerY += playerVelY;
+    
+    // Constrain player to world bounds
+    playerX = Math.max(15, Math.min(WORLD_WIDTH - 15, playerX));
+    playerY = Math.max(7.5, Math.min(WORLD_HEIGHT - 7.5, playerY));
+    
+    // Update camera position
+    cameraX = Math.max(0, Math.min(WORLD_WIDTH - window.innerWidth, playerX - window.innerWidth / 2));
+    cameraY = Math.max(0, Math.min(WORLD_HEIGHT - window.innerHeight, playerY - window.innerHeight / 2));
+    
+    // Apply camera transform to game world
+    document.querySelector('.game-world').style.transform = `translate(${-cameraX}px, ${-cameraY}px)`;
+    
+    // Update player position relative to camera
+    player.style.left = (playerX - 15) + 'px';
+    player.style.top = (playerY - 7.5) + 'px';
+    player.style.transform = `rotate(${playerAngle}deg)`;
+    
+    const speed = Math.sqrt(playerVelX * playerVelX + playerVelY * playerVelY);
+    const driftIntensity = Math.abs(speed * (keys.ArrowLeft || keys.ArrowRight ? 1 : 0.5));
+    player.style.setProperty('--trail-width', `${driftIntensity * 20}px`);
+    
+    if (speed > 2) {
+      const trailCount = Math.ceil(speed / 2);
+      for (let i = 0; i < trailCount; i++) {
+        const trailX = playerX - (playerVelX * (i * 0.1));
+        const trailY = playerY - (playerVelY * (i * 0.1));
+        createTrail(trailX, trailY, playerAngle, driftIntensity * (10 - i));
+      }
+      player.classList.toggle('boosting', speed > 5);
+    }
+  }
+}
+
+function createCop() {
+  const cop = document.createElement('div');
+  cop.className = 'cop';
+  const side = Math.floor(Math.random() * 4);
+  let x, y;
+  
+  // Spawn relative to camera view
+  switch(side) {
+    case 0: x = cameraX + Math.random() * window.innerWidth; y = cameraY - 30; break;
+    case 1: x = cameraX + window.innerWidth + 30; y = cameraY + Math.random() * window.innerHeight; break;
+    case 2: x = cameraX + Math.random() * window.innerWidth; y = cameraY + window.innerHeight + 30; break;
+    case 3: x = cameraX - 30; y = cameraY + Math.random() * window.innerHeight; break;
+  }
+  
+  cop.style.left = x + 'px';
+  cop.style.top = y + 'px';
+  document.querySelector('.game-world').appendChild(cop);
+  
+  cops.push({
+    element: cop,
+    x: x,
+    y: y,
+    angle: 0,
+    velocity: { x: 0, y: 0 },
+    targetAngle: 0,
+    movementPattern: Math.floor(Math.random() * 4), // 0: direct, 1: sine, 2: circular, 3: zigzag
+    patternOffset: 0,
+    lastZigzag: Date.now()
+  });
+
+  // Add siren sound when cop is created
+  if (audioContext) {
+    const sirenInterval = setInterval(() => {
+      if (!gameIsOver) {
+        // Alternating frequencies for wailing effect
+        playSound(800, 'sine', 0.15);
+        setTimeout(() => {
+          playSound(600, 'sine', 0.15);
+        }, 200);
+      } else {
+        clearInterval(sirenInterval);
+      }
+    }, 800);
+    
+    // Store interval ID in cop object for cleanup
+    cops[cops.length - 1].sirenInterval = sirenInterval;
+  }
+}
+
+function createExplosion(x, y, size = 1) {
+  const explosion = document.createElement('div');
+  explosion.className = 'explosion';
+  explosion.style.left = (x - 50) + 'px';
+  explosion.style.top = (y - 50) + 'px';
+  
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 100 100');
+  svg.style.width = '100%';
+  svg.style.height = '100%';
+  
+  const particles = 12;
+  for(let i = 0; i < particles; i++) {
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    const angle = (i * 360 / particles) * Math.PI / 180;
+    line.setAttribute('x1', '50');
+    line.setAttribute('y1', '50');
+    line.setAttribute('x2', 50 + Math.cos(angle) * 40);
+    line.setAttribute('y2', 50 + Math.sin(angle) * 40);
+    line.setAttribute('stroke', '#f00');
+    line.setAttribute('stroke-width', '3');
+    svg.appendChild(line);
+  }
+  
+  explosion.appendChild(svg);
+  document.body.appendChild(explosion);
+  explosion.style.animation = 'explode 0.5s forwards';
+  
+  shakeScreen();
+  
+  playSound(200, 'square', 0.3);
+  
+  setTimeout(() => {
+    document.body.removeChild(explosion);
+  }, 500);
+}
+
+function checkCollisions() {
+  if (gameIsOver) return;
+
+  const playerRect = player.getBoundingClientRect();
+  
+  // Check player collision with obstacles
+  for(let obstacle of obstacles) {
+    const obstacleRect = obstacle.element.getBoundingClientRect();
+    if (!(playerRect.right < obstacleRect.left || 
+          playerRect.left > obstacleRect.right || 
+          playerRect.bottom < obstacleRect.top || 
+          playerRect.top > obstacleRect.bottom)) {
+      gameOver();
+      return;
+    }
+  }
+
+  // Check cop collisions with obstacles
+  for(let cop of cops) {
+    const copRect = cop.element.getBoundingClientRect();
+    
+    // Check cop collision with player
+    if (!(playerRect.right < copRect.left || 
+          playerRect.left > copRect.right || 
+          playerRect.bottom < copRect.top || 
+          playerRect.top > copRect.bottom)) {
+      gameOver();
+      return;
+    }
+    
+    // Check cop collision with obstacles
+    for(let obstacle of obstacles) {
+      const obstacleRect = obstacle.element.getBoundingClientRect();
+      if (!(copRect.right < obstacleRect.left || 
+            copRect.left > obstacleRect.right || 
+            copRect.bottom < obstacleRect.top || 
+            copRect.top > obstacleRect.bottom)) {
+        const points = 50 * scoreMultiplier;
+        score += points;
+        showScorePopup(cop.x, cop.y, points);
+        
+        // Create explosion at collision point
+        createExplosion(cop.x, cop.y, 1.5); // Slightly larger explosion
+        
+        // Play crash sound
+        if (audioContext) {
+          playSound(100, 'square', 0.3); // Lower frequency for impact
+          setTimeout(() => playSound(80, 'square', 0.2), 100);
+        }
+
+        // Create smaller secondary explosions
+        setTimeout(() => {
+          createExplosion(cop.x + Math.random() * 30 - 15, 
+                         cop.y + Math.random() * 30 - 15, 0.7);
+        }, 100);
+        
+        setTimeout(() => {
+          createExplosion(cop.x + Math.random() * 30 - 15, 
+                         cop.y + Math.random() * 30 - 15, 0.5);
+        }, 200);
+
+        document.querySelector('.game-world').removeChild(cop.element);
+        cops.splice(cops.indexOf(cop), 1);
+        scoreElement.textContent = score;
+        break;
+      }
+    }
+  }
+
+  // Check cop-to-cop collisions
+  for(let i = 0; i < cops.length; i++) {
+    for(let j = i + 1; j < cops.length; j++) {
+      const dx = cops[i].x - cops[j].x;
+      const dy = cops[i].y - cops[j].y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      
+      if(distance < 30) {
+        if (cops[i].sirenInterval) clearInterval(cops[i].sirenInterval);
+        if (cops[j].sirenInterval) clearInterval(cops[j].sirenInterval);
+        createExplosion(cops[i].x, cops[i].y);
+        document.querySelector('.game-world').removeChild(cops[i].element);
+        document.querySelector('.game-world').removeChild(cops[j].element);
+        cops.splice(j, 1);
+        cops.splice(i, 1);
+        score += 100;
+        scoreElement.textContent = score;
+        break;
+      }
+    }
+  }
+}
+
+function gameOver() {
+  gameIsOver = true;
+  lastScore = score;
+  if (score > highScore) {
+    highScore = score;
+    highScoreElement.textContent = highScore;
+    // Update menu high score display
+    document.getElementById('menuHighScore').textContent = highScore;
+  }
+  
+  gameOverElement.innerHTML = `
+    <h2>GAME OVER</h2>
+    <p>Score: ${score}</p>
+    <p>High Score: ${highScore}</p>
+    <p>Time: ${timerElement.textContent}</p>
+    <button class="return-menu-btn" onclick="returnToMenu()">Return to Menu</button>
+  `;
+  
+  gameOverElement.style.display = 'block';
+  requestAnimationFrame(() => {
+    gameOverElement.classList.add('visible');
+  });
+
+  clearInterval(gameLoop);
+  clearInterval(spawnLoop);
+  clearInterval(timerInterval);
+  clearInterval(speedIncreaseInterval);
+  clearInterval(copIncreaseInterval);
+  
+  cops.forEach(cop => {
+    if (cop.sirenInterval) {
+      clearInterval(cop.sirenInterval);
+    }
+    createExplosion(cop.x, cop.y);
+    document.querySelector('.game-world').removeChild(cop.element);
+  });
+  cops = [];
+  
+  obstacles.forEach(obstacle => {
+    document.querySelector('.game-world').removeChild(obstacle.element);
+  });
+  obstacles = [];
+}
+
+function returnToMenu() {
+  gameOverElement.classList.remove('visible');
+  setTimeout(() => {
+    gameOverElement.style.display = 'none';
+    titleScreen.style.display = 'flex';
+    titleScreen.style.opacity = '1';
+    
+    // Update menu scores
+    document.getElementById('menuHighScore').textContent = highScore;
+    document.getElementById('menuLastScore').textContent = lastScore;
+    
+    // Reset game state
+    gameIsOver = false;
+    score = 0;
+    scoreElement.textContent = score;
+    playerX = 2000;
+    playerY = 2000;
+    playerVelX = 0;
+    playerVelY = 0;
+    playerAngle = 0;
+    copSpeed = 3;
+    spawnInterval = initialSpawnInterval;
+    gameStarted = false;
+
+    // Reset selected game mode to classic
+    document.querySelectorAll('.mode-button').forEach(button => {
+      button.classList.remove('selected');
+      if(button.dataset.mode === 'classic') {
+        button.classList.add('selected');
+      }
+    });
+    currentGameMode = 'classic';
+  }, 500);
+}
+
+function updateCops() {
+  const timestamp = Date.now();
+  
+  cops.forEach(cop => {
+    const dx = playerX - cop.x;
+    const dy = playerY - cop.y;
+    const baseAngle = Math.atan2(dy, dx);
+    
+    // Apply different movement patterns
+    let targetAngle = baseAngle;
+    let speedMultiplier = 1;
+    
+    switch(cop.movementPattern) {
+      case 1: // Sine wave movement
+        const sineOffset = getSineWaveOffset(timestamp);
+        targetAngle += Math.sin(timestamp * 0.003) * 0.5;
+        break;
+        
+      case 2: // Circular pursuit
+        const circularOffset = getCircularOffset(timestamp);
+        cop.x += circularOffset.x * 0.1;
+        cop.y += circularOffset.y * 0.1;
+        targetAngle += Math.sin(timestamp * 0.002) * 0.3;
+        speedMultiplier = 1.1; // Reduced from 1.2
+        break;
+        
+      case 3: // Zigzag
+        if (timestamp - cop.lastZigzag > 1000) {
+          cop.patternOffset = Math.random() * Math.PI/2 - Math.PI/4;
+          cop.lastZigzag = timestamp;
+        }
+        targetAngle += cop.patternOffset;
+        speedMultiplier = 1.05; // Reduced from 1.1
+        break;
+    }
+    
+    const angleDiff = targetAngle - cop.angle;
+    cop.angle += angleDiff * 0.1;
+    
+    const targetVelX = Math.cos(targetAngle) * copSpeed * speedMultiplier;
+    const targetVelY = Math.sin(targetAngle) * copSpeed * speedMultiplier;
+    
+    // Also reduce acceleration by lowering this multiplier
+    cop.velocity.x += (targetVelX - cop.velocity.x) * 0.08; // Changed from 0.1
+    cop.velocity.y += (targetVelY - cop.velocity.y) * 0.08; // Changed from 0.1
+    
+    cop.x += cop.velocity.x;
+    cop.y += cop.velocity.y;
+    
+    // Add slight rotation based on velocity changes
+    const driftAngle = cop.angle + Math.atan2(cop.velocity.y, cop.velocity.x) * 0.5;
+    
+    cop.element.style.left = cop.x + 'px';
+    cop.element.style.top = cop.y + 'px';
+    cop.element.style.transform = `rotate(${driftAngle * 180 / Math.PI}deg)`;
+  });
+  
+  updatePlayer();
+  checkCollisions();
+}
+
+function startGame() {
+  switch(currentGameMode) {
+    case 'survival':
+      copSpeed = 4; // Faster cops
+      spawnInterval = initialSpawnInterval / 2; // More frequent spawns
+      break;
+      
+    case 'maze':
+      // Create more maze-like obstacles
+      createMazeObstacles();
+      copSpeed = 3;
+      spawnInterval = initialSpawnInterval * 1.2;
+      break;
+      
+    case 'time-trial':
+      copSpeed = 3.5;
+      spawnInterval = initialSpawnInterval;
+      startTimer(60); // Start with 60 seconds
+      break;
+      
+    case 'stealth':
+      copSpeed = 3;
+      spawnInterval = initialSpawnInterval * 1.5;
+      enableStealthMode();
+      break;
+      
+    case 'chaos':
+      copSpeed = 3;
+      spawnInterval = initialSpawnInterval;
+      enableChaosMode();
+      break;
+      
+    case 'classic':
+    default:
+      copSpeed = 3;
+      spawnInterval = initialSpawnInterval;
+      break;
+  }
+  
+  createObstacles();
+  startTime = new Date().getTime();
+  timerInterval = setInterval(updateTimer, 100);
+  gameLoop = setInterval(updateCops, 16);
+  spawnLoop = setInterval(createCop, spawnInterval);
+  speedIncreaseInterval = setInterval(increaseCopSpeed, 10000);
+  copIncreaseInterval = setInterval(increaseCopSpawnRate, 15000);
+}
+
+// Add function to create maze-like obstacles
+function createMazeObstacles() {
+  // Create a grid of barriers to form maze-like patterns
+  const gridSize = 200;
+  const worldSize = 4000;
+  
+  for(let x = gridSize; x < worldSize - gridSize; x += gridSize) {
+    for(let y = gridSize; y < worldSize - gridSize; y += gridSize) {
+      if(Math.random() < 0.7) { // 70% chance to place barrier
+        const barrier = document.createElement('div');
+        barrier.className = 'obstacle-barrier';
+        
+        // Randomly rotate barrier to be vertical or horizontal
+        const isVertical = Math.random() < 0.5;
+        barrier.style.transform = isVertical ? 'rotate(90deg)' : 'rotate(0deg)';
+        
+        barrier.style.left = x + 'px';
+        barrier.style.top = y + 'px';
+        
+        document.querySelector('.game-world').appendChild(barrier);
+        obstacles.push({
+          element: barrier,
+          x: x,
+          y: y,
+          type: 'barrier'
+        });
+      }
+    }
+  }
+}
+
+function startTimer(seconds) {
+  let timeLeft = seconds;
+  timerElement.textContent = timeLeft;
+  
+  timerInterval = setInterval(() => {
+    timeLeft--;
+    timerElement.textContent = timeLeft;
+    
+    if (timeLeft <= 0) {
+      gameOver();
+    }
+  }, 1000);
+}
+
+function enableStealthMode() {
+  const gameWorld = document.querySelector('.game-world');
+  gameWorld.style.filter = 'brightness(0.3)';
+  
+  // Create a circular light around player
+  const light = document.createElement('div');
+  light.className = 'player-light';
+  light.style.cssText = `
+    position: absolute;
+    width: 200px;
+    height: 200px;
+    background: radial-gradient(circle, rgba(255,255,255,0.2) 0%, rgba(0,0,0,1) 70%);
+    pointer-events: none;
+    z-index: 10;
+  `;
+  gameWorld.appendChild(light);
+  
+  // Update light position in game loop
+  const updateLight = () => {
+    if (!gameIsOver) {
+      light.style.left = (playerX - 100) + 'px';
+      light.style.top = (playerY - 100) + 'px';
+      requestAnimationFrame(updateLight);
+    }
+  };
+  requestAnimationFrame(updateLight);
+}
+
+function enableChaosMode() {
+  // Random events every few seconds
+  setInterval(() => {
+    if (!gameIsOver) {
+      const event = Math.floor(Math.random() * 5);
+      switch(event) {
+        case 0: // Speed boost
+          playerSpeed *= 1.5;
+          setTimeout(() => playerSpeed /= 1.5, 3000);
+          break;
+        case 1: // Crazy cops
+          cops.forEach(cop => {
+            cop.movementPattern = Math.floor(Math.random() * 4);
+          });
+          break;
+        case 2: // Random teleport
+          const x = Math.random() * (WORLD_WIDTH - 100) + 50;
+          const y = Math.random() * (WORLD_HEIGHT - 100) + 50;
+          playerX = x;
+          playerY = y;
+          break;
+        case 3: // Multiply score
+          scoreMultiplier *= 2;
+          setTimeout(() => scoreMultiplier /= 2, 5000);
+          break;
+        case 4: // Spawn extra cops
+          for(let i = 0; i < 3; i++) createCop();
+          break;
+      }
+    }
+  }, 10000);
+}
+
+function updateCarColor(color) {
+  document.documentElement.style.setProperty('--car-color', color);
+  document.documentElement.style.setProperty('--car-color-dark', adjustBrightness(color, -20));
+}
+
+function updateTrailColor(color) {
+  document.documentElement.style.setProperty('--trail-color-transparent', `${color}4D`); // 30% opacity
+  document.documentElement.style.setProperty('--trail-color-semi', `${color}66`); // 40% opacity
+}
+
+// Add helper function to adjust color brightness
+function adjustBrightness(color, percent) {
+  const num = parseInt(color.replace('#', ''), 16);
+  const r = (num >> 16) + percent;
+  const g = ((num >> 8) & 0x00FF) + percent;
+  const b = (num & 0x0000FF) + percent;
+
+  const newR = Math.min(255, Math.max(0, r));
+  const newG = Math.min(255, Math.max(0, g));
+  const newB = Math.min(255, Math.max(0, b));
+
+  return `#${(newB | (newG << 8) | (newR << 16)).toString(16).padStart(6, '0')}`;
+}
+
+startButton.addEventListener('click', () => {
+  titleScreen.style.opacity = '0';
+  setTimeout(() => {
+    titleScreen.style.display = 'none';
+    if (!gameStarted) {
+      gameStarted = true;
+      startGame();
+    }
+  }, 500);
+});
+
+carColorPicker.addEventListener('input', (e) => {
+  updateCarColor(e.target.value);
+});
+
+trailColorPicker.addEventListener('input', (e) => {
+  updateTrailColor(e.target.value);
+});
+
+// Initialize colors on startup
+updateCarColor(carColorPicker.value);
+updateTrailColor(trailColorPicker.value);
+
+customizeToggle.addEventListener('click', () => {
+  colorCustomizer.classList.toggle('visible');
+  customizeToggle.textContent = colorCustomizer.classList.contains('visible') ? 'Hide' : 'Customize';
+});
+
+function showGameModes() {
+  titleScreen.style.opacity = '0';
+  setTimeout(() => {
+    titleScreen.style.display = 'none';
+    gamemodesScreen.style.display = 'flex';
+    requestAnimationFrame(() => {
+      gamemodesScreen.style.opacity = '1';
+    });
+  }, 500);
+}
+
+function returnToTitleScreen() {
+  gamemodesScreen.style.opacity = '0';
+  setTimeout(() => {
+    gamemodesScreen.style.display = 'none';
+    titleScreen.style.display = 'flex';
+    requestAnimationFrame(() => {
+      titleScreen.style.opacity = '1';
+    });
+  }, 500);
+}
+
+document.getElementById('viewModesBtn').addEventListener('click', showGameModes);
+
+// Replace this line with a safer version that checks if the element exists first
+const titleScreenGameModes = document.querySelector('.title-screen .game-modes');
+if (titleScreenGameModes) {
+  titleScreenGameModes.remove();
+}
+
+gameStarted = false;
+</script>
+</body>
+</html>
