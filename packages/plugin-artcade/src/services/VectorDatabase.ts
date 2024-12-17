@@ -3,12 +3,23 @@ import {
     IAgentRuntime,
     elizaLogger,
     DatabaseAdapter,
-    DatabaseError,
-    TransactionClient,
-    EmbeddingCache,
-    VectorOperations,
+    MemoryManager,
 } from "@ai16z/eliza";
 import { GamePattern } from "./PatternStaging";
+
+// Custom error class for database operations
+class DatabaseError extends Error {
+    constructor(
+        message: string,
+        public readonly cause?: unknown
+    ) {
+        super(message);
+        this.name = "DatabaseError";
+        if (cause) {
+            this.cause = cause;
+        }
+    }
+}
 
 export interface VectorSearchResult {
     pattern: GamePattern;
@@ -25,8 +36,9 @@ interface AuditLogEntry {
 export class VectorDatabase extends Service {
     private db!: DatabaseAdapter<any>;
     private runtime!: IAgentRuntime & { logger: typeof elizaLogger };
-    private embeddingCache!: EmbeddingCache;
-    private vectorOps!: VectorOperations;
+    private embeddingCache!: any;
+    private vectorOps!: any;
+    private memoryManager!: MemoryManager;
     private cache: Map<
         string,
         {
@@ -36,6 +48,7 @@ export class VectorDatabase extends Service {
     > = new Map();
     private readonly CACHE_TTL = 300000; // 5 minutes
     private readonly EMBEDDING_DIMENSION = 1536;
+    private readonly TABLE_NAME = "game_patterns";
 
     constructor() {
         super();
@@ -47,11 +60,17 @@ export class VectorDatabase extends Service {
         this.runtime = runtime;
         this.db = runtime.getDatabaseAdapter();
 
-        // Get Eliza's embedding cache from runtime
+        // Initialize Eliza's core components
         this.embeddingCache = runtime.getEmbeddingCache();
-
-        // Initialize vector operations
         this.vectorOps = runtime.getVectorOperations();
+
+        // Initialize MemoryManager with proper configuration
+        this.memoryManager = new MemoryManager({
+            runtime,
+            tableName: this.TABLE_NAME,
+            embeddingCache: this.embeddingCache,
+            vectorOps: this.vectorOps,
+        });
 
         // Initialize database schema and security
         await this.initializeSchema();
@@ -97,26 +116,32 @@ export class VectorDatabase extends Service {
             this.runtime.logger.error("Failed to setup audit logging", {
                 error,
             });
-            throw error;
+            throw new DatabaseError("Failed to setup audit logging", error);
         }
     }
 
     private async setupVectorOperations(): Promise<void> {
         try {
             await this.vectorOps.initialize({
-                tableName: "game_patterns",
+                tableName: this.TABLE_NAME,
                 embeddingColumn: "embedding",
                 dimension: this.EMBEDDING_DIMENSION,
                 distanceMetric: "cosine",
+                indexType: "hnsw", // Explicitly use HNSW as recommended
             });
 
-            this.runtime.logger.info("Vector operations initialized");
+            this.runtime.logger.info(
+                "Vector operations initialized with HNSW index"
+            );
         } catch (error) {
             this.runtime.logger.error(
                 "Failed to initialize vector operations",
                 { error }
             );
-            throw error;
+            throw new DatabaseError(
+                "Vector operations initialization failed",
+                error
+            );
         }
     }
 
@@ -141,6 +166,7 @@ export class VectorDatabase extends Service {
                 error,
                 entry,
             });
+            throw new DatabaseError("Failed to log operation", error);
         }
     }
 
@@ -161,31 +187,47 @@ export class VectorDatabase extends Service {
         cutoffDate.setDate(cutoffDate.getDate() - cutoffDays);
 
         await this.db.transaction(async (client) => {
-            // Get patterns to be deleted for audit
-            const patternsToDelete = await client.query(
-                `SELECT id FROM game_patterns
-                 WHERE last_used < $1
-                 AND usage_count = 0`,
-                [cutoffDate]
-            );
+            try {
+                // Get patterns to be deleted
+                const patternsToDelete = await client.query(
+                    `SELECT id FROM ${this.TABLE_NAME}
+                     WHERE last_used < $1
+                     AND usage_count = 0`,
+                    [cutoffDate]
+                );
 
-            // Log deletion in audit
-            for (const pattern of patternsToDelete.rows) {
-                await this.logOperation({
-                    operation: "CLEANUP_DELETE",
-                    pattern_id: pattern.id,
-                    metadata: { cutoff_days: cutoffDays },
-                    performed_at: new Date(),
+                // Log deletions
+                for (const pattern of patternsToDelete.rows) {
+                    await this.logOperation({
+                        operation: "CLEANUP_DELETE",
+                        pattern_id: pattern.id,
+                        metadata: { cutoff_days: cutoffDays },
+                        performed_at: new Date(),
+                    });
+
+                    // Clear pattern from cache
+                    await this.embeddingCache.delete(`pattern_${pattern.id}`);
+                }
+
+                // Perform deletion
+                await client.query(
+                    `DELETE FROM ${this.TABLE_NAME}
+                     WHERE last_used < $1
+                     AND usage_count = 0`,
+                    [cutoffDate]
+                );
+
+                this.runtime.logger.info("Completed pattern cleanup", {
+                    deletedCount: patternsToDelete.rows.length,
+                    cutoffDays,
                 });
+            } catch (error) {
+                this.runtime.logger.error("Failed to cleanup old patterns", {
+                    error,
+                    cutoffDays,
+                });
+                throw new DatabaseError("Pattern cleanup failed", error);
             }
-
-            // Perform deletion
-            await client.query(
-                `DELETE FROM game_patterns
-                 WHERE last_used < $1
-                 AND usage_count = 0`,
-                [cutoffDate]
-            );
         });
     }
 
@@ -251,12 +293,22 @@ export class VectorDatabase extends Service {
                 "Failed to initialize vector database schema",
                 { error }
             );
-            throw error;
+            throw new DatabaseError(
+                "Failed to initialize vector database schema",
+                error
+            );
         }
     }
 
     async storePattern(pattern: GamePattern): Promise<void> {
         try {
+            // Validate embedding dimension before proceeding
+            if (pattern.embedding.length !== this.EMBEDDING_DIMENSION) {
+                throw new DatabaseError(
+                    `Invalid embedding dimension: ${pattern.embedding.length}`
+                );
+            }
+
             await this.db.transaction(async (client) => {
                 const {
                     id,
@@ -267,13 +319,6 @@ export class VectorDatabase extends Service {
                     effectiveness_score,
                     usage_count,
                 } = pattern;
-
-                // Validate embedding dimension
-                if (embedding.length !== this.EMBEDDING_DIMENSION) {
-                    throw new Error(
-                        `Invalid embedding dimension: ${embedding.length}`
-                    );
-                }
 
                 // Store pattern with vector operations
                 await this.vectorOps.store(client, {
@@ -309,11 +354,17 @@ export class VectorDatabase extends Service {
                 `Failed to store pattern: ${pattern.pattern_name}`,
                 { error }
             );
-            throw this.handleDatabaseError(error);
+            if (error instanceof DatabaseError) {
+                throw error;
+            }
+            throw new DatabaseError("Store failed", error);
         }
     }
 
     private handleDatabaseError(error: any): Error {
+        if (error instanceof DatabaseError) {
+            return error;
+        }
         if (error.code === "23505") {
             // Unique violation
             return new DatabaseError(
@@ -328,7 +379,7 @@ export class VectorDatabase extends Service {
                 error
             );
         }
-        return error;
+        return new DatabaseError("Database operation failed", error);
     }
 
     async findSimilarPatterns(
@@ -338,14 +389,33 @@ export class VectorDatabase extends Service {
         limit: number = 5
     ): Promise<VectorSearchResult[]> {
         try {
-            // Check embedding cache first
-            const cacheKey = `${type}_${embedding.join(",")}`;
-            const cachedResults = await this.embeddingCache.get(cacheKey);
-            if (cachedResults) {
-                return cachedResults as VectorSearchResult[];
+            // Validate embedding dimension
+            if (embedding.length !== this.EMBEDDING_DIMENSION) {
+                throw new DatabaseError(
+                    `Invalid embedding dimension: ${embedding.length}`
+                );
             }
 
-            // Use vector operations for similarity search
+            // Try to get from cache first
+            const cacheKey = `${type}_${embedding.join(",")}`;
+            try {
+                const cachedResults = await this.embeddingCache.get(cacheKey);
+                if (cachedResults && cachedResults.length > 0) {
+                    return cachedResults.map((result: any) => ({
+                        pattern: result.pattern,
+                        similarity: result.similarity || 0,
+                    }));
+                }
+            } catch (cacheError) {
+                this.runtime.logger.warn(
+                    "Cache miss, falling back to vector operations",
+                    {
+                        error: cacheError,
+                    }
+                );
+            }
+
+            // Use vector operations with proper error handling
             const results = await this.vectorOps.findSimilar({
                 embedding,
                 filter: { type },
@@ -354,6 +424,12 @@ export class VectorDatabase extends Service {
                 orderBy: "similarity",
                 orderDirection: "DESC",
             });
+
+            if (!results || !Array.isArray(results)) {
+                throw new DatabaseError(
+                    "Invalid results from vector operations"
+                );
+            }
 
             const patterns = results.map((row) => ({
                 pattern: {
@@ -369,14 +445,19 @@ export class VectorDatabase extends Service {
             }));
 
             // Cache the results
-            await this.embeddingCache.set(cacheKey, patterns);
+            await this.embeddingCache.set(cacheKey, patterns, this.CACHE_TTL);
 
             return patterns;
         } catch (error) {
             this.runtime.logger.error("Failed to find similar patterns", {
                 error,
+                type,
+                threshold,
             });
-            throw error;
+            if (error instanceof DatabaseError) {
+                throw error;
+            }
+            throw new DatabaseError("Vector operation failed", error);
         }
     }
 
@@ -402,7 +483,10 @@ export class VectorDatabase extends Service {
                 `Failed to update effectiveness score for pattern ${id}`,
                 { error }
             );
-            throw error;
+            throw new DatabaseError(
+                "Failed to update effectiveness score",
+                error
+            );
         }
     }
 
@@ -434,7 +518,7 @@ export class VectorDatabase extends Service {
                 `Failed to increment usage count for pattern ${id}`,
                 { error }
             );
-            throw error;
+            throw new DatabaseError("Failed to increment usage count", error);
         }
     }
 
@@ -474,7 +558,7 @@ export class VectorDatabase extends Service {
             this.runtime.logger.error(`Failed to get pattern by id ${id}`, {
                 error,
             });
-            throw error;
+            throw new DatabaseError("Failed to get pattern by ID", error);
         }
     }
 }
