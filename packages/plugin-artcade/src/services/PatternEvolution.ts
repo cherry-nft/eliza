@@ -677,4 +677,142 @@ export class PatternEvolution extends Service {
         const layout = layouts[Math.floor(Math.random() * layouts.length)];
         return html.replace(/style="([^"]*)"/, `style="$1 ${layout}"`);
     }
+
+    private addGameElements(html: string): string {
+        const gameElements = [
+            {
+                type: "player",
+                html: `<div class="game-player" style="width: 32px; height: 32px; background-color: rgb(255, 0, 0); position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);" data-speed="5"></div>
+                <div class="game-controls" style="position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; background: rgba(0,0,0,0.1); padding: 10px; border-radius: 8px;">
+                    <button onclick="handleMove('left')" style="width: 40px; height: 40px;">←</button>
+                    <div style="display: flex; flex-direction: column; gap: 5px;">
+                        <button onclick="handleMove('up')" style="width: 40px; height: 40px;">↑</button>
+                        <button onclick="handleMove('down')" style="width: 40px; height: 40px;">↓</button>
+                    </div>
+                    <button onclick="handleMove('right')" style="width: 40px; height: 40px;">→</button>
+                </div>
+                <script>
+                    function handleMove(direction) {
+                        const player = document.querySelector('.game-player');
+                        if (!player) return;
+                        const speed = parseInt(player.dataset.speed) || 5;
+                        switch(direction) {
+                            case 'left': player.style.left = (parseInt(player.style.left || 0) - speed) + 'px'; break;
+                            case 'right': player.style.left = (parseInt(player.style.left || 0) + speed) + 'px'; break;
+                            case 'up': player.style.top = (parseInt(player.style.top || 0) - speed) + 'px'; break;
+                            case 'down': player.style.top = (parseInt(player.style.top || 0) + speed) + 'px'; break;
+                        }
+                    }
+                    document.addEventListener("keydown", (e) => {
+                        const direction = {
+                            'ArrowLeft': 'left',
+                            'ArrowRight': 'right',
+                            'ArrowUp': 'up',
+                            'ArrowDown': 'down'
+                        }[e.key];
+                        if (direction) handleMove(direction);
+                    });
+                </script>`,
+            },
+            {
+                type: "collectible",
+                html: `<div class="game-collectible" style="width: 16px; height: 16px; background-color: rgb(255, 255, 0); position: absolute; border-radius: 50%; animation: float 2s infinite ease-in-out;"></div>`,
+            },
+            {
+                type: "powerup",
+                html: `<div class="game-powerup" style="width: 24px; height: 24px; background-color: rgb(0, 255, 0); position: absolute; border-radius: 50%; animation: pulse 1s infinite;" data-effect="speed" data-duration="5000"></div>`,
+            },
+            {
+                type: "portal",
+                html: `<div class="game-portal" style="width: 40px; height: 60px; background: linear-gradient(to right, #4a00e0, #8e2de2); position: absolute; border-radius: 20px; animation: glow 2s infinite;" data-target-level="2"></div>`,
+            },
+            {
+                type: "checkpoint",
+                html: `<div class="game-checkpoint" style="width: 32px; height: 32px; background-color: rgb(255, 215, 0); position: absolute; border-radius: 4px; animation: pulse 1.5s infinite;" data-checkpoint-id="1"></div>`,
+            },
+        ];
+
+        // Add game state management
+        if (!html.includes("gameState")) {
+            html = `<script>
+                const gameState = {
+                    score: 0,
+                    health: 100,
+                    level: 1,
+                    powerups: [],
+                    combo: 0,
+                    checkpoints: [],
+                    addPowerup: function(effect, duration) {
+                        this.powerups.push({ effect, expires: Date.now() + duration });
+                        setTimeout(() => this.removePowerup(effect), duration);
+                    },
+                    removePowerup: function(effect) {
+                        this.powerups = this.powerups.filter(p => p.effect !== effect);
+                    },
+                    saveCheckpoint: function() {
+                        this.checkpoints.push({
+                            score: this.score,
+                            health: this.health,
+                            level: this.level,
+                            timestamp: Date.now()
+                        });
+                    }
+                };
+
+                // Initialize keyboard controls
+                document.addEventListener("keydown", (e) => {
+                    const player = document.querySelector('.game-player');
+                    if (!player) return;
+                    const speed = parseInt(player.dataset.speed) || 5;
+                    switch(e.key) {
+                        case "ArrowLeft": player.style.left = (parseInt(player.style.left || 0) - speed) + 'px'; break;
+                        case "ArrowRight": player.style.left = (parseInt(player.style.left || 0) + speed) + 'px'; break;
+                        case "ArrowUp": player.style.top = (parseInt(player.style.top || 0) - speed) + 'px'; break;
+                        case "ArrowDown": player.style.top = (parseInt(player.style.top || 0) + speed) + 'px'; break;
+                    }
+
+                    // Check collisions
+                    const powerups = document.querySelectorAll('.game-powerup');
+                    powerups.forEach(powerup => {
+                        if (this.checkCollision(player, powerup)) {
+                            const effect = powerup.dataset.effect;
+                            const duration = parseInt(powerup.dataset.duration);
+                            gameState.addPowerup(effect, duration);
+                            powerup.remove();
+                        }
+                    });
+
+                    // Check portals
+                    const portals = document.querySelectorAll('.game-portal');
+                    portals.forEach(portal => {
+                        if (this.checkCollision(player, portal)) {
+                            gameState.level = parseInt(portal.dataset.targetLevel);
+                            gameState.saveCheckpoint();
+                        }
+                    });
+                });
+            </script>${html}`;
+        }
+
+        // Add random game elements
+        const numElements = Math.floor(Math.random() * 3) + 1;
+        for (let i = 0; i < numElements; i++) {
+            const element =
+                gameElements[Math.floor(Math.random() * gameElements.length)];
+            html = html.replace("</div>", `${element.html}</div>`);
+        }
+
+        return html;
+    }
+
+    private checkCollision(el1: Element, el2: Element): boolean {
+        const rect1 = el1.getBoundingClientRect();
+        const rect2 = el2.getBoundingClientRect();
+        return !(
+            rect1.right < rect2.left ||
+            rect1.left > rect2.right ||
+            rect1.bottom < rect2.top ||
+            rect1.top > rect2.bottom
+        );
+    }
 }

@@ -150,6 +150,162 @@ export class PatternLibrary {
         );
     }
 
+    async extractPatterns(html: string): Promise<GamePattern[]> {
+        const patterns: GamePattern[] = [];
+
+        // Extract animations
+        const animationPatterns = await this.extractAnimationPatterns(html);
+        patterns.push(...animationPatterns);
+
+        // Extract layouts
+        const layoutPatterns = await this.extractLayoutPatterns(html);
+        patterns.push(...layoutPatterns);
+
+        // Extract interactions
+        const interactionPatterns = await this.extractInteractionPatterns(html);
+        patterns.push(...interactionPatterns);
+
+        // Extract styles
+        const stylePatterns = await this.extractStylePatterns(html);
+        patterns.push(...stylePatterns);
+
+        // Extract game mechanics (existing functionality)
+        const gameMechanics = await this.extractGameMechanics(html);
+        patterns.push(...gameMechanics);
+
+        return patterns;
+    }
+
+    private async extractAnimationPatterns(
+        html: string
+    ): Promise<GamePattern[]> {
+        const patterns: GamePattern[] = [];
+        const animationElements = html.match(/<[^>]+animation:[^>]+>/g) || [];
+        const keyframeRules =
+            html.match(/@keyframes\s+([^{]+)\s*{([^}]+)}/g) || [];
+
+        if (animationElements.length > 0 || keyframeRules.length > 0) {
+            patterns.push({
+                id: uuidv4(),
+                type: "animation",
+                pattern_name: "animation_pattern",
+                content: {
+                    html: animationElements.join("\n"),
+                    css: keyframeRules.join("\n"),
+                    context: "animation",
+                    metadata: {
+                        visual_type: "animation",
+                        animation_duration: this.extractAnimationDuration(html),
+                    },
+                },
+                embedding: [],
+                effectiveness_score: 1.0,
+                usage_count: 0,
+            });
+        }
+
+        return patterns;
+    }
+
+    private async extractLayoutPatterns(html: string): Promise<GamePattern[]> {
+        const patterns: GamePattern[] = [];
+        const layoutElements =
+            html.match(/<[^>]+(display:|grid-|flex-)[^>]+>/g) || [];
+
+        if (layoutElements.length > 0) {
+            patterns.push({
+                id: uuidv4(),
+                type: "layout",
+                pattern_name: "layout_pattern",
+                content: {
+                    html: layoutElements.join("\n"),
+                    context: "layout",
+                    metadata: {
+                        visual_type: "layout",
+                    },
+                },
+                embedding: [],
+                effectiveness_score: 1.0,
+                usage_count: 0,
+            });
+        }
+
+        return patterns;
+    }
+
+    private async extractInteractionPatterns(
+        html: string
+    ): Promise<GamePattern[]> {
+        const patterns: GamePattern[] = [];
+        const interactionElements =
+            html.match(/<[^>]+(onclick|onmouseover|draggable)[^>]+>/g) || [];
+
+        if (interactionElements.length > 0) {
+            patterns.push({
+                id: uuidv4(),
+                type: "interaction",
+                pattern_name: "interaction_pattern",
+                content: {
+                    html: interactionElements.join("\n"),
+                    context: "interaction",
+                    metadata: {
+                        interaction_type: "user_input",
+                    },
+                },
+                embedding: [],
+                effectiveness_score: 1.0,
+                usage_count: 0,
+            });
+        }
+
+        return patterns;
+    }
+
+    private async extractStylePatterns(html: string): Promise<GamePattern[]> {
+        const patterns: GamePattern[] = [];
+        const styleElements = html.match(/<[^>]+(style="[^"]+")/g) || [];
+        const colorScheme = this.extractColorScheme(html);
+
+        if (styleElements.length > 0) {
+            patterns.push({
+                id: uuidv4(),
+                type: "style",
+                pattern_name: "style_pattern",
+                content: {
+                    html: styleElements.join("\n"),
+                    context: "style",
+                    metadata: {
+                        visual_type: "style",
+                        color_scheme: colorScheme,
+                    },
+                },
+                embedding: [],
+                effectiveness_score: 1.0,
+                usage_count: 0,
+            });
+        }
+
+        return patterns;
+    }
+
+    private extractAnimationDuration(html: string): string {
+        const durationMatch = html.match(/animation(?:-duration)?:\s*([^;]+)/);
+        if (!durationMatch) return "0s";
+
+        // Extract just the duration part from animation shorthand
+        const parts = durationMatch[1].split(/\s+/);
+        const duration = parts.find((part) =>
+            part.match(/^\d+(?:\.\d+)?[ms]?s$/)
+        );
+        return duration || "0s";
+    }
+
+    private extractColorScheme(html: string): string[] {
+        const colorMatches =
+            html.match(/#[0-9a-f]{3,6}|rgb\([^)]+\)|rgba\([^)]+\)/gi) || [];
+        return [...new Set(colorMatches)];
+    }
+
     async extractGameMechanics(html: string): Promise<GamePattern[]> {
         const patterns: GamePattern[] = [];
 
@@ -247,6 +403,28 @@ export class PatternLibrary {
     private extractCollisionElements(html: string): string {
         const collisionElements =
             html.match(/<div[^>]*data-collision="true"[^>]*>.*?<\/div>/g) || [];
+
+        // Add keyboard event listener if not present
+        if (
+            collisionElements.length > 0 &&
+            !html.includes('addEventListener("keydown"')
+        ) {
+            collisionElements[0] = `${collisionElements[0]}
+            <script>
+                document.addEventListener("keydown", (e) => {
+                    const player = document.querySelector('.game-player');
+                    if (!player) return;
+                    const speed = parseInt(player.dataset.speed) || 5;
+                    switch(e.key) {
+                        case "ArrowLeft": player.style.left = (parseInt(player.style.left || 0) - speed) + 'px'; break;
+                        case "ArrowRight": player.style.left = (parseInt(player.style.left || 0) + speed) + 'px'; break;
+                        case "ArrowUp": player.style.top = (parseInt(player.style.top || 0) - speed) + 'px'; break;
+                        case "ArrowDown": player.style.top = (parseInt(player.style.top || 0) + speed) + 'px'; break;
+                    }
+                });
+            </script>`;
+        }
+
         return collisionElements.join("\n");
     }
 
@@ -274,6 +452,26 @@ export class PatternLibrary {
     private extractPowerUpElements(html: string): string {
         const powerUpElements =
             html.match(/<div[^>]*game-powerup[^>]*>.*?<\/div>/g) || [];
+
+        // Add game state if not present
+        if (powerUpElements.length > 0 && !html.includes("gameState")) {
+            powerUpElements[0] = `${powerUpElements[0]}
+            <script>
+                const gameState = {
+                    score: 0,
+                    health: 100,
+                    powerups: [],
+                    addPowerup: function(effect, duration) {
+                        this.powerups.push({ effect, expires: Date.now() + duration });
+                        setTimeout(() => this.removePowerup(effect), duration);
+                    },
+                    removePowerup: function(effect) {
+                        this.powerups = this.powerups.filter(p => p.effect !== effect);
+                    }
+                };
+            </script>`;
+        }
+
         return powerUpElements.join("\n");
     }
 

@@ -238,4 +238,104 @@ describe("PatternLibrary", () => {
             ]);
         });
     });
+
+    describe("pattern extraction", () => {
+        it("should extract animation patterns", async () => {
+            const html = `
+                <div style="animation: pulse 2s infinite;">
+                    <style>
+                        @keyframes pulse {
+                            0% { transform: scale(1); }
+                            50% { transform: scale(1.1); }
+                            100% { transform: scale(1); }
+                        }
+                    </style>
+                </div>
+            `;
+
+            const patterns = await library.extractPatterns(html);
+            const animationPattern = patterns.find(
+                (p) => p.type === "animation"
+            );
+            expect(animationPattern).toBeDefined();
+            expect(animationPattern?.content.css).toContain("@keyframes pulse");
+            expect(animationPattern?.content.metadata.animation_duration).toBe(
+                "2s"
+            );
+        });
+
+        it("should extract layout patterns", async () => {
+            const html = `
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr);">
+                    <div style="display: flex; flex-direction: column;">
+                        <span>Item 1</span>
+                    </div>
+                </div>
+            `;
+
+            const patterns = await library.extractPatterns(html);
+            const layoutPattern = patterns.find((p) => p.type === "layout");
+            expect(layoutPattern).toBeDefined();
+            expect(layoutPattern?.content.html).toContain("display: grid");
+            expect(layoutPattern?.content.html).toContain("display: flex");
+        });
+
+        it("should extract interaction patterns", async () => {
+            const html = `
+                <div onclick="handleClick()" onmouseover="handleHover()">
+                    <div draggable="true">Drag me</div>
+                </div>
+            `;
+
+            const patterns = await library.extractPatterns(html);
+            const interactionPattern = patterns.find(
+                (p) => p.type === "interaction"
+            );
+            expect(interactionPattern).toBeDefined();
+            expect(interactionPattern?.content.html).toContain("onclick");
+            expect(interactionPattern?.content.html).toContain("draggable");
+            expect(interactionPattern?.content.metadata.interaction_type).toBe(
+                "user_input"
+            );
+        });
+
+        it("should extract style patterns", async () => {
+            const html = `
+                <div style="background-color: #ff0000; color: rgb(0, 255, 0);">
+                    <span style="border: 1px solid rgba(0, 0, 255, 0.5);">Styled content</span>
+                </div>
+            `;
+
+            const patterns = await library.extractPatterns(html);
+            const stylePattern = patterns.find((p) => p.type === "style");
+            expect(stylePattern).toBeDefined();
+            expect(stylePattern?.content.html).toContain("background-color");
+            expect(stylePattern?.content.metadata.color_scheme).toContain(
+                "#ff0000"
+            );
+            expect(stylePattern?.content.metadata.color_scheme).toHaveLength(3);
+        });
+
+        it("should extract multiple pattern types from complex HTML", async () => {
+            const html = `
+                <div style="display: grid; animation: fade 1s;">
+                    <div onclick="handleClick()" style="background-color: #123456;">
+                        <style>
+                            @keyframes fade {
+                                from { opacity: 0; }
+                                to { opacity: 1; }
+                            }
+                        </style>
+                    </div>
+                </div>
+            `;
+
+            const patterns = await library.extractPatterns(html);
+            const types = patterns.map((p) => p.type);
+            expect(types).toContain("animation");
+            expect(types).toContain("layout");
+            expect(types).toContain("interaction");
+            expect(types).toContain("style");
+        });
+    });
 });
