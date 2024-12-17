@@ -1,5 +1,18 @@
 # Artcade Sandbox Testing Questions
 
+# Claude Proposes...
+
+1. Setup a simple dev server
+2. Create a visual pattern playground:
+    - Pattern preview area
+    - Controls for pattern parameters
+    - Real-time embedding visualization
+    - Pattern effectiveness metrics display
+3. Add basic monitoring:
+    - Console logging for pattern operations
+    - Visual feedback for pattern mutations
+    - Performance metrics display
+
 ## Pattern Evolution
 
 **Question**: How does pattern evolution work in terms of effectiveness scores and mutation?
