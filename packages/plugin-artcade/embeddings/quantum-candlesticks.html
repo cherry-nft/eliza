@@ -1,0 +1,637 @@
+<html><head><base href="https://websim.ai/@shiningfog19511286/djaoudyfx-6-1-quantum-hyperintelligence-fusion-ultra">
+<title>DjaoudyFx 6.1 - Quantum Hyperintelligence Fusion Ultra Dashboard</title>
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.9.1/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tensorflow/3.18.0/tf.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700&family=Roboto:wght@300;400;500;700&display=swap');
+
+:root {
+    --primary-bg: #000814;
+    --secondary-bg: #001529;
+    --accent-color: #00f7ff;
+    --text-color: #e0e0e0;
+    --chart-bg: #002a4e;
+    --positive-color: #00ff9d;
+    --negative-color: #ff4500;
+    --neutral-color: #ffa500;
+    --neon-blue: #18f0ff;
+    --quantum-purple: #9b30ff;
+    --bitcoin-orange: #f7931a;
+}
+
+body {
+    font-family: 'Roboto', sans-serif;
+    background: linear-gradient(135deg, var(--primary-bg) 0%, var(--secondary-bg) 100%);
+    color: var(--text-color);
+    margin: 0;
+    padding: 10px;
+    min-height: 100vh;
+    font-size: 12px;
+    line-height: 1.4;
+    overflow-x: hidden;
+}
+
+.dashboard-title {
+    font-family: 'Orbitron', sans-serif;
+    text-align: center;
+    font-size: 2em;
+    margin-bottom: 15px;
+    background: linear-gradient(to right, var(--bitcoin-orange), var(--neon-blue), var(--quantum-purple));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-shadow: 0 0 10px rgba(247,147,26,0.5);
+}
+
+.dashboard {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    grid-auto-rows: minmax(100px, auto);
+    gap: 10px;
+    max-width: 1920px;
+    margin: 0 auto;
+}
+
+.column {
+    background: linear-gradient(135deg, rgba(0, 42, 78, 0.9) 0%, rgba(0, 21, 41, 0.9) 100%);
+    border-radius: 10px;
+    padding: 10px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.column:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 20px rgba(0,247,255,0.4);
+}
+
+.chart-container {
+    height: 180px;
+    margin-bottom: 10px;
+}
+
+h2, h3, h4 {
+    font-family: 'Orbitron', sans-serif;
+    color: var(--accent-color);
+    margin: 0 0 8px 0;
+    font-size: 1.1em;
+}
+
+.analysis-item {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    padding: 10px;
+    margin-bottom: 10px;
+    transition: all 0.3s ease;
+}
+
+.analysis-item:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 3px 10px rgba(0, 247, 255, 0.3);
+}
+
+.glow {
+    animation: glow 2s ease-in-out infinite alternate;
+}
+
+@keyframes glow {
+    from {
+        text-shadow: 0 0 3px #fff, 0 0 6px #fff, 0 0 9px var(--bitcoin-orange), 0 0 12px var(--bitcoin-orange);
+    }
+    to {
+        text-shadow: 0 0 6px #fff, 0 0 12px #fff, 0 0 18px var(--bitcoin-orange), 0 0 24px var(--neon-blue), 0 0 30px var(--quantum-purple);
+    }
+}
+
+#currentPrice {
+    font-size: 1.8em;
+    font-weight: bold;
+    text-align: center;
+    padding: 10px;
+    background: linear-gradient(45deg, var(--chart-bg), var(--secondary-bg));
+    border-radius: 10px;
+    margin-bottom: 10px;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.3);
+}
+
+.positive { color: var(--positive-color); }
+.negative { color: var(--negative-color); }
+.neutral { color: var(--neutral-color); }
+
+#tradingViewWidget {
+    grid-column: span 4;
+    grid-row: span 3;
+    height: 600px;
+}
+
+.side-panel {
+    display: flex;
+    flex-direction: column;
+}
+
+.side-panel .analysis-item {
+    flex: 1;
+}
+
+#quantum3DVisualizer {
+    width: 100%;
+    height: 200px;
+}
+
+.bottom-panel {
+    grid-column: span 6;
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 10px;
+}
+
+.sync-analysis {
+    grid-column: span 6;
+    text-align: center;
+    font-size: 1em;
+    padding: 10px;
+    background: linear-gradient(45deg, var(--chart-bg), var(--secondary-bg));
+    border-radius: 10px;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.3);
+}
+
+p {
+    margin: 5px 0;
+    font-size: 0.9em;
+}
+
+.scrollable {
+    max-height: 300px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--accent-color) var(--secondary-bg);
+}
+
+.scrollable::-webkit-scrollbar {
+    width: 6px;
+}
+
+.scrollable::-webkit-scrollbar-track {
+    background: var(--secondary-bg);
+}
+
+.scrollable::-webkit-scrollbar-thumb {
+    background-color: var(--accent-color);
+    border-radius: 3px;
+}
+
+.hidden {
+    display: none;
+}
+
+.notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background-color: var(--accent-color);
+    color: var(--primary-bg);
+    padding: 10px 20px;
+    border-radius: 5px;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.3);
+    z-index: 1000;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+#aiAssistant {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background-color: var(--secondary-bg);
+    color: var(--text-color);
+    padding: 15px;
+    border-radius: 10px;
+    box-shadow: 0 3px 15px rgba(0,247,255,0.3);
+    z-index: 1000;
+    max-width: 300px;
+}
+
+#aiAssistant h4 {
+    margin-top: 0;
+}
+
+#aiAssistantChat {
+    max-height: 200px;
+    overflow-y: auto;
+    margin-bottom: 10px;
+}
+
+#aiAssistantInput {
+    width: 100%;
+    padding: 5px;
+    border: none;
+    border-radius: 5px;
+    background-color: var(--chart-bg);
+    color: var(--text-color);
+}
+
+</style>
+</head>
+<body>
+
+<h1 class="dashboard-title glow">DjaoudyFx 6.1 - Quantum Hyperintelligence Fusion Ultra Dashboard</h1>
+
+<div class="dashboard">
+    <div class="column scrollable">
+        <div id="currentPrice" class="glow">BTC/USD: $67,168.31 <span class="positive">+2.5%</span></div>
+        <div class="analysis-item">
+            <h3>Analyse IA Quantum</h3>
+            <div id="aiQuantumChart" class="chart-container"></div>
+            <p id="aiQuantumAnalysis"></p>
+        </div>
+        <div class="analysis-item">
+            <h3>Patterns Quantiques</h3>
+            <div id="quantumPatternChart" class="chart-container"></div>
+            <p id="quantumPatternAnalysis"></p>
+        </div>
+    </div>
+
+    <div id="tradingViewWidget"></div>
+
+    <div class="column side-panel scrollable">
+        <div class="analysis-item">
+            <h3>Multi-Timeframe Hyperintelligent</h3>
+            <div id="hyperMultiTimeframeChart" class="chart-container"></div>
+            <div id="hyperMultiTimeframeAnalysis"></div>
+        </div>
+        <div class="analysis-item">
+            <h3>Volatilité Quantique</h3>
+            <div id="quantumVolatilityChart" class="chart-container"></div>
+            <p id="quantumVolatilityAnalysis"></p>
+        </div>
+        <div class="analysis-item">
+            <h3>SMC Quantiques</h3>
+            <div id="quantumSMCChart" class="chart-container"></div>
+            <p id="quantumSMCAnalysis"></p>
+        </div>
+    </div>
+
+    <div class="column scrollable">
+        <div class="analysis-item">
+            <h3>Sentiment Hyperdimensionnel</h3>
+            <div id="hyperSentimentChart" class="chart-container"></div>
+            <p id="hyperSentimentAnalysis"></p>
+        </div>
+        <div class="analysis-item">
+            <h3>Visualisation 3D Quantique</h3>
+            <div id="quantum3DVisualizer"></div>
+            <p id="quantum3DAnalysis"></p>
+        </div>
+    </div>
+
+    <div class="bottom-panel">
+        <div class="analysis-item">
+            <h3>Price Action Avancée</h3>
+            <div id="priceActionChart" class="chart-container"></div>
+            <p id="priceActionAnalysis"></p>
+        </div>
+        <div class="analysis-item">
+            <h3>Détection de Reversals</h3>
+            <div id="reversalDetectionChart" class="chart-container"></div>
+            <p id="reversalAnalysis"></p>
+        </div>
+        <div class="analysis-item">
+            <h3>SMC Approfondie</h3>
+            <div id="smcAdvancedChart" class="chart-container"></div>
+            <p id="smcAdvancedAnalysis"></p>
+        </div>
+        <div class="analysis-item">
+            <h3>Vagues d'Elliott Quantiques</h3>
+            <div id="elliottWaveChart" class="chart-container"></div>
+            <p id="elliottWaveAnalysis"></p>
+        </div>
+        <div class="analysis-item">
+            <h3>Analyse de Volume Profile</h3>
+            <div id="volumeProfileChart" class="chart-container"></div>
+            <p id="volumeProfileAnalysis"></p>
+        </div>
+        <div class="analysis-item">
+            <h3>Analyse Fractale</h3>
+            <div id="fractalAnalysisChart" class="chart-container"></div>
+            <p id="fractalAnalysis"></p>
+        </div>
+        <div class="sync-analysis">
+            <h3>Synchronisation Intelligente</h3>
+            <p id="syncAnalysis"></p>
+        </div>
+    </div>
+</div>
+
+<div id="aiAssistant" class="hidden">
+    <h4>Assistant IA DjaoudyFx</h4>
+    <div id="aiAssistantChat"></div>
+    <input type="text" id="aiAssistantInput" placeholder="Posez votre question...">
+</div>
+
+<script>
+// Initialisation du widget TradingView
+new TradingView.widget({
+    "width": "100%",
+    "height": "100%",
+    "symbol": "BITSTAMP:BTCUSD",
+    "interval": "D",
+    "timezone": "Etc/UTC",
+    "theme": "dark",
+    "style": "1",
+    "locale": "fr",
+    "toolbar_bg": "#f1f3f6",
+    "enable_publishing": false,
+    "allow_symbol_change": true,
+    "container_id": "tradingViewWidget",
+    "studies": [
+        "MASimple@tv-basicstudies",
+        "MAExp@tv-basicstudies",
+        "RSI@tv-basicstudies",
+        "MACD@tv-basicstudies",
+        "StochasticRSI@tv-basicstudies",
+        "IchimokuCloud@tv-basicstudies"
+    ]
+});
+
+// Fonction pour créer un graphique avec Plotly
+function createChart(elementId, data, layout) {
+    Plotly.newPlot(elementId, [data], {
+        ...layout,
+        paper_bgcolor: 'rgba(0,0,0,0)',
+        plot_bgcolor: 'rgba(0,0,0,0)',
+        font: {color: '#e0e0e0', size: 10},
+        margin: {t:20, b:20, l:20, r:20},
+        height: 180
+    });
+}
+
+// Fonction pour afficher une notification
+function showNotification(message) {
+    const notification = document.createElement('div');
+    notification.classList.add('notification');
+    notification.textContent = message;
+    document.body.appendChild(notification);
+
+    setTimeout(() => {
+        notification.style.opacity = '1';
+    }, 100);
+
+    setTimeout(() => {
+        notification.style.opacity = '0';
+        setTimeout(() => {
+            document.body.removeChild(notification);
+        }, 300);
+    }, 3000);
+}
+
+// Initialisation des graphiques et analyses
+$(document).ready(function() {
+    // Graphique d'analyse IA Quantum
+    createChart('aiQuantumChart', {
+        x: ['1h', '4h', '12h', '24h', '3d', '1w'],
+        y: [67200, 67500, 68000, 68500, 69000, 70000],
+        type: 'scatter',
+        mode: 'lines+markers',
+        line: {color: '#00f7ff', width: 2},
+        marker: {color: '#18f0ff', size: 6, symbol: 'diamond'}
+    }, {
+        title: {text: 'Prédiction IA Quantum', font: {size: 12}},
+        xaxis: {title: 'Horizon', titlefont: {size: 10}},
+        yaxis: {title: 'Prix prédit', titlefont: {size: 10}}
+    });
+    $('#aiQuantumAnalysis').html("IA Quantum: Tendance haussière (94.3% prob.) sur 24h. Convergence multi-dimensionnelle.");
+
+    // Graphique de détection de patterns quantiques
+    createChart('quantumPatternChart', {
+        x: ['Q-Triangle', 'Hyperellipse', 'F-Wedge'],
+        y: [0.92, 0.85, 0.78],
+        type: 'bar',
+        marker: {
+            color: ['#00ff9d', '#00f7ff', '#9b30ff'],
+            line: {width: 1, color: '#18f0ff'}
+        }
+    }, {
+        title: {text: 'Force des Patterns', font: {size: 12}},
+        yaxis: {title: 'Probabilité', titlefont: {size: 10}}
+    });
+    $('#quantumPatternAnalysis').html("Q-Triangle (92% fiab.). Breakout haussier imminent. Cible: $72,500 ±1.5%.");
+
+    // Graphique Multi-Timeframe Hyperintelligent
+    createChart('hyperMultiTimeframeChart', {
+        x: ['1m', '5m', '15m', '1h', '4h', '1D', '1W'],
+        y: [1, 0.8, 0.9, 1, 0.95, 0.85, 0.75],
+        type: 'scatter',
+        mode: 'lines+markers',
+        line: {color: '#9b30ff', width: 2},
+        marker: {color: '#18f0ff', size: 6, symbol: 'star'}
+    }, {
+        title: {text: 'Multi-Timeframe', font: {size: 12}},
+        yaxis: {title: 'Force tendance', titlefont: {size: 10}}
+    });
+    $('#hyperMultiTimeframeAnalysis').html(`
+        <p>1m-15m: <span class="positive">Très Haussier</span></p>
+        <p>1h-4h: <span class="positive">Haussier</span></p>
+        <p>1D: <span class="neutral">Consolid.</span> 1W: <span class="positive">Haussier</span></p>
+        <p>Convergence: 89.7%</p>
+    `);
+
+    // Graphique de volatilité quantique
+    createChart('quantumVolatilityChart', {
+        x: ['1h', '4h', '12h', '24h', '3d', '1w'],
+        y: [2.1, 3.5, 4.2, 5.8, 7.1, 9.3],
+        type: 'scatter',
+        mode: 'lines',
+        line: {color: '#00f7ff', width: 2},
+        fill: 'tozeroy',
+        fillcolor: 'rgba(0,247,255,0.2)'
+    }, {
+        title: {text: 'Volatilité Quantique', font: {size: 12}},
+        yaxis: {title: 'Volatilité (%)', titlefont: {size: 10}}
+    });
+    $('#quantumVolatilityAnalysis').html("↑ volatilité 24-48h. Pic potentiel: 8.7%.");
+
+    // Graphique SMC Quantique
+    createChart('quantumSMCChart', {
+        values: [45, 30, 25],
+        labels: ['Accum.', 'Distrib.', 'Equil.'],
+        type: 'pie',
+        marker: {
+            colors: ['#00ff9d', '#ff4500', '#ffa500'],
+            line: {color: '#18f0ff', width: 1}
+        },
+        textinfo: 'label+percent',
+        textposition: 'inside',
+        hole: .4
+    }, {
+        title: {text: 'SMC Quantique', font: {size: 12}}
+    });
+    $('#quantumSMCAnalysis').html("Accumulation quantique. Smart money: position agressive. Prob. hausse: 87.3%");
+
+    // Graphique de sentiment hyperdimensionnel
+    createChart('hyperSentimentChart', {
+        x: ['Twitter', 'Reddit', 'News', 'Forum', 'Dark Web', 'AI'],
+        y: [0.82, 0.75, 0.68, 0.79, 0.91, 0.88],
+        type: 'bar',
+        marker: {
+            color: ['#00f7ff', '#00ff9d', '#ffa500', '#9b30ff', '#ff4500', '#18f0ff'],
+            line: {width: 1, color: '#ffffff'}
+        }
+    }, {
+        title: {text: 'Sentiment Hyperdimensionnel', font: {size: 12}},
+        yaxis: {title: 'Score', titlefont: {size: 10}}
+    });
+    $('#hyperSentimentAnalysis').html("Sentiment global très positif. Intérêt institutionnel +23%. Consensus haussier dark web.");
+
+    // Initialisation de la visualisation 3D quantique
+    initQuantum3DVisualizer();
+
+    // Price Action Analysis
+    createChart('priceActionChart', {
+        x: ['09:00', '10:00', '11:00', '12:00', '13:00', '14:00'],
+        y: [67000, 67200, 67150, 67300, 67250, 67400],
+        type: 'candlestick',
+        xaxis: 'x',
+        yaxis: 'y'
+    }, {
+        title: {text: 'Price Action', font: {size: 12}},
+        xaxis: {title: 'Heure', titlefont: {size: 10}},
+        yaxis: {title: 'Prix', titlefont: {size: 10}}
+    });
+    $('#priceActionAnalysis').html("Structure haussière. Support: $67,000. Résistance: $67,500.");
+
+    // Reversal Detection
+    createChart('reversalDetectionChart', {
+        x: ['1D', '2D', '3D', '4D', '5D'],
+        y: [66800, 67000, 67200, 67100, 67400],
+        type: 'scatter',
+        mode: 'lines+markers',
+        line: {color: '#9b30ff', width: 2},
+        marker: {size: 6, color: ['#00ff9d', '#00ff9d', '#00ff9d', '#ff4500', '#00ff9d']}
+    }, {
+        title: {text: 'Détection Reversals', font: {size: 12}},
+        xaxis: {title: 'Jours', titlefont: {size: 10}},
+        yaxis: {title: 'Prix', titlefont: {size: 10}}
+    });
+    $('#reversalAnalysis').html("Reversal haussier J4. Confirmation tendance actuelle.");
+
+    // Advanced SMC Analysis
+    createChart('smcAdvancedChart', {
+        x: ['Accum.', 'Manip.', 'Distrib.'],
+        y: [0.6, 0.3, 0.1],
+        type: 'bar',
+        marker: {color: ['#00ff9d', '#ffa500', '#ff4500']}
+    }, {
+        title: {text: 'SMC Avancée', font: {size: 12}},
+        yaxis: {title: 'Intensité', titlefont: {size: 10}}
+    });
+    $('#smcAdvancedAnalysis').html("Phase accumulation dominante. Smart money: position hausse.");
+
+    // Elliott Wave Analysis
+    createChart('elliottWaveChart', {
+        x: [1, 2, 3, 4, 5, 'A', 'B', 'C'],
+        y: [67000, 67200, 67100, 67300, 67500, 67400, 67450, 67600],
+        type: 'scatter',
+        mode: 'lines+markers',
+        line: {color: '#18f0ff', width: 2},
+        marker: {size: 6, color: '#9b30ff'}
+    }, {
+        title: {text: 'Vagues Elliott', font: {size: 12}},
+        xaxis: {title: 'Vagues', titlefont: {size: 10}},
+        yaxis: {title: 'Prix', titlefont: {size: 10}}
+    });
+    $('#elliottWaveAnalysis').html("5-3 identifiée. Vague C correction. Proj. impulsion: $68,200.");
+
+    // Volume Profile Analysis
+    createChart('volumeProfileChart', {
+        y: [67000, 67100, 67200, 67300, 67400, 67500],
+        x: [100, 150, 200, 180, 120, 90],
+        type: 'bar',
+        orientation: 'h',
+        marker: {color: '#00f7ff'}
+    }, {
+        title: {text: 'Volume Profile', font: {size: 12}},
+        yaxis: {title: 'Niveaux de prix', titlefont: {size: 10}},
+        xaxis: {title: 'Volume', titlefont: {size: 10}}
+    });
+    $('#volumeProfileAnalysis').html("POC à $67,200. Forte accumulation au-dessus de $67,300.");
+
+    // Fractal Analysis
+    createChart('fractalAnalysisChart', {
+        x: [1, 2, 3, 4, 5, 6, 7, 8],
+        y: [67000, 67200, 67150, 67300, 67250, 67400, 67350, 67500],
+        type: 'scatter',
+        mode: 'lines+markers',
+        line: {color: '#9b30ff', width: 2},
+        marker: {size: 6, color: '#00ff9d'}
+    }, {
+        title: {text: 'Analyse Fractale', font: {size: 12}},
+        xaxis: {title: 'Période', titlefont: {size: 10}},
+        yaxis: {title: 'Prix', titlefont: {size: 10}}
+    });
+    $('#fractalAnalysis').html("Structure fractale haussière. Dimension: 1.62 (proche de Fibonacci).");
+
+    // Synchronization Analysis
+    $('#syncAnalysis').html(`
+        Convergence globale: 92.3% | Alignement multi-indicateurs: fort
+        Projections: court terme $68,200 ±1.5%, moyen terme $72,500 ±2%
+        Facteurs clés: accumulation SMC, liquidité $67k-$68k, sentiment positif
+        <strong>Conclusion:</strong> Forte probabilité de mouvement haussier significatif
+    `);
+
+    // Activation de l'assistant IA
+    $('#aiAssistant').removeClass('hidden');
+    $('#aiAssistantInput').on('keypress', function(e) {
+        if(e.which == 13) {
+            let question = $(this).val();
+            $('#aiAssistantChat').append(`<p><strong>Vous:</strong> ${question}</p>`);
+            // Simuler une réponse de l'IA (à remplacer par une véritable IA dans une implémentation réelle)
+            setTimeout(() => {
+                $('#aiAssistantChat').append(`<p><strong>Assistant IA:</strong> Analyse en cours de votre question sur "${question}". Basé sur les données actuelles, la tendance semble favorable pour un mouvement haussier à court terme. Surveillez les niveaux clés mentionnés dans l'analyse de synchronisation pour confirmer cette hypothèse.</p>`);
+                $('#aiAssistantChat').scrollTop($('#aiAssistantChat')[0].scrollHeight);
+            }, 1000);
+            $(this).val('');
+        }
+    });
+});
+
+// Fonction pour initialiser la visualisation 3D quantique
+function initQuantum3DVisualizer() {
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer();
+    renderer.setSize(200, 200);
+    document.getElementById('quantum3DVisualizer').appendChild(renderer.domElement);
+
+    const geometry = new THREE.TorusKnotGeometry(10, 3, 100, 16);
+    const material = new THREE.MeshBasicMaterial({color: 0x00f7ff, wireframe: true});
+    const torusKnot = new THREE.Mesh(geometry, material);
+    scene.add(torusKnot);
+
+    camera.position.z = 30;
+
+    function animate() {
+        requestAnimationFrame(animate);
+        torusKnot.rotation.x += 0.01;
+        torusKnot.rotation.y += 0.01;
+        renderer.render(scene, camera);
+    }
+    animate();
+
+    $('#quantum3DAnalysis').html("Visualisation des flux de données multi-dimensionnels en temps réel. Topologie de marché complexe indiquant une structure haussière.");
+}
+
+// Simulation de mises à jour en temps réel
+setInterval(() => {
+    let newPrice = 67168.31 + (Math.random() - 0.5) * 100;
+    $('#currentPrice').html(`BTC/USD: $${newPrice.toFixed(2)} <span class="${newPrice > 67168.31 ? 'positive' : 'negative'}">${newPrice > 67168.31 ? '+' : ''}${((newPrice - 67168.31) / 67168.31 * 100).toFixed(2)}%</span>`);
+    showNotification(`Nouveau prix BTC: $${newPrice.toFixed(2)}`);
+}, 5000);
+</script>
+
+</body>
+</html>

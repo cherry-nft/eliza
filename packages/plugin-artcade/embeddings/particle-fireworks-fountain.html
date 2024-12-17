@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Particle Fireworks Fountain</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #000;
+      overflow: hidden;
+    }
+    canvas {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+  <script>
+    try {
+      const canvas = document.getElementById('canvas');
+      const ctx = canvas.getContext('2d');
+      const particles = [];
+      const fireworks = [];
+      const gravity = 0.1;
+      const friction = 0.98;
+      const colors = ['#FF6633', '#FFB399', '#FF33FF', '#FFFF99', '#00B3E6', '#E6B333', '#3366E6'];
+      let audioContext, oscillator;
+
+      function resizeCanvas() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+      }
+
+      function createParticle(x, y, color) {
+        const particle = {
+          x,
+          y,
+          vx: (Math.random() - 0.5) * 6,
+          vy: (Math.random() - 1) * 6,
+          color,
+          radius: 3 + Math.random() * 3,
+          burst: false,
+        };
+        particles.push(particle);
+      }
+
+      function createFirework(x, y, color) {
+        const firework = {
+          x,
+          y,
+          vx: 0,
+          vy: -10,
+          color,
+          radius: 5,
+          burst: false,
+          particles: [],
+        };
+        fireworks.push(firework);
+      }
+
+      function playNote() {
+        if (audioContext) {
+          oscillator.frequency.value = 440 * Math.pow(2, (Math.random() * 2 - 1) * 4);
+          oscillator.start();
+          setTimeout(() => oscillator.stop(), 100);
+        }
+      }
+
+      function animate() {
+        requestAnimationFrame(animate);
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        particles.forEach((particle, index) => {
+          particle.vy += gravity;
+          particle.x += particle.vx;
+          particle.y += particle.vy;
+          particle.vx *= friction;
+          particle.vy *= friction;
+          ctx.beginPath();
+          ctx.arc(particle.x, particle.y, particle.radius, 0, Math.PI * 2);
+          ctx.fillStyle = particle.color;
+          ctx.fill();
+
+          if (particle.y > canvas.height + 50) {
+            particles.splice(index, 1);
+          }
+        });
+
+        fireworks.forEach((firework, index) => {
+          firework.x += firework.vx;
+          firework.y += firework.vy;
+          ctx.beginPath();
+          ctx.arc(firework.x, firework.y, firework.radius, 0, Math.PI * 2);
+          ctx.fillStyle = firework.color;
+          ctx.fill();
+
+          if (!firework.burst && firework.y < 0) {
+            firework.burst = true;
+            const particleCount = 50 + Math.random() * 50;
+            for (let i = 0; i < particleCount; i++) {
+              const particle = {
+                x: firework.x,
+                y: firework.y,
+                vx: (Math.random() - 0.5) * 10,
+                vy: (Math.random() - 1) * 10,
+                color: firework.color,
+                radius: 2 + Math.random() * 2,
+              };
+              firework.particles.push(particle);
+            }
+          }
+
+          if (firework.burst) {
+            firework.particles.forEach((particle, particleIndex) => {
+              particle.vy += gravity;
+              particle.x += particle.vx;
+              particle.y += particle.vy;
+              particle.vx *= friction;
+              particle.vy *= friction;
+              ctx.beginPath();
+              ctx.arc(particle.x, particle.y, particle.radius, 0, Math.PI * 2);
+              ctx.fillStyle = particle.color;
+              ctx.fill();
+
+              if (
+                particle.x < 0 ||
+                particle.x > canvas.width ||
+                particle.y > canvas.height + 50
+              ) {
+                firework.particles.splice(particleIndex, 1);
+                playNote();
+              }
+            });
+
+            if (firework.particles.length === 0) {
+              fireworks.splice(index, 1);
+            }
+          }
+        });
+      }
+
+      function handleClick(event) {
+        const x = event.clientX;
+        const y = event.clientY;
+        const color = colors[Math.floor(Math.random() * colors.length)];
+        createFirework(x, y, color);
+      }
+
+      function initAudio() {
+        try {
+          window.AudioContext = window.AudioContext || window.webkitAudioContext;
+          audioContext = new AudioContext();
+          oscillator = audioContext.createOscillator();
+          oscillator.type = 'triangle';
+          oscillator.connect(audioContext.destination);
+        } catch (error) {
+          console.error('Web Audio API is not supported in this browser:', error);
+        }
+      }
+
+      window.addEventListener('resize', resizeCanvas);
+      window.addEventListener('click', handleClick);
+      resizeCanvas();
+      initAudio();
+      animate();
+    } catch (error) {
+      console.error('An error occurred:', error);
+    }
+  </script>
+</body>
+</html>

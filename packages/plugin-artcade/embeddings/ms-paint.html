@@ -1,0 +1,583 @@
+<html><head><base href="." /><title>MS Paint Clone</title>
+<style>
+  body {
+    margin: 0;
+    padding: 20px;
+    background: #f0f0f0;
+    font-family: Arial, sans-serif;
+  }
+  
+  .paint-app {
+    background: #d4d4d4;
+    border: 2px solid #999;
+    border-radius: 4px;
+    padding: 10px;
+    max-width: 1000px;
+    margin: 0 auto;
+  }
+  
+  .toolbar {
+    background: #efefef;
+    padding: 10px;
+    margin-bottom: 10px;
+    border: 1px solid #999;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  
+  .tool {
+    padding: 5px 10px;
+    background: #fff;
+    border: 1px solid #999;
+    cursor: pointer;
+  }
+  
+  .tool:hover {
+    background: #e0e0e0;
+  }
+  
+  .tool.active {
+    background: #b3d9ff;
+  }
+  
+  #canvas {
+    background: #fff;
+    border: 1px solid #999;
+    cursor: crosshair;
+  }
+  
+  .color-picker {
+    display: flex;
+    gap: 5px;
+    margin: 10px 0;
+    align-items: center;
+  }
+  
+  .color {
+    width: 30px;
+    height: 30px;
+    border: 2px solid #999;
+    cursor: pointer;
+  }
+  
+  .color:hover {
+    border-color: #333;
+  }
+  
+  .size-picker {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  
+  .color.active {
+    border-color: #333;
+    border-width: 3px;
+  }
+
+  #customColor {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    border: 2px solid #999;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+  }
+
+  #customColor::-webkit-color-swatch-wrapper {
+    padding: 0;
+  }
+
+  #customColor::-webkit-color-swatch {
+    border: none;
+    border-radius: 2px;
+  }
+
+  #customColor::-moz-color-swatch {
+    border: none;
+    border-radius: 2px;
+  }
+
+  #customColor:hover {
+    border-color: #333;
+    transform: scale(1.05);
+  }
+
+  #customColor:after {
+    content: 'Pick Color';
+    position: absolute;
+    bottom: -25px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 12px;
+    white-space: nowrap;
+    color: #666;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+  }
+
+  #customColor:hover:after {
+    opacity: 1;
+  }
+
+  #customColor.active {
+    border-color: #333;
+    border-width: 3px;
+    box-shadow: 0 0 5px rgba(0,0,0,0.2);
+  }
+
+  .clear-btn {
+    background: #ff6b6b;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    cursor: pointer;
+    border-radius: 4px;
+  }
+
+  .clear-btn:hover {
+    background: #ff5252;
+  }
+
+  .download-btn {
+    background: #4CAF50;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    cursor: pointer;
+    border-radius: 4px;
+  }
+
+  .download-btn:hover {
+    background: #45a049;
+  }
+
+  .import-btn {
+    background: #2196F3;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    cursor: pointer;
+    border-radius: 4px;
+  }
+
+  .import-btn:hover {
+    background: #1976D2;
+  }
+
+  .text-options {
+    display: none;
+    position: absolute;
+    background: white;
+    border: 1px solid #999;
+    padding: 10px;
+    border-radius: 4px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+  }
+
+  .text-options.show {
+    display: block;
+  }
+
+  #textInput {
+    margin-bottom: 5px;
+    width: 200px;
+  }
+
+  #fontSelect {
+    margin-bottom: 5px;
+    width: 200px;
+  }
+</style>
+</head>
+<body>
+<div class="paint-app">
+  <div class="toolbar">
+    <button class="tool active" data-tool="brush">Brush</button>
+    <button class="tool" data-tool="rect">Rectangle</button>
+    <button class="tool" data-tool="circle">Circle</button>
+    <button class="tool" data-tool="line">Line</button>
+    <button class="tool" data-tool="text">Text</button>
+    <button class="tool" data-tool="eraser">Eraser</button>
+    <div class="size-picker">
+      Size: <input type="range" id="size" min="1" max="50" value="5">
+    </div>
+    <button class="clear-btn" id="clearCanvas">Clear All</button>
+    <button class="download-btn" id="downloadImage">Download Image</button>
+    <button class="import-btn" id="importImage">Import Image</button>
+    <input type="file" id="imageInput" accept="image/*" style="display: none;">
+  </div>
+  
+  <div class="color-picker">
+    <div class="color active" style="background: #000000" data-color="#000000"></div>
+    <div class="color" style="background: #ff0000" data-color="#ff0000"></div>
+    <div class="color" style="background: #00ff00" data-color="#00ff00"></div>
+    <div class="color" style="background: #0000ff" data-color="#0000ff"></div>
+    <div class="color" style="background: #ffff00" data-color="#ffff00"></div>
+    <div class="color" style="background: #ff00ff" data-color="#ff00ff"></div>
+    <div class="color" style="background: #00ffff" data-color="#00ffff"></div>
+    <div class="color" style="background: #ffffff" data-color="#ffffff"></div>
+    <input type="color" id="customColor" title="Choose custom color">
+  </div>
+  
+  <canvas id="canvas"></canvas>
+
+  <div class="text-options" id="textOptions">
+    <input type="text" id="textInput" placeholder="Enter text...">
+    <select id="fontSelect">
+      <option value="Arial">Arial</option>
+      <option value="Times New Roman">Times New Roman</option>
+      <option value="Courier New">Courier New</option>
+      <option value="Georgia">Georgia</option>
+      <option value="Verdana">Verdana</option>
+    </select>
+    <button id="addTextBtn">Add Text</button>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+let isDrawing = false;
+let currentTool = 'brush';
+let currentColor = '#000000';
+let currentSize = 5;
+let startX, startY;
+let lastX, lastY;
+
+// Set canvas size
+function resizeCanvas() {
+  const rect = canvas.parentElement.getBoundingClientRect();
+  canvas.width = rect.width - 22; // Account for borders
+  canvas.height = window.innerHeight - 250;
+}
+
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+// Modified download functionality with permissions check
+document.getElementById('downloadImage').addEventListener('click', async () => {
+  try {
+    // Check if we have permission to download
+    if (window.Notification && Notification.permission !== "granted") {
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") {
+        alert("Please allow permissions to download images");
+        return;
+      }
+    }
+
+    // Create the download
+    const link = document.createElement('a');
+    link.download = 'my-paint-image.png';
+    
+    // Show a notification
+    if (Notification.permission === "granted") {
+      new Notification("Download Starting", {
+        body: "Your image is being downloaded...",
+        icon: canvas.toDataURL('image/png')
+      });
+    }
+
+    // Handle the file download
+    try {
+      // Create file handle
+      const handle = await window.showSaveFilePicker({
+        suggestedName: 'my-paint-image.png',
+        types: [{
+          description: 'PNG Image',
+          accept: {'image/png': ['.png']},
+        }],
+      });
+      
+      // Convert canvas to blob
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+      
+      // Create writable stream and write the blob
+      const writable = await handle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+      
+    } catch (err) {
+      // Fallback to traditional download if File System Access API is not supported
+      link.href = canvas.toDataURL('image/png');
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+    
+  } catch (err) {
+    console.error('Error downloading image:', err);
+    alert('There was an error downloading your image. Please try again.');
+  }
+});
+
+// Clear canvas functionality
+document.getElementById('clearCanvas').addEventListener('click', () => {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+});
+
+// Tool selection
+document.querySelectorAll('.tool').forEach(tool => {
+  tool.addEventListener('click', (e) => {
+    document.querySelector('.tool.active').classList.remove('active');
+    e.target.classList.add('active');
+    currentTool = e.target.dataset.tool;
+  });
+});
+
+// Color selection
+document.querySelectorAll('.color').forEach(color => {
+  color.addEventListener('click', (e) => {
+    document.querySelector('.color.active')?.classList.remove('active');
+    e.target.classList.add('active');
+    currentColor = e.target.dataset.color;
+    // Reset custom color picker border
+    document.getElementById('customColor').style.borderColor = '#999';
+    document.getElementById('customColor').style.borderWidth = '2px';
+  });
+});
+
+// Updated custom color selection
+document.getElementById('customColor').addEventListener('click', (e) => {
+  // Prevent the default click behavior
+  e.preventDefault();
+  // Stop event propagation to prevent any parent handlers from firing
+  e.stopPropagation();
+  
+  // Get the input element (the actual color picker)
+  const input = e.target;
+  
+  // Programmatically open the color picker
+  input.click();
+  
+  // Remove active class from other colors
+  document.querySelector('.color.active')?.classList.remove('active');
+  
+  // Add active class to custom color picker
+  input.classList.add('active');
+});
+
+// Update the input event listener for customColor
+document.getElementById('customColor').addEventListener('input', (e) => {
+  // Prevent the default behavior
+  e.preventDefault();
+  // Stop event propagation
+  e.stopPropagation();
+  
+  // Remove active class from any previously selected color
+  document.querySelector('.color.active')?.classList.remove('active');
+  currentColor = e.target.value;
+  
+  // Update the custom color picker border to show it's selected
+  e.target.classList.add('active');
+  
+  // Add a brief animation to show the color was selected
+  e.target.style.transform = 'scale(1.1)';
+  setTimeout(() => {
+    e.target.style.transform = 'scale(1)';
+  }, 200);
+});
+
+// Size selection
+document.getElementById('size').addEventListener('input', (e) => {
+  currentSize = e.target.value;
+});
+
+// Text options dialog positioning
+function showTextOptions(x, y) {
+  const textOptions = document.getElementById('textOptions');
+  textOptions.style.left = x + 'px';
+  textOptions.style.top = y + 'px';
+  textOptions.classList.add('show');
+}
+
+// Drawing functions
+function startDrawing(e) {
+  isDrawing = true;
+  const rect = canvas.getBoundingClientRect();
+  startX = e.clientX - rect.left;
+  startY = e.clientY - rect.top;
+  lastX = startX;
+  lastY = startY;
+  
+  if (currentTool === 'text') {
+    showTextOptions(e.clientX, e.clientY);
+    return;
+  }
+  
+  if (currentTool === 'brush' || currentTool === 'eraser') {
+    ctx.beginPath();
+    ctx.moveTo(startX, startY);
+    ctx.lineTo(startX, startY);
+    ctx.stroke();
+  }
+}
+
+// Add text to canvas
+document.getElementById('addTextBtn').addEventListener('click', () => {
+  const text = document.getElementById('textInput').value;
+  const font = document.getElementById('fontSelect').value;
+  const size = currentSize * 2; // Make text size more reasonable
+  
+  ctx.font = `${size}px ${font}`;
+  ctx.fillStyle = currentColor;
+  ctx.fillText(text, startX, startY);
+  
+  // Hide text options and clear input
+  document.getElementById('textOptions').classList.remove('show');
+  document.getElementById('textInput').value = '';
+});
+
+// Click outside text options to close
+document.addEventListener('click', (e) => {
+  const textOptions = document.getElementById('textOptions');
+  if (!textOptions.contains(e.target) && 
+      !e.target.classList.contains('tool') && 
+      currentTool !== 'text') {
+    textOptions.classList.remove('show');
+  }
+});
+
+// Import image functionality
+document.getElementById('importImage').addEventListener('click', () => {
+  document.getElementById('imageInput').click();
+});
+
+document.getElementById('imageInput').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (file) {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        // Center the image on the canvas
+        const scale = Math.min(
+          canvas.width / img.width,
+          canvas.height / img.height
+        );
+        const x = (canvas.width / 2) - (img.width / 2) * scale;
+        const y = (canvas.height / 2) - (img.height / 2) * scale;
+        
+        // Draw the image while preserving transparency
+        ctx.save();
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(
+          img,
+          x,
+          y,
+          img.width * scale,
+          img.height * scale
+        );
+        ctx.restore();
+      };
+      img.src = event.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+});
+
+// Drawing functionality
+function draw(e) {
+  if (!isDrawing) return;
+  if (currentTool === 'text') return;
+  
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  
+  ctx.lineWidth = currentSize;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = currentTool === 'eraser' ? '#ffffff' : currentColor;
+  
+  switch(currentTool) {
+    case 'brush':
+    case 'eraser':
+      ctx.beginPath();
+      ctx.moveTo(lastX, lastY);
+      ctx.lineTo(x, y);
+      ctx.stroke();
+      lastX = x;
+      lastY = y;
+      break;
+      
+    case 'rect':
+      drawShape(() => {
+        ctx.beginPath();
+        ctx.rect(startX, startY, x - startX, y - startY);
+        ctx.stroke();
+      });
+      break;
+      
+    case 'circle':
+      drawShape(() => {
+        ctx.beginPath();
+        const radius = Math.sqrt(Math.pow(x - startX, 2) + Math.pow(y - startY, 2));
+        ctx.arc(startX, startY, radius, 0, Math.PI * 2);
+        ctx.stroke();
+      });
+      break;
+      
+    case 'line':
+      drawShape(() => {
+        ctx.beginPath();
+        ctx.moveTo(startX, startY);
+        ctx.lineTo(x, y);
+        ctx.stroke();
+      });
+      break;
+  }
+}
+
+function drawShape(shapeFn) {
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.putImageData(imageData, 0, 0);
+  shapeFn();
+}
+
+function stopDrawing() {
+  isDrawing = false;
+}
+
+// Mouse events
+canvas.addEventListener('mousedown', startDrawing);
+canvas.addEventListener('mousemove', draw);
+canvas.addEventListener('mouseup', stopDrawing);
+canvas.addEventListener('mouseout', stopDrawing);
+
+// Touch events
+canvas.addEventListener('touchstart', (e) => {
+  e.preventDefault();
+  const touch = e.touches[0];
+  const mouseEvent = new MouseEvent('mousedown', {
+    clientX: touch.clientX,
+    clientY: touch.clientY
+  });
+  canvas.dispatchEvent(mouseEvent);
+});
+
+canvas.addEventListener('touchmove', (e) => {
+  e.preventDefault();
+  const touch = e.touches[0];
+  const mouseEvent = new MouseEvent('mousemove', {
+    clientX: touch.clientX,
+    clientY: touch.clientY
+  });
+  canvas.dispatchEvent(mouseEvent);
+});
+
+canvas.addEventListener('touchend', (e) => {
+  e.preventDefault();
+  const mouseEvent = new MouseEvent('mouseup', {});
+  canvas.dispatchEvent(mouseEvent);
+});
+</script>
+</body></html>

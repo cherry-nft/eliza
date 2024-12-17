@@ -1,0 +1,984 @@
+<html><head><base href="https://websim.ai" />
+<title>PirateRogue.io</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<style>
+body, html {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+  background-color: #001220;
+  touch-action: none;
+}
+
+#game-container {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.ocean-background {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image: url('https://i.postimg.cc/DZC66mkf/ezgif-1-ce17936684.gif');
+  background-size: 16.67% 16.67%;
+  background-repeat: repeat;
+  image-rendering: pixelated;
+}
+
+#player {
+  position: absolute;
+  width: 64px;
+  height: 64px;
+  background-image: url('https://i.postimg.cc/7L3Q3xZb/ship1.png');
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  transform-origin: center center;
+  z-index: 10;
+}
+
+.enemy {
+  position: absolute;
+  width: 48px;
+  height: 48px;
+  background-image: url('https://i.postimg.cc/VNQV0S13/ship5.png');
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  transform-origin: center center;
+  z-index: 5;
+}
+
+.projectile {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background-color: #000000;
+  border-radius: 50%;
+  z-index: 8;
+}
+
+.xp-orb {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  background-color: #ffff00;
+  z-index: 7;
+}
+
+.magnet {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  font-size: 24px;
+  z-index: 7;
+}
+
+.bomb {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  font-size: 24px;
+  z-index: 7;
+}
+
+#health-bar-container, #xp-bar-container {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 200px;
+  height: 20px;
+  background-color: #333;
+  border: 2px solid #666;
+  z-index: 100;
+}
+
+#health-bar-container {
+  bottom: 20px;
+}
+
+#xp-bar-container {
+  bottom: 50px;
+}
+
+#health-bar, #xp-bar {
+  width: 100%;
+  height: 100%;
+  transition: width 0.3s ease-out;
+}
+
+#health-bar {
+  background-color: #0f0;
+  position: relative;
+}
+
+#health-text {
+  position: absolute;
+  width: 100%;
+  text-align: center;
+  color: #fff;
+  font-weight: bold;
+  text-shadow: 1px 1px 1px #000;
+}
+
+#xp-bar {
+  background-color: #ffff00;
+}
+
+#score-container {
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  color: #fff;
+  font-family: Arial, sans-serif;
+  font-size: 24px;
+  z-index: 100;
+}
+
+#xp-container {
+  position: fixed;
+  top: 50px;
+  left: 20px;
+  color: #fff;
+  font-family: Arial, sans-serif;
+  font-size: 24px;
+  z-index: 100;
+}
+
+#level-container {
+  position: fixed;
+  top: 80px;
+  left: 20px;
+  color: #fff;
+  font-family: Arial, sans-serif;
+  font-size: 24px;
+  z-index: 100;
+}
+
+#mobile-controller {
+  display: none;
+  position: fixed;
+  bottom: 50px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 150px;
+  height: 150px;
+  z-index: 1000;
+}
+
+.control-button {
+  position: absolute;
+  width: 50px;
+  height: 50px;
+  background-color: rgba(255, 255, 255, 0.5);
+  border-radius: 25px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 24px;
+  user-select: none;
+}
+
+#up { top: 0; left: 50px; }
+#down { bottom: 0; left: 50px; }
+#left { left: 0; top: 50px; }
+#right { right: 0; top: 50px; }
+
+#level-up-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.8);
+  display: none;
+  justify-content: center;
+  align-items: center;
+  z-index: 2000;
+}
+
+#level-up-content {
+  background-color: #001220;
+  padding: 20px;
+  border-radius: 10px;
+  text-align: center;
+  color: #fff;
+  font-family: Arial, sans-serif;
+}
+
+.upgrade-option {
+  margin: 10px;
+  padding: 10px;
+  background-color: #003366;
+  border: none;
+  color: white;
+  font-size: 16px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.upgrade-option:hover {
+  background-color: #004c99;
+}
+
+#game-over-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.8);
+  display: none;
+  justify-content: center;
+  align-items: center;
+  z-index: 3000;
+}
+
+#game-over-content {
+  background-color: #001220;
+  padding: 20px;
+  border-radius: 10px;
+  text-align: center;
+  color: #fff;
+  font-family: Arial, sans-serif;
+}
+
+#replay-button {
+  margin-top: 20px;
+  padding: 10px 20px;
+  font-size: 18px;
+  background-color: #003366;
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+#replay-button:hover {
+  background-color: #004c99;
+}
+</style>
+</head>
+<body>
+<div id="game-container">
+  <div class="ocean-background"></div>
+  <div id="player"></div>
+</div>
+<div id="xp-bar-container">
+  <div id="xp-bar"></div>
+</div>
+<div id="health-bar-container">
+  <div id="health-bar">
+    <div id="health-text"></div>
+  </div>
+</div>
+<div id="score-container">Score: <span id="score">0</span></div>
+<div id="xp-container">XP: <span id="xp">0</span> / <span id="xp-to-level">3</span></div>
+<div id="level-container">Level: <span id="level">1</span></div>
+<div id="mobile-controller">
+  <div id="up" class="control-button">&#8593;</div>
+  <div id="down" class="control-button">&#8595;</div>
+  <div id="left" class="control-button">&#8592;</div>
+  <div id="right" class="control-button">&#8594;</div>
+</div>
+<div id="level-up-modal">
+  <div id="level-up-content">
+    <h2>Level Up!</h2>
+    <p>Choose an upgrade:</p>
+    <div id="upgrade-options"></div>
+  </div>
+</div>
+<div id="game-over-modal">
+  <div id="game-over-content">
+    <h2>Game Over</h2>
+    <p>Your score: <span id="final-score"></span></p>
+    <button id="replay-button">Play Again</button>
+  </div>
+</div>
+
+<script>
+const gameContainer = document.getElementById('game-container');
+const background = document.querySelector('.ocean-background');
+const player = document.getElementById('player');
+const mobileController = document.getElementById('mobile-controller');
+const healthBar = document.getElementById('health-bar');
+const healthText = document.getElementById('health-text');
+const xpBar = document.getElementById('xp-bar');
+const scoreElement = document.getElementById('score');
+const xpElement = document.getElementById('xp');
+const xpToLevelElement = document.getElementById('xp-to-level');
+const levelElement = document.getElementById('level');
+const levelUpModal = document.getElementById('level-up-modal');
+const upgradeOptions = document.getElementById('upgrade-options');
+const gameOverModal = document.getElementById('game-over-modal');
+const finalScoreElement = document.getElementById('final-score');
+const replayButton = document.getElementById('replay-button');
+let playerX = window.innerWidth / 2;
+let playerY = window.innerHeight / 2;
+let cameraX = 0;
+let cameraY = 0;
+let speed = 300; // Adjusted for pixels per second
+const keys = {};
+let playerHealth = 50;
+let maxPlayerHealth = 50;
+const enemies = [];
+const projectiles = [];
+const xpOrbs = [];
+const magnets = [];
+const bombs = [];
+const enemyRadius = 24;
+const playerRadius = 32;
+let projectileSpeed = 600; // Adjusted for pixels per second
+let projectileDamage = 10;
+let projectileCount = 1;
+let projectileSize = 8;
+let attackSpeed = 1000;
+let healthRegen = 0;
+let score = 0;
+let xp = 0;
+let level = 1;
+let xpToLevel = 3;
+let gameTime = 0;
+let enemySpawnInterval = 2000;
+let enemySpawnCount = 1;
+let isGamePaused = false;
+let animationFrameId = null;
+let xpMagnetRange = 100;
+let projectilePenetration = 1;
+let lastUpdateTime = performance.now();
+let projectileRange = 250;
+let projectileFanAngle = Math.PI / 6; // 30 degrees fan angle
+let magnetActive = false;
+let magnetDuration = 5000; // 5 seconds
+
+const upgrades = [
+  { name: 'speed', label: 'Increase Speed', apply: () => speed *= 1.05 },
+  { name: 'projectile-count', label: 'Increase Projectile Count', apply: () => projectileCount = Math.min(projectileCount + 2, 9) },
+  { name: 'attack-speed', label: 'Increase Attack Speed', apply: () => attackSpeed = Math.max(100, attackSpeed * 0.8) }, // Changed to 20% faster
+  { name: 'max-health', label: 'Increase Max Health', apply: () => { maxPlayerHealth *= 1.05; playerHealth = maxPlayerHealth; updateHealthBar(); } },
+  { name: 'health-regen', label: 'Add Health Regeneration', apply: () => healthRegen += 1 },
+  { name: 'xp-magnet', label: 'Increase XP Magnet Range', apply: () => xpMagnetRange *= 1.1 },
+  { name: 'projectile-penetration', label: 'Increase Projectile Penetration', apply: () => projectilePenetration++ },
+  { name: 'range', label: 'Increase Projectile Range', apply: () => projectileRange *= 1.05 }
+];
+
+function getRandomUpgrades(count) {
+  const shuffled = upgrades.sort(() => 0.5 - Math.random());
+  return shuffled.slice(0, count);
+}
+
+function showLevelUpModal() {
+  isGamePaused = true;
+  upgradeOptions.innerHTML = '';
+  const randomUpgrades = getRandomUpgrades(3);
+  randomUpgrades.forEach(upgrade => {
+    const button = document.createElement('button');
+    button.className = 'upgrade-option';
+    button.textContent = upgrade.label;
+    button.addEventListener('click', () => {
+      upgrade.apply();
+      hideLevelUpModal();
+    });
+    upgradeOptions.appendChild(button);
+  });
+  levelUpModal.style.display = 'flex';
+}
+
+function hideLevelUpModal() {
+  levelUpModal.style.display = 'none';
+  isGamePaused = false;
+  lastUpdateTime = performance.now();
+  if (!animationFrameId) {
+    animationFrameId = requestAnimationFrame(gameLoop);
+  }
+}
+
+function isMobile() {
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+}
+
+if (isMobile()) {
+  mobileController.style.display = 'block';
+}
+
+function gameLoop(currentTime) {
+  if (isGamePaused) {
+    animationFrameId = null;
+    return;
+  }
+
+  const deltaTime = (currentTime - lastUpdateTime) / 1000;
+  lastUpdateTime = currentTime;
+
+  updatePlayerPosition(deltaTime);
+  updateEnemies(deltaTime);
+  updateProjectiles(deltaTime);
+  updateXPOrbs(deltaTime);
+  updateMagnets(deltaTime);
+  updateBombs(deltaTime);
+  checkCollisions();
+
+  gameTime += deltaTime * 1000;
+  updateDifficulty();
+
+  animationFrameId = requestAnimationFrame(gameLoop);
+}
+
+function updatePlayerPosition(deltaTime) {
+  let dx = 0;
+  let dy = 0;
+
+  if (keys['w'] || keys['ArrowUp']) dy -= 1;
+  if (keys['s'] || keys['ArrowDown']) dy += 1;
+  if (keys['a'] || keys['ArrowLeft']) dx -= 1;
+  if (keys['d'] || keys['ArrowRight']) dx += 1;
+
+  if (dx !== 0 && dy !== 0) {
+    const magnitude = Math.sqrt(dx * dx + dy * dy);
+    dx = dx / magnitude * speed * deltaTime;
+    dy = dy / magnitude * speed * deltaTime;
+  } else {
+    dx *= speed * deltaTime;
+    dy *= speed * deltaTime;
+  }
+
+  if (dx !== 0 || dy !== 0) {
+    let angle = Math.atan2(dy, dx);
+    let snapAngle = Math.round((angle - Math.PI / 2) / (Math.PI / 4)) * (Math.PI / 4);
+    player.style.transform = `translate(-50%, -50%) rotate(${snapAngle}rad)`;
+  }
+
+  playerX += dx;
+  playerY += dy;
+
+  cameraX = playerX - window.innerWidth / 2;
+  cameraY = playerY - window.innerHeight/ 2;
+
+  player.style.left = `${window.innerWidth / 2}px`;
+  player.style.top = `${window.innerHeight / 2}px`;
+
+  const bgOffsetX = -cameraX % (window.innerWidth / 6);
+  const bgOffsetY = -cameraY % (window.innerHeight / 6);
+  background.style.backgroundPosition = `${bgOffsetX}px ${bgOffsetY}px`;
+}
+
+function updateDifficulty() {
+  if (gameTime % 30000 === 0) {
+    enemySpawnInterval = Math.max(500, enemySpawnInterval - 200);
+    enemySpawnCount = Math.min(20, Math.floor(level * 1.5));
+  }
+}
+
+function spawnEnemy() {
+  if (isGamePaused) return;
+
+  for (let i = 0; i < enemySpawnCount; i++) {
+    const enemy = document.createElement('div');
+    enemy.className = 'enemy';
+    gameContainer.appendChild(enemy);
+
+    const angle = Math.random() * Math.PI * 2;
+    const distance = Math.max(window.innerWidth, window.innerHeight) / 2 + 50;
+    const enemyX = playerX + Math.cos(angle) * distance;
+    const enemyY = playerY + Math.sin(angle) * distance;
+
+    enemies.push({ element: enemy, x: enemyX, y: enemyY });
+  }
+}
+
+function updateEnemies(deltaTime) {
+  const enemySpeed = 210;
+  for (let i = enemies.length - 1; i >= 0; i--) {
+    const enemy = enemies[i];
+    const dx = playerX - enemy.x;
+    const dy = playerY - enemy.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    
+    let newX = enemy.x + (dx / distance) * enemySpeed * deltaTime;
+    let newY = enemy.y + (dy / distance) * enemySpeed * deltaTime;
+
+    let collision = false;
+    for (let j = 0; j < enemies.length; j++) {
+      if (i !== j) {
+        const otherEnemy = enemies[j];
+        const edx = newX - otherEnemy.x;
+        const edy = newY - otherEnemy.y;
+        const edistance = Math.sqrt(edx * edx + edy * edy);
+        if (edistance < enemyRadius) {
+          collision = true;
+          break;
+        }
+      }
+    }
+
+    if (!collision) {
+      enemy.x = newX;
+      enemy.y = newY;
+    }
+
+    const angle = Math.atan2(dy, dx) - Math.PI / 2;
+    enemy.element.style.transform = `translate(-50%, -50%) rotate(${angle}rad)`;
+
+    enemy.element.style.left = `${enemy.x - cameraX}px`;
+    enemy.element.style.top = `${enemy.y - cameraY}px`;
+
+    if (distance > Math.max(window.innerWidth, window.innerHeight) * 1.5) {
+      enemy.element.remove();
+      enemies.splice(i, 1);
+    }
+  }
+}
+
+function shootProjectile() {
+  if (isGamePaused || enemies.length === 0) return;
+
+  const closestEnemy = enemies.reduce((closest, current) => {
+    const distanceToCurrent = Math.hypot(current.x - playerX, current.y - playerY);
+    const distanceToClosest = Math.hypot(closest.x - playerX, closest.y - playerY);
+    return distanceToCurrent < distanceToClosest ? current : closest;
+  });
+
+  const baseAngle = Math.atan2(closestEnemy.y - playerY, closestEnemy.x - playerX);
+  
+  for (let i = 0; i < projectileCount; i++) {
+    const angleOffset = (i - (projectileCount - 1) / 2) * (projectileFanAngle / (projectileCount - 1 || 1));
+    const angle = baseAngle + angleOffset;
+
+    const projectile = document.createElement('div');
+    projectile.className = 'projectile';
+    projectile.style.width = `${projectileSize}px`;
+    projectile.style.height = `${projectileSize}px`;
+    gameContainer.appendChild(projectile);
+
+    const velocityX = Math.cos(angle) * projectileSpeed;
+    const velocityY = Math.sin(angle) * projectileSpeed;
+
+    projectiles.push({
+      element: projectile,
+      x: playerX,
+      y: playerY,
+      velocityX: velocityX,
+      velocityY: velocityY,
+      penetration: projectilePenetration,
+      distanceTraveled: 0
+    });
+  }
+}
+
+function updateProjectiles(deltaTime) {
+  for (let i = projectiles.length - 1; i >= 0; i--) {
+    const projectile = projectiles[i];
+    const dx = projectile.velocityX * deltaTime;
+    const dy = projectile.velocityY * deltaTime;
+    projectile.x += dx;
+    projectile.y += dy;
+    projectile.distanceTraveled += Math.sqrt(dx * dx + dy * dy);
+
+    projectile.element.style.left = `${projectile.x - cameraX}px`;
+    projectile.element.style.top = `${projectile.y - cameraY}px`;
+
+    if (
+      projectile.x < cameraX - 100 ||
+      projectile.x > cameraX + window.innerWidth + 100 ||
+      projectile.y < cameraY - 100 ||
+      projectile.y > cameraY + window.innerHeight + 100 ||
+      projectile.distanceTraveled > projectileRange
+    ) {
+      projectile.element.remove();
+      projectiles.splice(i, 1);
+    }
+  }
+}
+
+function spawnXPOrb(x, y) {
+  const orb = document.createElement('div');
+  orb.className = 'xp-orb';
+  gameContainer.appendChild(orb);
+
+  xpOrbs.push({ element: orb, x: x, y: y });
+}
+
+function spawnMagnet(x, y) {
+  const magnet = document.createElement('div');
+  magnet.className = 'magnet';
+  magnet.textContent = '🧲';
+  gameContainer.appendChild(magnet);
+
+  magnets.push({ element: magnet, x: x, y: y });
+}
+
+function spawnBomb(x, y) {
+  const bomb = document.createElement('div');
+  bomb.className = 'bomb';
+  bomb.textContent = '💣';
+  gameContainer.appendChild(bomb);
+
+  bombs.push({ element: bomb, x: x, y: y });
+}
+
+function updateXPOrbs(deltaTime) {
+  const baseOrbSpeed = 300;
+  for (let i = xpOrbs.length - 1; i >= 0; i--) {
+    const orb = xpOrbs[i];
+    const dx = playerX - orb.x;
+    const dy = playerY - orb.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+
+    let orbSpeed = baseOrbSpeed;
+    if (distance < xpMagnetRange || magnetActive) {
+      orbSpeed *= 2; // Double the speed when moving towards the player
+    }
+
+    if (distance < xpMagnetRange || magnetActive) {
+      orb.x += (dx / distance) * orbSpeed * deltaTime;
+      orb.y += (dy / distance) * orbSpeed * deltaTime;
+    }
+
+    orb.element.style.left = `${orb.x - cameraX}px`;
+    orb.element.style.top = `${orb.y - cameraY}px`;
+
+    if (distance < playerRadius) {
+      xp += 1;
+      updateXP();
+      orb.element.remove();
+      xpOrbs.splice(i, 1);
+    }
+  }
+}
+
+function updateMagnets(deltaTime) {
+  const magnetSpeed = 300;
+  for (let i = magnets.length - 1; i >= 0; i--) {
+    const magnet = magnets[i];
+    const dx = playerX - magnet.x;
+    const dy = playerY - magnet.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+
+    if (distance < xpMagnetRange) {
+      magnet.x += (dx / distance) * magnetSpeed * deltaTime;
+      magnet.y += (dy / distance) * magnetSpeed * deltaTime;
+    }
+
+    magnet.element.style.left = `${magnet.x - cameraX}px`;
+    magnet.element.style.top = `${magnet.y - cameraY}px`;
+
+    if (distance < playerRadius) {
+      activateMagnet();
+      magnet.element.remove();
+      magnets.splice(i, 1);
+    }
+  }
+}
+
+function updateBombs(deltaTime) {
+  const bombSpeed = 300;
+  for (let i = bombs.length - 1; i >= 0; i--) {
+    const bomb = bombs[i];
+    const dx = playerX - bomb.x;
+    const dy = playerY - bomb.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+
+    if (distance < xpMagnetRange) {
+      bomb.x += (dx / distance) * bombSpeed * deltaTime;
+      bomb.y += (dy / distance) * bombSpeed * deltaTime;
+    }
+
+    bomb.element.style.left = `${bomb.x - cameraX}px`;
+    bomb.element.style.top = `${bomb.y - cameraY}px`;
+
+    if (distance < playerRadius) {
+      activateBomb();
+      bomb.element.remove();
+      bombs.splice(i, 1);
+    }
+  }
+}
+
+function activateMagnet() {
+  magnetActive = true;
+  setTimeout(() => {
+    magnetActive = false;
+  }, magnetDuration);
+}
+
+function activateBomb() {
+  // Kill all enemies on screen
+  enemies.forEach(enemy => {
+    enemy.element.remove();
+    score += 10;
+    spawnXPOrb(enemy.x, enemy.y);
+  });
+  enemies.length = 0;
+  updateScore();
+}
+
+function checkCollisions() {
+  for (let i = enemies.length - 1; i >= 0; i--) {
+    const enemy = enemies[i];
+    const dx = playerX - enemy.x;
+    const dy = playerY - enemy.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+
+    if (distance < playerRadius + enemyRadius) {
+      playerHealth -= 10;
+      updateHealthBar();
+      enemies.splice(i, 1);
+      enemy.element.remove();
+
+      if (playerHealth <= 0) {
+        gameOver();
+        return;
+      }
+    }
+
+    for (let j = projectiles.length - 1; j >= 0; j--) {
+      const projectile = projectiles[j];
+      const pdx = projectile.x - enemy.x;
+      const pdy = projectile.y - enemy.y;
+      const pDistance = Math.sqrt(pdx * pdx + pdy * pdy);
+
+      if (pDistance < enemyRadius + projectileSize / 2) {
+        enemies.splice(i, 1);
+        enemy.element.remove();
+        score += 10;
+        updateScore();
+        spawnXPOrb(enemy.x, enemy.y);
+
+        // 1 in 50 chance to spawn a magnet
+        if (Math.random() < 0.02) {
+          spawnMagnet(enemy.x, enemy.y);
+        }
+
+        // 1 in 50 chance to spawn a bomb
+        if (Math.random() < 0.02) {
+          spawnBomb(enemy.x, enemy.y);
+        }
+
+        projectile.penetration--;
+        if (projectile.penetration <= 0) {
+          projectiles.splice(j, 1);
+          projectile.element.remove();
+        }
+        break;
+      }
+    }
+  }
+}
+
+function updateHealthBar() {
+  healthBar.style.width = `${(playerHealth / maxPlayerHealth) * 100}%`;
+  healthText.textContent = `${Math.ceil(playerHealth)} / ${Math.ceil(maxPlayerHealth)}`;
+}
+
+function updateXPBar() {
+  xpBar.style.width = `${(xp / xpToLevel) * 100}%`;
+}
+
+function updateScore() {
+  scoreElement.textContent = score;
+}
+
+function updateXP() {
+  xpElement.textContent = xp;
+  xpToLevelElement.textContent = xpToLevel;
+  updateXPBar();
+  if (xp >= xpToLevel) {
+    levelUp();
+  }
+}
+
+function levelUp() {
+  level++;
+  xp -= xpToLevel;
+  xpToLevel += 1;
+  levelElement.textContent = level;
+  updateXP();
+  playerHealth = Math.min(playerHealth + 10, maxPlayerHealth);
+  updateHealthBar();
+  showLevelUpModal();
+  
+  enemySpawnCount = Math.min(20, Math.floor(level * 1.5));
+}
+
+function gameOver() {
+  isGamePaused = true;
+  finalScoreElement.textContent = score;
+  gameOverModal.style.display = 'flex';
+}
+
+function resetGame() {
+  playerHealth = maxPlayerHealth;
+  updateHealthBar();
+  enemies.forEach(enemy => enemy.element.remove());
+  enemies.length = 0;
+  projectiles.forEach(projectile => projectile.element.remove());
+  projectiles.length = 0;
+  xpOrbs.forEach(orb => orb.element.remove());
+  xpOrbs.length = 0;
+  magnets.forEach(magnet => magnet.element.remove());
+  magnets.length = 0;
+  bombs.forEach(bomb => bomb.element.remove());
+  bombs.length = 0;
+  playerX = window.innerWidth / 2;
+  playerY = window.innerHeight / 2;
+  score = 0;
+  xp = 0;
+  level = 1;
+  xpToLevel = 3;
+  updateScore();
+  updateXP();
+  levelElement.textContent = level;
+  gameTime = 0;
+  enemySpawnInterval = 2000;
+  enemySpawnCount = 1;
+  speed = 300;
+  projectileCount = 1;
+  projectileSize = 8;
+  attackSpeed = 1000;
+  healthRegen = 0;
+  xpMagnetRange = 100;
+  projectilePenetration = 1;
+  projectileRange = 250;
+  lastUpdateTime = performance.now();
+  isGamePaused = false;
+  gameOverModal.style.display = 'none';
+  if (!animationFrameId) {
+    animationFrameId = requestAnimationFrame(gameLoop);
+  }
+}
+
+document.addEventListener('keydown', (e) => {
+  keys[e.key] = true;
+});
+
+document.addEventListener('keyup', (e) => {
+  keys[e.key] = false;
+});
+
+function handleMobileControl(direction, isPressed) {
+  keys[direction] = isPressed;
+}
+
+['up', 'down', 'left', 'right'].forEach(direction => {
+  const button = document.getElementById(direction);
+  button.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    handleMobileControl(direction, true);
+  });
+  button.addEventListener('touchend', () => handleMobileControl(direction, false));
+});
+
+window.addEventListener('resize', () => {
+  cameraX = playerX - window.innerWidth / 2;
+  cameraY = playerY - window.innerHeight / 2;
+});
+
+player.style.transform = 'translate(-50%, -50%)';
+lastUpdateTime= performance.now();
+animationFrameId = requestAnimationFrame(gameLoop);
+
+function spawnEnemies() {
+  if (!isGamePaused) {
+    spawnEnemy();
+  }
+  setTimeout(spawnEnemies, enemySpawnInterval);
+}
+
+function regenerateHealth() {
+  if (!isGamePaused && playerHealth < maxPlayerHealth) {
+    playerHealth = Math.min(playerHealth + healthRegen, maxPlayerHealth);
+    updateHealthBar();
+  }
+}
+
+spawnEnemies();
+setInterval(() => {
+  if (!isGamePaused) {
+    shootProjectile();
+  }
+}, attackSpeed);
+
+setInterval(regenerateHealth, 1000);
+
+resetGame();
+
+if (isMobile()) {
+  gameContainer.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    const touch = e.touches[0];
+    const rect = gameContainer.getBoundingClientRect();
+    const touchX = touch.clientX - rect.left;
+    const touchY = touch.clientY - rect.top;
+    
+    const dx = touchX - window.innerWidth / 2;
+    const dy = touchY - window.innerHeight / 2;
+    const angle = Math.atan2(dy, dx);
+    
+    keys['ArrowUp'] = dy < 0;
+    keys['ArrowDown'] = dy > 0;
+    keys['ArrowLeft'] = dx < 0;
+    keys['ArrowRight'] = dx > 0;
+    
+    player.style.transform = `translate(-50%, -50%) rotate(${angle}rad)`;
+  });
+  
+  gameContainer.addEventListener('touchend', () => {
+    keys['ArrowUp'] = false;
+    keys['ArrowDown'] = false;
+    keys['ArrowLeft'] = false;
+    keys['ArrowRight'] = false;
+  });
+}
+
+const introScreen = document.createElement('div');
+introScreen.style.position = 'fixed';
+introScreen.style.top = '0';
+introScreen.style.left = '0';
+introScreen.style.width = '100%';
+introScreen.style.height = '100%';
+introScreen.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
+introScreen.style.display = 'flex';
+introScreen.style.flexDirection = 'column';
+introScreen.style.justifyContent = 'center';
+introScreen.style.alignItems = 'center';
+introScreen.style.color = '#fff';
+introScreen.style.fontFamily = 'Arial, sans-serif';
+introScreen.style.zIndex = '3000';
+
+const title = document.createElement('h1');
+title.textContent = 'PirateRogue.io';
+title.style.marginBottom = '20px';
+
+const startButton = document.createElement('button');
+startButton.textContent = 'Start Game';
+startButton.style.padding = '10px 20px';
+startButton.style.fontSize = '18px';
+startButton.style.backgroundColor = '#003366';
+startButton.style.color = '#fff';
+startButton.style.border = 'none';
+startButton.style.borderRadius = '5px';
+startButton.style.cursor = 'pointer';
+
+startButton.addEventListener('click', () => {
+  introScreen.style.display = 'none';
+  isGamePaused = false;
+  lastUpdateTime = performance.now();
+  animationFrameId = requestAnimationFrame(gameLoop);
+});
+
+introScreen.appendChild(title);
+introScreen.appendChild(startButton);
+document.body.appendChild(introScreen);
+
+isGamePaused = true;
+
+replayButton.addEventListener('click', resetGame);
+
+</script>
+</body>
+</html>
