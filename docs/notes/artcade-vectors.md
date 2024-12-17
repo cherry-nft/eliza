@@ -11,6 +11,20 @@ Implement a vector-based pattern storage system as part of the Artcade plugin fo
 3. Improve evolution quality through pattern matching
 4. Create a self-improving game pattern library
 
+# Voice Memo Context
+
+_The ultimate goal is to test if Claude can effectively use embeddings from high-quality HTML examples to improve its output when users request similar functionalities to the embeddings._
+
+Keep in mind my specific purpose. Basically our users prompt on our website to generate self-contained HTML files which are effectively mini apps that are usually fun interactive engaging and/or serve some kind of unique business function (like generating a QR code). Basically, we let users create awesome mini apps.
+
+However, the quality of the output that gets generated is not always excellent. Sometimes there are issues with the canvas, the layout. Sometimes it's not that visual. Sometimes it's not that interactive. Sometimes it's not that entertaining. Sometimes it's missing key components, like a "play again" button or lack of collision detection.
+
+What I'm trying to get at with this embedding workflow is I've taken about 30+ self-contained HTML files that work great and are trying to cover the entire vector space. My goal is to get as quickly as possible to be prompting Claude so that I can see if Claude is actually using these embeddings to structure and generate better HTML files.
+
+Currently I have a pretty lengthy prompt in our production repo that actually generates these HTML files for the most part pretty well but like I said for our users it often has functionality mishaps. My goal is to ensure that We can instantiate Claude to check for embeddings of excellent working production code against the semantic keywords that users put in and be confident that Claude actually uses those embeddings to improve the output of the self-contained HTML.
+
+All of this work will ultimately be evaluated on the confidence that I have that Claude is actually learning from and/or directly using these embeddings when users prompt Claude and trigger certain keywords that gets Claude to use those embeddings. That's ultimately what i'm trying to test. But naturally I want to make a good faith effort in this test. That is, I want to take all the necessary steps to ensure that Claude is actually is Producing better self-contained HTML files explicitly because of the embeddings by following best practice of my embeddings workflow.
+
 ## Technical Architecture
 
 ### 1. Database Integration
@@ -929,9 +943,10 @@ Database Integration:
 ✅ Using Eliza's cache TTL and invalidation
 
 Pattern Approval System:
-❌ No staging area for patterns before approval
-❌ Missing approval metadata in pattern storage
-❌ No pattern history tracking
+✅Staging area for patterns before approval
+✅ Pattern history tracking
+❌ Approval metadata in pattern storage
+
 Evolution Result Tracking:
 ❌ No evolution run tracking
 ❌ Missing source location tracking for patterns

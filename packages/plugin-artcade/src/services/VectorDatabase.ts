@@ -5,7 +5,11 @@ import {
     DatabaseAdapter,
     MemoryManager,
 } from "@ai16z/eliza";
-import { GamePattern } from "./PatternStaging";
+import { GamePattern } from "../types/patterns";
+import {
+    PatternEffectivenessMetrics,
+    ClaudeUsageContext,
+} from "../types/effectiveness";
 
 // Custom error class for database operations
 class DatabaseError extends Error {
@@ -252,51 +256,46 @@ export class VectorDatabase extends Service {
 
     private async initializeSchema(): Promise<void> {
         try {
-            // Enable vector extension if not exists
             await this.db.query(`
-                CREATE EXTENSION IF NOT EXISTS vector;
-                CREATE EXTENSION IF NOT EXISTS hnsw;
-            `);
-
-            // Create pattern similarity function
-            await this.db.query(`
-                CREATE OR REPLACE FUNCTION pattern_similarity(
-                    pattern1 vector,
-                    pattern2 vector
-                ) RETURNS float AS $$
-                    SELECT 1 - (pattern1 <=> pattern2);
-                $$ LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE;
-            `);
-
-            // Create patterns table with vector support
-            await this.db.query(`
-                CREATE TABLE IF NOT EXISTS game_patterns (
+                CREATE TABLE IF NOT EXISTS ${this.TABLE_NAME} (
                     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                     type TEXT NOT NULL,
                     pattern_name TEXT NOT NULL,
                     content JSONB NOT NULL,
-                    embedding vector(1536),
+                    embedding VECTOR(${this.EMBEDDING_DIMENSION}),
                     effectiveness_score FLOAT DEFAULT 0,
                     usage_count INTEGER DEFAULT 0,
                     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
                     last_used TIMESTAMPTZ,
-                    approval_metadata JSONB
+                    claude_usage_metrics JSONB DEFAULT '{}'::jsonb
                 );
 
-                CREATE INDEX IF NOT EXISTS idx_game_patterns_embedding
-                ON game_patterns USING hnsw (embedding vector_cosine_ops);
+                CREATE TABLE IF NOT EXISTS pattern_effectiveness (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    pattern_id UUID REFERENCES ${this.TABLE_NAME}(id),
+                    prompt_keywords TEXT[],
+                    embedding_similarity FLOAT,
+                    claude_usage JSONB,
+                    quality_scores JSONB,
+                    usage_stats JSONB,
+                    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_pattern_effectiveness_pattern_id
+                ON pattern_effectiveness(pattern_id);
+
+                CREATE INDEX IF NOT EXISTS idx_pattern_effectiveness_similarity
+                ON pattern_effectiveness(embedding_similarity);
             `);
 
-            this.runtime.logger.info("Vector database schema initialized");
+            this.runtime.logger.info(
+                "Database schema initialized successfully"
+            );
         } catch (error) {
-            this.runtime.logger.error(
-                "Failed to initialize vector database schema",
-                { error }
-            );
-            throw new DatabaseError(
-                "Failed to initialize vector database schema",
-                error
-            );
+            this.runtime.logger.error("Failed to initialize database schema", {
+                error,
+            });
+            throw new DatabaseError("Schema initialization failed", error);
         }
     }
 
@@ -580,5 +579,126 @@ export class VectorDatabase extends Service {
             [patternName]
         );
         return result.rows[0] || null;
+    }
+
+    async trackClaudeUsage(context: ClaudeUsageContext): Promise<void> {
+        const { prompt, generated_html, matched_patterns, quality_assessment } =
+            context;
+
+        await this.db.transaction(async (client) => {
+            for (const match of matched_patterns) {
+                const { pattern_id, similarity, features_used } = match;
+
+                // Update pattern effectiveness metrics
+                const metrics: PatternEffectivenessMetrics = {
+                    pattern_id,
+                    prompt_keywords: this.extractKeywords(prompt),
+                    embedding_similarity: similarity,
+                    claude_usage: {
+                        direct_reuse: similarity > 0.9,
+                        structural_similarity: similarity,
+                        feature_adoption: features_used,
+                        timestamp: new Date(),
+                    },
+                    quality_scores: quality_assessment,
+                    usage_stats: await this.getPatternUsageStats(pattern_id),
+                };
+
+                await client.query(
+                    `INSERT INTO pattern_effectiveness (
+                        pattern_id,
+                        prompt_keywords,
+                        embedding_similarity,
+                        claude_usage,
+                        quality_scores,
+                        usage_stats
+                    ) VALUES ($1, $2, $3, $4, $5, $6)`,
+                    [
+                        pattern_id,
+                        metrics.prompt_keywords,
+                        metrics.embedding_similarity,
+                        metrics.claude_usage,
+                        metrics.quality_scores,
+                        metrics.usage_stats,
+                    ]
+                );
+
+                // Update pattern's effectiveness score and usage count
+                await this.updatePatternMetrics(pattern_id, metrics);
+            }
+        });
+    }
+
+    private async getPatternUsageStats(
+        patternId: string
+    ): Promise<PatternEffectivenessMetrics["usage_stats"]> {
+        const result = await this.db.query(
+            `SELECT
+                COUNT(*) as total_uses,
+                COUNT(CASE WHEN embedding_similarity > 0.8 THEN 1 END) as successful_uses,
+                AVG(embedding_similarity) as average_similarity,
+                MAX(created_at) as last_used
+            FROM pattern_effectiveness
+            WHERE pattern_id = $1`,
+            [patternId]
+        );
+
+        return {
+            total_uses: parseInt(result.rows[0].total_uses),
+            successful_uses: parseInt(result.rows[0].successful_uses),
+            average_similarity:
+                parseFloat(result.rows[0].average_similarity) || 0,
+            last_used: result.rows[0].last_used,
+        };
+    }
+
+    private async updatePatternMetrics(
+        patternId: string,
+        metrics: PatternEffectivenessMetrics
+    ): Promise<void> {
+        const { quality_scores, usage_stats } = metrics;
+        const newScore = this.calculateEffectivenessScore(quality_scores);
+
+        await this.db.query(
+            `UPDATE ${this.TABLE_NAME}
+            SET
+                effectiveness_score = $1,
+                usage_count = $2,
+                last_used = $3,
+                claude_usage_metrics = claude_usage_metrics || $4::jsonb
+            WHERE id = $5`,
+            [
+                newScore,
+                usage_stats.total_uses,
+                usage_stats.last_used,
+                { last_usage: metrics.claude_usage },
+                patternId,
+            ]
+        );
+    }
+
+    private calculateEffectivenessScore(
+        scores: PatternEffectivenessMetrics["quality_scores"]
+    ): number {
+        const weights = {
+            visual: 0.25,
+            interactive: 0.25,
+            functional: 0.25,
+            performance: 0.25,
+        };
+
+        return Object.entries(scores).reduce(
+            (score, [key, value]) => score + value * weights[key],
+            0
+        );
+    }
+
+    private extractKeywords(prompt: string): string[] {
+        // Simple keyword extraction - can be enhanced with NLP
+        return prompt
+            .toLowerCase()
+            .split(/\W+/)
+            .filter((word) => word.length > 3)
+            .slice(0, 10);
     }
 }

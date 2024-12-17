@@ -1,7 +1,197 @@
-import { DatabaseAdapter } from "@ai16z/eliza";
+import { vi } from "vitest";
+import { DatabaseAdapter, IAgentRuntime, elizaLogger } from "@ai16z/eliza";
 import { GamePattern } from "../../services/PatternStaging";
 
 export class DatabaseTestHelper {
+    private mockDatabaseAdapter: DatabaseAdapter<any>;
+    private mockRuntime: IAgentRuntime & { logger: typeof elizaLogger };
+
+    constructor() {
+        // Setup mock database adapter with test data
+        this.mockDatabaseAdapter = {
+            query: vi.fn().mockImplementation((sql: string, params?: any[]) => {
+                // Mock pattern usage stats
+                if (sql.includes("SELECT COUNT(*) as total_uses")) {
+                    return Promise.resolve({
+                        rows: [
+                            {
+                                total_uses: "5",
+                                successful_uses: "3",
+                                average_similarity: "0.85",
+                                last_used: new Date().toISOString(),
+                            },
+                        ],
+                    });
+                }
+                // Mock pattern effectiveness
+                if (sql.includes("pattern_effectiveness")) {
+                    // Return multiple rows for list query without pattern_id
+                    if (sql.includes("SELECT *") && !params?.length) {
+                        return Promise.resolve({
+                            rows: [
+                                {
+                                    id: crypto.randomUUID(),
+                                    pattern_id: params?.[0],
+                                    prompt_keywords: [
+                                        "test",
+                                        "interactive",
+                                        "animations",
+                                        "particle",
+                                        "effects",
+                                    ],
+                                    embedding_similarity: 0.85,
+                                    claude_usage: {
+                                        direct_reuse: true,
+                                        structural_similarity: 0.9,
+                                        feature_adoption: ["animation"],
+                                    },
+                                    quality_scores: {
+                                        visual: 0.8,
+                                        interactive: 0.9,
+                                        functional: 0.7,
+                                        performance: 0.85,
+                                    },
+                                    usage_stats: {
+                                        total_uses: 5,
+                                        successful_uses: 3,
+                                        average_similarity: 0.85,
+                                    },
+                                },
+                                {
+                                    id: crypto.randomUUID(),
+                                    pattern_id: params?.[0],
+                                    prompt_keywords: [
+                                        "test",
+                                        "interactive",
+                                        "animations",
+                                        "particle",
+                                        "effects",
+                                    ],
+                                    embedding_similarity: 0.75,
+                                    claude_usage: {
+                                        direct_reuse: false,
+                                        structural_similarity: 0.8,
+                                        feature_adoption: ["style"],
+                                    },
+                                    quality_scores: {
+                                        visual: 0.7,
+                                        interactive: 0.8,
+                                        functional: 0.6,
+                                        performance: 0.75,
+                                    },
+                                    usage_stats: {
+                                        total_uses: 3,
+                                        successful_uses: 2,
+                                        average_similarity: 0.75,
+                                    },
+                                },
+                            ],
+                        });
+                    }
+                    // Return single row for specific pattern query
+                    return Promise.resolve({
+                        rows: [
+                            {
+                                id: crypto.randomUUID(),
+                                pattern_id: params?.[0],
+                                prompt_keywords: [
+                                    "test",
+                                    "interactive",
+                                    "animations",
+                                    "particle",
+                                    "effects",
+                                ],
+                                embedding_similarity: 0.85,
+                                claude_usage: {
+                                    direct_reuse: true,
+                                    structural_similarity: 0.9,
+                                    feature_adoption: ["animation"],
+                                },
+                                quality_scores: {
+                                    visual: 0.8,
+                                    interactive: 0.9,
+                                    functional: 0.7,
+                                    performance: 0.85,
+                                },
+                                usage_stats: {
+                                    total_uses: 5,
+                                    successful_uses: 3,
+                                    average_similarity: 0.85,
+                                },
+                            },
+                        ],
+                    });
+                }
+                // Mock game patterns query
+                if (sql.includes("game_patterns")) {
+                    return Promise.resolve({
+                        rows: [
+                            {
+                                id: params?.[0],
+                                type: "animation",
+                                pattern_name: "test_pattern",
+                                effectiveness_score: 1.0,
+                                usage_count: 5,
+                            },
+                        ],
+                    });
+                }
+                // Default empty response
+                return Promise.resolve({ rows: [] });
+            }),
+            transaction: vi.fn(async (callback) => {
+                return callback(this.mockDatabaseAdapter);
+            }),
+            beginTransaction: vi.fn(),
+            commit: vi.fn(),
+            rollback: vi.fn(),
+        } as unknown as DatabaseAdapter<any>;
+
+        // Setup mock runtime
+        this.mockRuntime = {
+            getDatabaseAdapter: vi
+                .fn()
+                .mockReturnValue(this.mockDatabaseAdapter),
+            getEmbeddingCache: vi.fn().mockReturnValue({
+                get: vi.fn(),
+                set: vi.fn(),
+                delete: vi.fn(),
+                initialize: vi.fn(),
+            }),
+            getVectorOperations: vi.fn().mockReturnValue({
+                initialize: vi.fn(),
+                store: vi.fn(),
+                findSimilar: vi.fn(),
+            }),
+            logger: {
+                info: vi.fn(),
+                error: vi.fn(),
+                debug: vi.fn(),
+                warn: vi.fn(),
+            },
+        } as unknown as IAgentRuntime & { logger: typeof elizaLogger };
+    }
+
+    getMockRuntime() {
+        return this.mockRuntime;
+    }
+
+    async cleanup() {
+        await this.mockDatabaseAdapter.query("DELETE FROM pattern_audit_logs");
+        await this.mockDatabaseAdapter.query("DELETE FROM game_patterns");
+    }
+
+    async query(sql: string, params?: any[]) {
+        return this.mockDatabaseAdapter.query(sql, params);
+    }
+
+    async insertTestPattern(pattern: Partial<GamePattern>) {
+        return DatabaseTestHelper.createTestPattern(
+            this.mockDatabaseAdapter,
+            pattern
+        );
+    }
+
     static async createTestPattern(
         db: DatabaseAdapter<any>,
         overrides: Partial<GamePattern> = {}
