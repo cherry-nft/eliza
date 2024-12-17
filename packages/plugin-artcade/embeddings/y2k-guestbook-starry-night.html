@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Y2K Guestbook Starry Night</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background: radial-gradient(ellipse at center, #000 0%, #111 100%);
+      overflow: hidden;
+      font-family: Arial, sans-serif;
+      color: #fff;
+    }
+
+    .message {
+      position: absolute;
+      padding: 10px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 5px;
+      box-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
+      animation: bounce 5s infinite;
+    }
+
+    @keyframes bounce {
+      0% {
+        transform: translate(0, 0);
+      }
+      25% {
+        transform: translate(50px, -50px);
+      }
+      50% {
+        transform: translate(0, 0);
+      }
+      75% {
+        transform: translate(-50px, 50px);
+      }
+      100% {
+        transform: translate(0, 0);
+      }
+    }
+
+    .sparkle {
+      position: absolute;
+      width: 5px;
+      height: 5px;
+      background: radial-gradient(circle, #fff, transparent 50%);
+      animation: sparkle 2s infinite;
+    }
+
+    @keyframes sparkle {
+      0% {
+        opacity: 1;
+        transform: scale(1);
+      }
+      100% {
+        opacity: 0;
+        transform: scale(2);
+      }
+    }
+
+    .mood {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      font-size: 24px;
+    }
+  </style>
+</head>
+<body>
+  <div class="mood">🌟</div>
+  <script>
+    try {
+      const messageInput = document.createElement('input');
+      messageInput.type = 'text';
+      messageInput.placeholder = 'Enter your message...';
+      document.body.appendChild(messageInput);
+
+      const sendButton = document.createElement('button');
+      sendButton.textContent = 'Send';
+      document.body.appendChild(sendButton);
+
+      const createMessage = (text) => {
+        const message = document.createElement('div');
+        message.textContent = text;
+        message.classList.add('message');
+        message.style.left = `${Math.random() * (window.innerWidth - 200)}px`;
+        message.style.top = `${Math.random() * (window.innerHeight - 200)}px`;
+        document.body.appendChild(message);
+      };
+
+      const createSparkle = () => {
+        const sparkle = document.createElement('div');
+        sparkle.classList.add('sparkle');
+        sparkle.style.left = `${Math.random() * window.innerWidth}px`;
+        sparkle.style.top = `${Math.random() * window.innerHeight}px`;
+        document.body.appendChild(sparkle);
+        setTimeout(() => sparkle.remove(), 2000);
+      };
+
+      const moods = ['🌟', '✨', '⭐', '🌠', '💫'];
+      let currentMoodIndex = 0;
+
+      const updateMood = () => {
+        const moodElement = document.querySelector('.mood');
+        moodElement.textContent = moods[currentMoodIndex];
+        currentMoodIndex = (currentMoodIndex + 1) % moods.length;
+      };
+
+      setInterval(createSparkle, 200);
+      setInterval(updateMood, 3000);
+
+      sendButton.addEventListener('click', () => {
+        const messageText = messageInput.value.trim();
+        if (messageText) {
+          createMessage(messageText);
+          messageInput.value = '';
+        }
+      });
+
+      messageInput.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+          sendButton.click();
+        }
+      });
+    } catch (error) {
+      console.error('An error occurred:', error);
+    }
+  </script>
+</body>
+</html>

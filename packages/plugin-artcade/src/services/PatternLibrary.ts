@@ -1,5 +1,6 @@
 import { Service } from "@ai16z/eliza";
 import { v4 as uuidv4 } from "uuid";
+import { glitchInvasionPattern } from "../patterns/cursor-mechanics";
 
 interface GamePattern {
     id: string;
@@ -50,6 +51,9 @@ export class PatternLibrary {
         this.vectorDb = runtime.getService("VectorDatabase");
         this.staging = runtime.getService("PatternStaging");
         this.runtime.logger.info("PatternLibrary service initialized");
+
+        // Register the glitch invasion pattern
+        await this.storePattern(glitchInvasionPattern);
     }
 
     async storePattern(pattern: Partial<GamePattern>): Promise<string> {

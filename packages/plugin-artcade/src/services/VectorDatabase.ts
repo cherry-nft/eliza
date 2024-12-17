@@ -561,4 +561,24 @@ export class VectorDatabase extends Service {
             throw new DatabaseError("Failed to get pattern by ID", error);
         }
     }
+
+    async listStoredPatterns(): Promise<GamePattern[]> {
+        const result = await this.db.query(`
+            SELECT * FROM game_patterns
+            ORDER BY created_at DESC
+            LIMIT 10
+        `);
+        return result.rows;
+    }
+
+    async getPatternByName(patternName: string): Promise<GamePattern | null> {
+        const result = await this.db.query(
+            `
+            SELECT * FROM game_patterns
+            WHERE pattern_name = $1
+        `,
+            [patternName]
+        );
+        return result.rows[0] || null;
+    }
 }
