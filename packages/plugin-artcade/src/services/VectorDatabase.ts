@@ -5,6 +5,8 @@ import {
     DatabaseAdapter,
     DatabaseError,
     TransactionClient,
+    EmbeddingCache,
+    VectorOperations,
 } from "@ai16z/eliza";
 import { GamePattern } from "./PatternStaging";
 
@@ -23,6 +25,8 @@ interface AuditLogEntry {
 export class VectorDatabase extends Service {
     private db!: DatabaseAdapter<any>;
     private runtime!: IAgentRuntime & { logger: typeof elizaLogger };
+    private embeddingCache!: EmbeddingCache;
+    private vectorOps!: VectorOperations;
     private cache: Map<
         string,
         {
@@ -31,6 +35,7 @@ export class VectorDatabase extends Service {
         }
     > = new Map();
     private readonly CACHE_TTL = 300000; // 5 minutes
+    private readonly EMBEDDING_DIMENSION = 1536;
 
     constructor() {
         super();
@@ -42,10 +47,17 @@ export class VectorDatabase extends Service {
         this.runtime = runtime;
         this.db = runtime.getDatabaseAdapter();
 
+        // Get Eliza's embedding cache from runtime
+        this.embeddingCache = runtime.getEmbeddingCache();
+
+        // Initialize vector operations
+        this.vectorOps = runtime.getVectorOperations();
+
         // Initialize database schema and security
         await this.initializeSchema();
         await this.setupSecurity();
         await this.setupAuditLogging();
+        await this.setupVectorOperations();
     }
 
     private async setupSecurity(): Promise<void> {
@@ -85,6 +97,25 @@ export class VectorDatabase extends Service {
             this.runtime.logger.error("Failed to setup audit logging", {
                 error,
             });
+            throw error;
+        }
+    }
+
+    private async setupVectorOperations(): Promise<void> {
+        try {
+            await this.vectorOps.initialize({
+                tableName: "game_patterns",
+                embeddingColumn: "embedding",
+                dimension: this.EMBEDDING_DIMENSION,
+                distanceMetric: "cosine",
+            });
+
+            this.runtime.logger.info("Vector operations initialized");
+        } catch (error) {
+            this.runtime.logger.error(
+                "Failed to initialize vector operations",
+                { error }
+            );
             throw error;
         }
     }
@@ -237,36 +268,23 @@ export class VectorDatabase extends Service {
                     usage_count,
                 } = pattern;
 
-                await client.query(
-                    `
-                    INSERT INTO game_patterns (
-                        id,
-                        type,
-                        pattern_name,
-                        content,
-                        embedding,
-                        effectiveness_score,
-                        usage_count
-                    ) VALUES ($1, $2, $3, $4, $5, $6, $7)
-                    ON CONFLICT (id) DO UPDATE SET
-                        type = EXCLUDED.type,
-                        pattern_name = EXCLUDED.pattern_name,
-                        content = EXCLUDED.content,
-                        embedding = EXCLUDED.embedding,
-                        effectiveness_score = EXCLUDED.effectiveness_score,
-                        usage_count = EXCLUDED.usage_count,
-                        last_used = CURRENT_TIMESTAMP
-                    `,
-                    [
-                        id,
-                        type,
-                        pattern_name,
-                        content,
-                        embedding,
-                        effectiveness_score,
-                        usage_count,
-                    ]
-                );
+                // Validate embedding dimension
+                if (embedding.length !== this.EMBEDDING_DIMENSION) {
+                    throw new Error(
+                        `Invalid embedding dimension: ${embedding.length}`
+                    );
+                }
+
+                // Store pattern with vector operations
+                await this.vectorOps.store(client, {
+                    id,
+                    type,
+                    pattern_name,
+                    content,
+                    embedding,
+                    effectiveness_score,
+                    usage_count,
+                });
 
                 await this.logOperation({
                     operation: "STORE_PATTERN",
@@ -275,8 +293,8 @@ export class VectorDatabase extends Service {
                     performed_at: new Date(),
                 });
 
-                // Update cache
-                this.setCachedPattern(pattern);
+                // Clear embedding cache for this pattern type
+                await this.embeddingCache.delete(`${type}_*`);
             });
 
             this.runtime.logger.debug(
@@ -320,21 +338,24 @@ export class VectorDatabase extends Service {
         limit: number = 5
     ): Promise<VectorSearchResult[]> {
         try {
-            const result = await this.db.query(
-                `
-                SELECT *,
-                    pattern_similarity(embedding, $1::vector) as similarity
-                FROM game_patterns
-                WHERE
-                    type = $2 AND
-                    pattern_similarity(embedding, $1::vector) > $3
-                ORDER BY similarity DESC
-                LIMIT $4;
-                `,
-                [embedding, type, threshold, limit]
-            );
+            // Check embedding cache first
+            const cacheKey = `${type}_${embedding.join(",")}`;
+            const cachedResults = await this.embeddingCache.get(cacheKey);
+            if (cachedResults) {
+                return cachedResults as VectorSearchResult[];
+            }
 
-            return result.rows.map((row) => ({
+            // Use vector operations for similarity search
+            const results = await this.vectorOps.findSimilar({
+                embedding,
+                filter: { type },
+                threshold,
+                limit,
+                orderBy: "similarity",
+                orderDirection: "DESC",
+            });
+
+            const patterns = results.map((row) => ({
                 pattern: {
                     id: row.id,
                     type: row.type,
@@ -346,6 +367,11 @@ export class VectorDatabase extends Service {
                 },
                 similarity: row.similarity,
             }));
+
+            // Cache the results
+            await this.embeddingCache.set(cacheKey, patterns);
+
+            return patterns;
         } catch (error) {
             this.runtime.logger.error("Failed to find similar patterns", {
                 error,

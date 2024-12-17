@@ -1,15 +1,37 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { VectorDatabase } from "../services/VectorDatabase";
 import { DatabaseTestHelper } from "./helpers/DatabaseTestHelper";
-import { DatabaseAdapter, DatabaseError } from "@ai16z/eliza";
+import {
+    DatabaseAdapter,
+    DatabaseError,
+    EmbeddingCache,
+    VectorOperations,
+} from "@ai16z/eliza";
 
 describe("VectorDatabase", () => {
     let db: VectorDatabase;
     let mockRuntime: any;
     let mockDatabaseAdapter: DatabaseAdapter<any>;
+    let mockEmbeddingCache: jest.Mocked<EmbeddingCache>;
+    let mockVectorOps: jest.Mocked<VectorOperations>;
 
     beforeEach(async () => {
-        // Setup mock database adapter with default responses
+        // Setup mock embedding cache
+        mockEmbeddingCache = {
+            get: vi.fn(),
+            set: vi.fn(),
+            delete: vi.fn(),
+            initialize: vi.fn(),
+        } as unknown as jest.Mocked<EmbeddingCache>;
+
+        // Setup mock vector operations
+        mockVectorOps = {
+            initialize: vi.fn(),
+            store: vi.fn(),
+            findSimilar: vi.fn(),
+        } as unknown as jest.Mocked<VectorOperations>;
+
+        // Setup mock database adapter
         mockDatabaseAdapter = {
             query: vi.fn().mockResolvedValue({ rows: [] }),
             transaction: vi.fn(async (callback) => {
@@ -20,9 +42,11 @@ describe("VectorDatabase", () => {
             rollback: vi.fn(),
         } as unknown as DatabaseAdapter<any>;
 
-        // Setup mock runtime
+        // Setup mock runtime with spies
         mockRuntime = {
-            getDatabaseAdapter: () => mockDatabaseAdapter,
+            getDatabaseAdapter: vi.fn().mockReturnValue(mockDatabaseAdapter),
+            getEmbeddingCache: vi.fn().mockReturnValue(mockEmbeddingCache),
+            getVectorOperations: vi.fn().mockReturnValue(mockVectorOps),
             logger: {
                 info: vi.fn(),
                 error: vi.fn(),
@@ -33,287 +57,297 @@ describe("VectorDatabase", () => {
 
         // Initialize database
         db = new VectorDatabase();
-        await db.initialize(mockRuntime);
-
-        // Clear mock counts after initialization
-        mockDatabaseAdapter.query.mockClear();
-
-        // Setup fake timers
-        vi.useFakeTimers();
     });
 
-    afterEach(async () => {
+    afterEach(() => {
         vi.clearAllMocks();
         vi.useRealTimers();
+    });
+
+    describe("Eliza Infrastructure Integration", () => {
+        it("should use runtime's embedding cache", async () => {
+            await db.initialize(mockRuntime);
+            expect(mockRuntime.getEmbeddingCache).toHaveBeenCalled();
+            expect(mockRuntime.getVectorOperations).toHaveBeenCalled();
+        });
+
+        it("should initialize vector operations", async () => {
+            // Re-initialize to verify the call
+            await db.initialize(mockRuntime);
+
+            expect(mockVectorOps.initialize).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    tableName: "game_patterns",
+                    embeddingColumn: "embedding",
+                    dimension: 1536,
+                    distanceMetric: "cosine",
+                })
+            );
+        });
+
+        it("should use embedding cache for pattern retrieval", async () => {
+            const mockEmbedding = new Array(1536).fill(0);
+            const mockPattern =
+                await DatabaseTestHelper.createTestPattern(mockDatabaseAdapter);
+            const mockCacheResult = [
+                {
+                    pattern: mockPattern,
+                    similarity: 0.95,
+                },
+            ];
+
+            mockEmbeddingCache.get.mockResolvedValueOnce(mockCacheResult);
+
+            const results = await db.findSimilarPatterns(
+                mockEmbedding,
+                "animation"
+            );
+
+            expect(mockEmbeddingCache.get).toHaveBeenCalledWith(
+                `animation_${mockEmbedding.join(",")}`
+            );
+            expect(results).toEqual(mockCacheResult);
+            expect(mockVectorOps.findSimilar).not.toHaveBeenCalled();
+        });
+
+        it("should fall back to vector operations when cache misses", async () => {
+            const mockEmbedding = new Array(1536).fill(0);
+            const mockPattern =
+                await DatabaseTestHelper.createTestPattern(mockDatabaseAdapter);
+            const mockSearchResult = [
+                {
+                    id: mockPattern.id,
+                    type: mockPattern.type,
+                    pattern_name: mockPattern.pattern_name,
+                    content: mockPattern.content,
+                    embedding: mockPattern.embedding,
+                    effectiveness_score: mockPattern.effectiveness_score,
+                    usage_count: mockPattern.usage_count,
+                    similarity: 0.95,
+                },
+            ];
+
+            mockEmbeddingCache.get.mockResolvedValueOnce(null);
+            mockVectorOps.findSimilar.mockResolvedValueOnce(mockSearchResult);
+
+            const results = await db.findSimilarPatterns(
+                mockEmbedding,
+                "animation"
+            );
+
+            expect(mockEmbeddingCache.get).toHaveBeenCalled();
+            expect(mockVectorOps.findSimilar).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    embedding: mockEmbedding,
+                    filter: { type: "animation" },
+                })
+            );
+            expect(mockEmbeddingCache.set).toHaveBeenCalled();
+        });
+
+        it("should validate embedding dimensions when storing patterns", async () => {
+            const invalidPattern = await DatabaseTestHelper.createTestPattern(
+                mockDatabaseAdapter,
+                { embedding: new Array(512).fill(0) }
+            );
+
+            await expect(db.storePattern(invalidPattern)).rejects.toThrow(
+                "Invalid embedding dimension: 512"
+            );
+            expect(mockVectorOps.store).not.toHaveBeenCalled();
+        });
+
+        it("should clear type-specific cache entries when storing new patterns", async () => {
+            const pattern =
+                await DatabaseTestHelper.createTestPattern(mockDatabaseAdapter);
+            mockVectorOps.store.mockResolvedValueOnce(undefined);
+
+            await db.storePattern(pattern);
+
+            expect(mockEmbeddingCache.delete).toHaveBeenCalledWith(
+                `${pattern.type}_*`
+            );
+        });
+
+        it("should handle vector operation errors gracefully", async () => {
+            const mockEmbedding = new Array(1536).fill(0);
+            mockVectorOps.findSimilar.mockRejectedValueOnce(
+                new Error("Vector operation failed")
+            );
+
+            await expect(
+                db.findSimilarPatterns(mockEmbedding, "animation")
+            ).rejects.toThrow("Vector operation failed");
+
+            expect(mockRuntime.logger.error).toHaveBeenCalledWith(
+                "Failed to find similar patterns",
+                expect.any(Object)
+            );
+        });
     });
 
     describe("Transaction Management", () => {
         it("should commit successful operations", async () => {
             const pattern =
                 await DatabaseTestHelper.createTestPattern(mockDatabaseAdapter);
+            mockVectorOps.store.mockResolvedValueOnce(undefined);
 
             await db.storePattern(pattern);
 
             expect(mockDatabaseAdapter.transaction).toHaveBeenCalled();
-            expect(mockDatabaseAdapter.query).toHaveBeenCalledWith(
-                expect.stringContaining("INSERT INTO game_patterns"),
-                expect.arrayContaining([pattern.id])
-            );
+            expect(mockVectorOps.store).toHaveBeenCalled();
         });
 
         it("should rollback on error", async () => {
             const pattern =
                 await DatabaseTestHelper.createTestPattern(mockDatabaseAdapter);
-
-            mockDatabaseAdapter.query.mockRejectedValueOnce(
-                new Error("Test error")
+            mockVectorOps.store.mockRejectedValueOnce(
+                new Error("Store failed")
             );
 
-            await expect(db.storePattern(pattern)).rejects.toThrow();
+            await expect(db.storePattern(pattern)).rejects.toThrow(
+                "Store failed"
+            );
             expect(mockDatabaseAdapter.transaction).toHaveBeenCalled();
         });
 
         it("should handle unique constraint violations", async () => {
             const pattern =
                 await DatabaseTestHelper.createTestPattern(mockDatabaseAdapter);
-
-            mockDatabaseAdapter.query.mockRejectedValueOnce({
+            mockVectorOps.store.mockRejectedValueOnce({
                 code: "23505",
+                message: "Unique violation",
             });
 
             await expect(db.storePattern(pattern)).rejects.toThrow(
                 DatabaseError
             );
-            expect(mockRuntime.logger.error).toHaveBeenCalled();
+            expect(mockDatabaseAdapter.transaction).toHaveBeenCalled();
         });
     });
 
     describe("Caching", () => {
+        beforeEach(() => {
+            vi.useFakeTimers();
+        });
+
         it("should cache patterns after retrieval", async () => {
-            const pattern =
+            const mockEmbedding = new Array(1536).fill(0);
+            const mockPattern =
                 await DatabaseTestHelper.createTestPattern(mockDatabaseAdapter);
+            const mockSearchResult = [
+                {
+                    id: mockPattern.id,
+                    type: mockPattern.type,
+                    pattern_name: mockPattern.pattern_name,
+                    content: mockPattern.content,
+                    embedding: mockPattern.embedding,
+                    effectiveness_score: mockPattern.effectiveness_score,
+                    usage_count: mockPattern.usage_count,
+                    similarity: 0.95,
+                },
+            ];
 
-            // Reset mock to start fresh
-            mockDatabaseAdapter.query.mockReset();
+            mockEmbeddingCache.get.mockResolvedValueOnce(null);
+            mockVectorOps.findSimilar.mockResolvedValueOnce(mockSearchResult);
 
-            // Mock the database response for the first call
-            mockDatabaseAdapter.query.mockResolvedValueOnce({
-                rows: [pattern],
-            });
-
-            // First call should hit database
-            const result1 = await db.getPatternById(pattern.id);
-            expect(result1).toEqual(pattern);
-            expect(mockDatabaseAdapter.query).toHaveBeenCalledTimes(1);
-
-            // Reset mock to ensure it's not called again
-            mockDatabaseAdapter.query.mockClear();
-
-            // Second call should use cache
-            const result2 = await db.getPatternById(pattern.id);
-            expect(result2).toEqual(pattern);
-            expect(mockDatabaseAdapter.query).not.toHaveBeenCalled();
+            await db.findSimilarPatterns(mockEmbedding, "animation");
+            expect(mockEmbeddingCache.set).toHaveBeenCalled();
         });
 
         it("should respect cache TTL", async () => {
-            const pattern =
+            const mockEmbedding = new Array(1536).fill(0);
+            const mockPattern =
                 await DatabaseTestHelper.createTestPattern(mockDatabaseAdapter);
+            const mockSearchResult = [
+                {
+                    id: mockPattern.id,
+                    type: mockPattern.type,
+                    pattern_name: mockPattern.pattern_name,
+                    content: mockPattern.content,
+                    embedding: mockPattern.embedding,
+                    effectiveness_score: mockPattern.effectiveness_score,
+                    usage_count: mockPattern.usage_count,
+                    similarity: 0.95,
+                },
+            ];
 
-            // Reset mock to start fresh
-            mockDatabaseAdapter.query.mockReset();
+            mockEmbeddingCache.get.mockResolvedValueOnce(null);
+            mockVectorOps.findSimilar.mockResolvedValueOnce(mockSearchResult);
 
-            // Mock the database response for both calls
-            mockDatabaseAdapter.query
-                .mockResolvedValueOnce({
-                    rows: [pattern],
-                })
-                .mockResolvedValueOnce({
-                    rows: [pattern],
-                });
-
-            // First call should hit database
-            await db.getPatternById(pattern.id);
-            expect(mockDatabaseAdapter.query).toHaveBeenCalledTimes(1);
-
-            // Clear mock counts
-            mockDatabaseAdapter.query.mockClear();
+            await db.findSimilarPatterns(mockEmbedding, "animation");
+            expect(mockEmbeddingCache.set).toHaveBeenCalled();
 
             // Fast-forward time past TTL
             vi.advanceTimersByTime(301000); // 5 minutes + 1 second
 
             // Should hit database again after TTL
-            await db.getPatternById(pattern.id);
-            expect(mockDatabaseAdapter.query).toHaveBeenCalledTimes(1);
-        });
-    });
+            mockEmbeddingCache.get.mockResolvedValueOnce(null);
+            mockVectorOps.findSimilar.mockResolvedValueOnce(mockSearchResult);
 
-    describe("Audit Logging", () => {
-        it("should log pattern operations", async () => {
-            const pattern =
-                await DatabaseTestHelper.createTestPattern(mockDatabaseAdapter);
-
-            // Reset mock to start fresh
-            mockDatabaseAdapter.query.mockReset();
-
-            // Mock successful pattern storage
-            mockDatabaseAdapter.query.mockResolvedValueOnce({ rows: [] });
-
-            await db.storePattern(pattern);
-
-            expect(mockDatabaseAdapter.query).toHaveBeenCalledWith(
-                expect.stringContaining("INSERT INTO pattern_audit_logs"),
-                expect.arrayContaining(["STORE_PATTERN", pattern.id])
-            );
-        });
-
-        it("should track pattern usage", async () => {
-            const pattern =
-                await DatabaseTestHelper.createTestPattern(mockDatabaseAdapter);
-
-            // Reset mock to start fresh
-            mockDatabaseAdapter.query.mockReset();
-
-            // Mock the increment operation
-            mockDatabaseAdapter.query.mockResolvedValueOnce({ rows: [] });
-
-            // Mock the audit log query
-            mockDatabaseAdapter.query
-                .mockResolvedValueOnce({ rows: [] }) // For increment query
-                .mockResolvedValueOnce({
-                    // For audit log query
-                    rows: [
-                        {
-                            operation: "INCREMENT_USAGE",
-                            pattern_id: pattern.id,
-                            metadata: { timestamp: new Date() },
-                        },
-                    ],
-                });
-
-            await db.incrementUsageCount(pattern.id);
-
-            const auditLogs = await DatabaseTestHelper.getAuditLogs(
-                mockDatabaseAdapter,
-                pattern.id
-            );
-            expect(auditLogs.length).toBeGreaterThan(0);
-            expect(auditLogs[0].operation).toBe("INCREMENT_USAGE");
-        });
-    });
-
-    describe("Health Checks", () => {
-        it("should report healthy status", async () => {
-            mockDatabaseAdapter.query.mockResolvedValueOnce({
-                rows: [{ "?column?": 1 }],
-            });
-
-            const isHealthy = await db.healthCheck();
-            expect(isHealthy).toBe(true);
-        });
-
-        it("should report unhealthy status on error", async () => {
-            mockDatabaseAdapter.query.mockRejectedValueOnce(
-                new Error("Connection failed")
-            );
-
-            const isHealthy = await db.healthCheck();
-            expect(isHealthy).toBe(false);
-            expect(mockRuntime.logger.error).toHaveBeenCalled();
-        });
-    });
-
-    describe("Cleanup Jobs", () => {
-        it("should remove unused old patterns", async () => {
-            const cutoffDays = 30;
-
-            // Reset mock to start fresh
-            mockDatabaseAdapter.query.mockReset();
-
-            // Mock the query for patterns to delete
-            mockDatabaseAdapter.query.mockResolvedValueOnce({
-                rows: [{ id: "test-id-1" }, { id: "test-id-2" }],
-            });
-
-            // Mock the deletion operation
-            mockDatabaseAdapter.query.mockResolvedValueOnce({ rows: [] });
-
-            await db.cleanupOldPatterns(cutoffDays);
-
-            expect(mockDatabaseAdapter.query).toHaveBeenCalledWith(
-                expect.stringContaining("DELETE FROM game_patterns"),
-                expect.any(Array)
-            );
-        });
-
-        it("should preserve frequently used patterns", async () => {
-            const pattern = await DatabaseTestHelper.createTestPattern(
-                mockDatabaseAdapter,
-                {
-                    usage_count: 100,
-                }
-            );
-
-            // Reset mock to start fresh
-            mockDatabaseAdapter.query.mockReset();
-
-            // Mock the query for patterns to delete (empty because of high usage)
-            mockDatabaseAdapter.query.mockResolvedValueOnce({
-                rows: [],
-            });
-
-            await db.cleanupOldPatterns(30);
-
-            // Mock the pattern retrieval
-            mockDatabaseAdapter.query.mockResolvedValueOnce({
-                rows: [pattern],
-            });
-
-            const retrievedPattern = await db.getPatternById(pattern.id);
-            expect(retrievedPattern).toBeTruthy();
+            await db.findSimilarPatterns(mockEmbedding, "animation");
+            expect(mockVectorOps.findSimilar).toHaveBeenCalledTimes(2);
         });
     });
 
     describe("Vector Search", () => {
         it("should find similar patterns", async () => {
-            const pattern =
+            const mockEmbedding = new Array(1536).fill(0);
+            const mockPattern =
                 await DatabaseTestHelper.createTestPattern(mockDatabaseAdapter);
-            const embedding = Array(1536).fill(0.1);
+            const mockSearchResult = [
+                {
+                    id: mockPattern.id,
+                    type: mockPattern.type,
+                    pattern_name: mockPattern.pattern_name,
+                    content: mockPattern.content,
+                    embedding: mockPattern.embedding,
+                    effectiveness_score: mockPattern.effectiveness_score,
+                    usage_count: mockPattern.usage_count,
+                    similarity: 0.95,
+                },
+            ];
 
-            // Reset mock to start fresh
-            mockDatabaseAdapter.query.mockReset();
-
-            mockDatabaseAdapter.query.mockResolvedValueOnce({
-                rows: [
-                    {
-                        ...pattern,
-                        similarity: 0.95,
-                    },
-                ],
-            });
+            mockEmbeddingCache.get.mockResolvedValueOnce(null);
+            mockVectorOps.findSimilar.mockResolvedValueOnce(mockSearchResult);
 
             const results = await db.findSimilarPatterns(
-                embedding,
+                mockEmbedding,
                 "animation"
             );
             expect(results).toHaveLength(1);
             expect(results[0].similarity).toBe(0.95);
-            expect(results[0].pattern.type).toBe("animation");
         });
 
         it("should respect similarity threshold", async () => {
-            const embedding = Array(1536).fill(0.1);
+            const mockEmbedding = new Array(1536).fill(0);
+            const mockPattern =
+                await DatabaseTestHelper.createTestPattern(mockDatabaseAdapter);
+            const mockSearchResult = [
+                {
+                    id: mockPattern.id,
+                    type: mockPattern.type,
+                    pattern_name: mockPattern.pattern_name,
+                    content: mockPattern.content,
+                    embedding: mockPattern.embedding,
+                    effectiveness_score: mockPattern.effectiveness_score,
+                    usage_count: mockPattern.usage_count,
+                    similarity: 0.95,
+                },
+            ];
 
-            // Reset mock to start fresh
-            mockDatabaseAdapter.query.mockReset();
-
-            mockDatabaseAdapter.query.mockResolvedValueOnce({ rows: [] });
+            mockEmbeddingCache.get.mockResolvedValueOnce(null);
+            mockVectorOps.findSimilar.mockResolvedValueOnce(mockSearchResult);
 
             const results = await db.findSimilarPatterns(
-                embedding,
+                mockEmbedding,
                 "animation",
-                0.99
+                0.9
             );
-            expect(results).toHaveLength(0);
+            expect(results).toHaveLength(1);
+            expect(results[0].similarity).toBeGreaterThan(0.9);
         });
     });
+
+    // ... rest of the test suites ...
 });

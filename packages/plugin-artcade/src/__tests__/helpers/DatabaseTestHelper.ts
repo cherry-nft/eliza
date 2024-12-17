@@ -2,98 +2,82 @@ import { DatabaseAdapter } from "@ai16z/eliza";
 import { GamePattern } from "../../services/PatternStaging";
 
 export class DatabaseTestHelper {
-    static async setupTestDatabase(db: DatabaseAdapter<any>): Promise<void> {
-        // Drop existing tables
-        await db.query("DROP TABLE IF EXISTS pattern_audit_logs CASCADE");
-        await db.query("DROP TABLE IF EXISTS game_patterns CASCADE");
-
-        // Create extensions
-        await db.query(`
-            CREATE EXTENSION IF NOT EXISTS vector;
-            CREATE EXTENSION IF NOT EXISTS hnsw;
-        `);
-
-        // Create pattern similarity function
-        await db.query(`
-            CREATE OR REPLACE FUNCTION pattern_similarity(
-                pattern1 vector,
-                pattern2 vector
-            ) RETURNS float AS $$
-                SELECT 1 - (pattern1 <=> pattern2);
-            $$ LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE;
-        `);
-
-        // Create tables
-        await db.query(`
-            CREATE TABLE game_patterns (
-                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                type TEXT NOT NULL,
-                pattern_name TEXT NOT NULL,
-                content JSONB NOT NULL,
-                embedding vector(1536),
-                effectiveness_score FLOAT DEFAULT 0,
-                usage_count INTEGER DEFAULT 0,
-                created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-                last_used TIMESTAMPTZ,
-                approval_metadata JSONB
-            );
-
-            CREATE INDEX idx_game_patterns_embedding
-            ON game_patterns USING hnsw (embedding vector_cosine_ops);
-
-            CREATE TABLE pattern_audit_logs (
-                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                operation TEXT NOT NULL,
-                pattern_id UUID NOT NULL,
-                metadata JSONB,
-                performed_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (pattern_id) REFERENCES game_patterns(id)
-            );
-
-            CREATE INDEX idx_audit_logs_pattern ON pattern_audit_logs(pattern_id);
-            CREATE INDEX idx_audit_logs_operation ON pattern_audit_logs(operation);
-        `);
-    }
-
     static async createTestPattern(
         db: DatabaseAdapter<any>,
-        pattern: Partial<GamePattern> = {}
+        overrides: Partial<GamePattern> = {}
     ): Promise<GamePattern> {
-        const testPattern: GamePattern = {
+        const defaultPattern: GamePattern = {
             id: crypto.randomUUID(),
             type: "animation",
             pattern_name: "test_pattern",
             content: {
-                html: "<div>Test</div>",
-                css: ".test { color: red; }",
+                html: "<div class='test'>Test Pattern</div>",
+                css: "@keyframes test { }",
                 context: "test",
                 metadata: {
-                    visual_type: "test",
+                    visual_type: "animation",
+                    animation_duration: "1s",
                 },
             },
-            embedding: Array(1536).fill(0.1),
+            embedding: new Array(1536).fill(0),
             effectiveness_score: 1.0,
             usage_count: 0,
-            ...pattern,
         };
+
+        const pattern = { ...defaultPattern, ...overrides };
 
         await db.query(
             `INSERT INTO game_patterns (
-                id, type, pattern_name, content, embedding,
-                effectiveness_score, usage_count
+                id,
+                type,
+                pattern_name,
+                content,
+                embedding,
+                effectiveness_score,
+                usage_count
             ) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
             [
-                testPattern.id,
-                testPattern.type,
-                testPattern.pattern_name,
-                testPattern.content,
-                testPattern.embedding,
-                testPattern.effectiveness_score,
-                testPattern.usage_count,
+                pattern.id,
+                pattern.type,
+                pattern.pattern_name,
+                pattern.content,
+                pattern.embedding,
+                pattern.effectiveness_score,
+                pattern.usage_count,
             ]
         );
 
-        return testPattern;
+        return pattern;
+    }
+
+    static async setupVectorExtension(db: DatabaseAdapter<any>): Promise<void> {
+        await db.query(`
+            CREATE EXTENSION IF NOT EXISTS vector;
+            CREATE EXTENSION IF NOT EXISTS hnsw;
+        `);
+    }
+
+    static async createTestPatterns(
+        db: DatabaseAdapter<any>,
+        count: number,
+        type: string = "animation"
+    ): Promise<GamePattern[]> {
+        const patterns: GamePattern[] = [];
+
+        for (let i = 0; i < count; i++) {
+            const pattern = await this.createTestPattern(db, {
+                type,
+                pattern_name: `test_pattern_${i}`,
+                embedding: this.generateRandomEmbedding(),
+            });
+            patterns.push(pattern);
+        }
+
+        return patterns;
+    }
+
+    static generateRandomEmbedding(dimension: number = 1536): number[] {
+        return Array.from({ length: dimension }, () => Math.random());
     }
 
     static async getAuditLogs(
@@ -101,14 +85,64 @@ export class DatabaseTestHelper {
         patternId: string
     ): Promise<any[]> {
         const result = await db.query(
-            "SELECT * FROM pattern_audit_logs WHERE pattern_id = $1 ORDER BY performed_at DESC",
+            `SELECT * FROM pattern_audit_logs WHERE pattern_id = $1 ORDER BY performed_at DESC`,
             [patternId]
         );
         return result.rows;
     }
 
-    static async cleanup(db: DatabaseAdapter<any>): Promise<void> {
-        await db.query("DROP TABLE IF EXISTS pattern_audit_logs CASCADE");
-        await db.query("DROP TABLE IF EXISTS game_patterns CASCADE");
+    static async clearDatabase(db: DatabaseAdapter<any>): Promise<void> {
+        await db.query("DELETE FROM pattern_audit_logs");
+        await db.query("DELETE FROM game_patterns");
+    }
+
+    static async setupTestSchema(db: DatabaseAdapter<any>): Promise<void> {
+        await this.setupVectorExtension(db);
+
+        await db.query(`
+            CREATE TABLE IF NOT EXISTS game_patterns (
+                id UUID PRIMARY KEY,
+                type TEXT NOT NULL,
+                pattern_name TEXT NOT NULL,
+                content JSONB NOT NULL,
+                embedding vector(1536),
+                effectiveness_score FLOAT DEFAULT 0,
+                usage_count INTEGER DEFAULT 0,
+                created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                last_used TIMESTAMPTZ
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_game_patterns_embedding
+            ON game_patterns USING hnsw (embedding vector_cosine_ops);
+
+            CREATE TABLE IF NOT EXISTS pattern_audit_logs (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                operation TEXT NOT NULL,
+                pattern_id UUID NOT NULL,
+                metadata JSONB,
+                performed_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (pattern_id) REFERENCES game_patterns(id)
+            );
+        `);
+    }
+
+    static async findSimilarTestPatterns(
+        db: DatabaseAdapter<any>,
+        embedding: number[],
+        type: string,
+        threshold: number = 0.85,
+        limit: number = 5
+    ): Promise<any[]> {
+        const result = await db.query(
+            `SELECT *,
+                1 - (embedding <=> $1::vector) as similarity
+            FROM game_patterns
+            WHERE type = $2
+                AND 1 - (embedding <=> $1::vector) > $3
+            ORDER BY similarity DESC
+            LIMIT $4`,
+            [embedding, type, threshold, limit]
+        );
+        return result.rows;
     }
 }
