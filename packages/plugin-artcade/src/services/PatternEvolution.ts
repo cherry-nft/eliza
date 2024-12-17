@@ -473,6 +473,26 @@ export class PatternEvolution extends Service {
             }
         }
 
+        // Add collision detection to all game elements
+        mutatedPattern.content.html = this.addCollisionDetection(
+            mutatedPattern.content.html
+        );
+
+        // Ensure we have at least one level progression element
+        if (
+            !mutatedPattern.content.html.includes("game-portal") &&
+            !mutatedPattern.content.html.includes("game-checkpoint")
+        ) {
+            mutatedPattern.content.html = this.addLevelProgression(
+                mutatedPattern.content.html
+            );
+        }
+
+        // Add game mechanics
+        mutatedPattern.content.html = this.addGameMechanics(
+            mutatedPattern.content.html
+        );
+
         return this.staging.validatePattern(mutatedPattern);
     }
 
@@ -498,103 +518,66 @@ export class PatternEvolution extends Service {
 
     private addGameElement(html: string): string {
         const elements = [
-            // Collision detection element
-            `<div class="game-player" data-collision="true" style="width: 32px; height: 32px; background-color: rgb(255, 0, 0); position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);">
-                <script>
-                    setInterval(() => {
-                        const player = document.querySelector('.game-player');
-                        const rect = player.getBoundingClientRect();
-                        // Collision detection logic
-                        document.querySelectorAll('[data-collision="true"]').forEach(element => {
-                            if (element === player) return;
-                            const rect2 = element.getBoundingClientRect();
-                            if (rect.left < rect2.right && rect.right > rect2.left &&
-                                rect.top < rect2.bottom && rect.bottom > rect2.top) {
-                                element.dispatchEvent(new CustomEvent('collision', { detail: { player } }));
-                            }
-                        });
-                    }, 16);
-                </script>
-            </div>`,
-
-            // Power-up element with game state
-            `<div class="game-powerup" data-effect="speed" data-duration="5000" style="width: 16px; height: 16px; background-color: rgb(255, 255, 0); position: absolute; border-radius: 50%; animation: float 2s infinite ease-in-out;">
-                <script>
-                    const gameState = {
-                        score: 0,
-                        health: 100,
-                        powerups: [],
-                        level: 1,
-                        combo: 0,
-                        updateScore: function(points) {
-                            this.score += points * (this.combo + 1);
-                            document.querySelector('.game-score span').textContent = this.score;
-                        },
-                        updateHealth: function(amount) {
-                            this.health = Math.max(0, Math.min(100, this.health + amount));
-                            document.querySelector('.game-health span').textContent = this.health;
-                            if (this.health <= 0) this.gameOver();
-                        },
-                        addPowerup: function(effect, duration) {
-                            this.powerups.push({ effect, expires: Date.now() + duration });
-                            setTimeout(() => this.removePowerup(effect), duration);
-                        },
-                        removePowerup: function(effect) {
-                            this.powerups = this.powerups.filter(p => p.effect !== effect);
-                        },
-                        gameOver: function() {
-                            document.dispatchEvent(new CustomEvent('gameOver', { detail: { score: this.score } }));
-                        }
-                    };
-                </script>
-            </div>`,
-
-            // Level progression element
-            `<div class="game-portal" data-next-level="true" style="width: 48px; height: 48px; background: linear-gradient(45deg, #00f, #f0f); border-radius: 50%; animation: pulse 2s infinite;">
-                <script>
-                    function nextLevel() {
-                        gameState.level++;
-                        updateGameState();
-                    }
-                </script>
-            </div>`,
-
-            // Game controls
-            `<div class="game-controls" style="position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); display: flex; gap: 20px;">
-                <button class="control-left" ontouchstart="movePlayer('left')" ontouchend="stopPlayer()">←</button>
-                <button class="control-right" ontouchstart="movePlayer('right')" ontouchend="stopPlayer()">→</button>
-                <button class="control-action" ontouchstart="playerAction()">Action</button>
-                <script>
-                    function movePlayer(direction) {
-                        const player = document.querySelector('.game-player');
-                        if (!player) return;
-                        const speed = parseInt(player.dataset.speed) || 5;
-                        switch(direction) {
-                            case 'left': player.style.left = (parseInt(player.style.left || 0) - speed) + 'px'; break;
-                            case 'right': player.style.left = (parseInt(player.style.left || 0) + speed) + 'px'; break;
-                        }
-                    }
-
-                    function stopPlayer() {
-                        const player = document.querySelector('.game-player');
-                        if (!player) return;
-                        player.style.transition = 'none';
-                    }
-
-                    function playerAction() {
-                        const player = document.querySelector('.game-player');
-                        if (!player) return;
-                        player.dispatchEvent(new CustomEvent('action'));
-                    }
-                </script>
-            </div>`,
-
-            // Score display
-            `<div class="game-score" style="position: absolute; top: 10px; right: 10px; padding: 5px 10px; background-color: rgb(51, 51, 51); color: rgb(255, 255, 255); border-radius: 5px;">Score: <span>0</span></div>`,
+            {
+                type: "player",
+                html: `<div class="game-player" data-collision="true" style="width: 32px; height: 32px; background-color: rgb(255, 0, 0); position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);"></div>`,
+            },
+            {
+                type: "collectible",
+                html: `<div class="game-collectible" data-collision="true" style="width: 16px; height: 16px; background-color: rgb(255, 255, 0); position: absolute; border-radius: 50%; animation: float 2s infinite ease-in-out;"></div>`,
+            },
+            {
+                type: "obstacle",
+                html: `<div class="game-obstacle" data-collision="true" style="width: 24px; height: 24px; background-color: rgb(255, 0, 0); position: absolute;"></div>`,
+            },
+            {
+                type: "portal",
+                html: `<div class="game-portal" data-collision="true" style="width: 40px; height: 40px; background: radial-gradient(circle, #4CAF50 0%, transparent 100%); position: absolute; animation: pulse 2s infinite;"></div>`,
+            },
+            {
+                type: "checkpoint",
+                html: `<div class="game-checkpoint" data-collision="true" style="width: 32px; height: 32px; background-color: #2196F3; position: absolute; border-radius: 4px;"></div>`,
+            },
         ];
 
+        // Randomly select an element type
         const element = elements[Math.floor(Math.random() * elements.length)];
-        return html.replace("</div>", `${element}</div>`);
+
+        // Insert at a suitable position (before closing tag)
+        const insertPosition = html.lastIndexOf("</div>");
+        return (
+            html.slice(0, insertPosition) +
+            element.html +
+            html.slice(insertPosition)
+        );
+    }
+
+    private addLevelProgression(html: string): string {
+        const progressionElements = [
+            `<div class="game-portal" data-collision="true" style="width: 40px; height: 40px; background: radial-gradient(circle, #4CAF50 0%, transparent 100%); position: absolute; animation: pulse 2s infinite;">
+                <div class="portal-label">Next Level</div>
+            </div>`,
+            `<div class="game-checkpoint" data-collision="true" style="width: 32px; height: 32px; background-color: #2196F3; position: absolute; border-radius: 4px;">
+                <div class="checkpoint-label">Checkpoint</div>
+            </div>`,
+        ];
+
+        const element =
+            progressionElements[
+                Math.floor(Math.random() * progressionElements.length)
+            ];
+        const insertPosition = html.lastIndexOf("</div>");
+        return (
+            html.slice(0, insertPosition) + element + html.slice(insertPosition)
+        );
+    }
+
+    private addCollisionDetection(html: string): string {
+        // Add collision detection to existing game elements if they don't have it
+        return html.replace(
+            /class="(game-player|game-collectible|game-obstacle|game-portal|game-checkpoint)"/g,
+            'class="$1" data-collision="true"'
+        );
     }
 
     private addInteraction(html: string): string {
@@ -678,70 +661,46 @@ export class PatternEvolution extends Service {
         return html.replace(/style="([^"]*)"/, `style="$1 ${layout}"`);
     }
 
-    private addGameElements(html: string): string {
-        const gameElements = [
-            {
-                type: "player",
-                html: `<div class="game-player" style="width: 32px; height: 32px; background-color: rgb(255, 0, 0); position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);" data-speed="5"></div>
-                <div class="game-controls" style="position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; background: rgba(0,0,0,0.1); padding: 10px; border-radius: 8px;">
-                    <button onclick="handleMove('left')" style="width: 40px; height: 40px;">←</button>
-                    <div style="display: flex; flex-direction: column; gap: 5px;">
-                        <button onclick="handleMove('up')" style="width: 40px; height: 40px;">↑</button>
-                        <button onclick="handleMove('down')" style="width: 40px; height: 40px;">↓</button>
-                    </div>
-                    <button onclick="handleMove('right')" style="width: 40px; height: 40px;">→</button>
-                </div>
-                <script>
-                    function handleMove(direction) {
-                        const player = document.querySelector('.game-player');
-                        if (!player) return;
-                        const speed = parseInt(player.dataset.speed) || 5;
-                        switch(direction) {
-                            case 'left': player.style.left = (parseInt(player.style.left || 0) - speed) + 'px'; break;
-                            case 'right': player.style.left = (parseInt(player.style.left || 0) + speed) + 'px'; break;
-                            case 'up': player.style.top = (parseInt(player.style.top || 0) - speed) + 'px'; break;
-                            case 'down': player.style.top = (parseInt(player.style.top || 0) + speed) + 'px'; break;
+    private addGameMechanics(html: string): string {
+        // Add collision detection script
+        const collisionScript = `
+            <script>
+                function checkCollisions() {
+                    const player = document.querySelector('.game-player');
+                    if (!player) return;
+                    const playerRect = player.getBoundingClientRect();
+                    document.querySelectorAll('[data-collision="true"]').forEach(element => {
+                        if (element === player) return;
+                        const elementRect = element.getBoundingClientRect();
+                        if (playerRect.left < elementRect.right && playerRect.right > elementRect.left &&
+                            playerRect.top < elementRect.bottom && playerRect.bottom > elementRect.top) {
+                            element.dispatchEvent(new CustomEvent('collision', { detail: { player } }));
                         }
-                    }
-                    document.addEventListener("keydown", (e) => {
-                        const direction = {
-                            'ArrowLeft': 'left',
-                            'ArrowRight': 'right',
-                            'ArrowUp': 'up',
-                            'ArrowDown': 'down'
-                        }[e.key];
-                        if (direction) handleMove(direction);
                     });
-                </script>`,
-            },
-            {
-                type: "collectible",
-                html: `<div class="game-collectible" style="width: 16px; height: 16px; background-color: rgb(255, 255, 0); position: absolute; border-radius: 50%; animation: float 2s infinite ease-in-out;"></div>`,
-            },
-            {
-                type: "powerup",
-                html: `<div class="game-powerup" style="width: 24px; height: 24px; background-color: rgb(0, 255, 0); position: absolute; border-radius: 50%; animation: pulse 1s infinite;" data-effect="speed" data-duration="5000"></div>`,
-            },
-            {
-                type: "portal",
-                html: `<div class="game-portal" style="width: 40px; height: 60px; background: linear-gradient(to right, #4a00e0, #8e2de2); position: absolute; border-radius: 20px; animation: glow 2s infinite;" data-target-level="2"></div>`,
-            },
-            {
-                type: "checkpoint",
-                html: `<div class="game-checkpoint" style="width: 32px; height: 32px; background-color: rgb(255, 215, 0); position: absolute; border-radius: 4px; animation: pulse 1.5s infinite;" data-checkpoint-id="1"></div>`,
-            },
-        ];
+                }
+                setInterval(checkCollisions, 16);
+            </script>
+        `;
 
         // Add game state management
-        if (!html.includes("gameState")) {
-            html = `<script>
-                const gameState = {
+        const gameStateScript = `
+            <script>
+                window.gameState = {};
+                gameState = {
                     score: 0,
                     health: 100,
-                    level: 1,
                     powerups: [],
+                    level: 1,
                     combo: 0,
-                    checkpoints: [],
+                    updateScore: function(points) {
+                        this.score += points * (this.combo + 1);
+                        document.querySelector('.game-score span').textContent = this.score;
+                    },
+                    updateHealth: function(amount) {
+                        this.health = Math.max(0, Math.min(100, this.health + amount));
+                        document.querySelector('.game-health span').textContent = this.health;
+                        if (this.health <= 0) this.gameOver();
+                    },
                     addPowerup: function(effect, duration) {
                         this.powerups.push({ effect, expires: Date.now() + duration });
                         setTimeout(() => this.removePowerup(effect), duration);
@@ -749,70 +708,111 @@ export class PatternEvolution extends Service {
                     removePowerup: function(effect) {
                         this.powerups = this.powerups.filter(p => p.effect !== effect);
                     },
-                    saveCheckpoint: function() {
-                        this.checkpoints.push({
-                            score: this.score,
-                            health: this.health,
-                            level: this.level,
-                            timestamp: Date.now()
-                        });
+                    gameOver: function() {
+                        document.dispatchEvent(new CustomEvent('gameOver', { detail: { score: this.score } }));
                     }
                 };
+            </script>
+        `;
 
-                // Initialize keyboard controls
+        // Add player controls
+        const controlsHtml = `
+            <div class="game-controls" style="position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); display: flex; gap: 20px;">
+                <button class="control-left" ontouchstart="movePlayer('left')" ontouchend="stopPlayer()">←</button>
+                <button class="control-right" ontouchstart="movePlayer('right')" ontouchend="stopPlayer()">→</button>
+                <button class="control-action" ontouchstart="playerAction()">Action</button>
+            </div>
+            <script>
                 document.addEventListener("keydown", (e) => {
+                    switch(e.key) {
+                        case "ArrowLeft": movePlayer('left'); break;
+                        case "ArrowRight": movePlayer('right'); break;
+                        case " ": playerAction(); break;
+                    }
+                });
+
+                document.addEventListener("keyup", (e) => {
+                    if (["ArrowLeft", "ArrowRight"].includes(e.key)) {
+                        stopPlayer();
+                    }
+                });
+
+                function movePlayer(direction) {
                     const player = document.querySelector('.game-player');
                     if (!player) return;
                     const speed = parseInt(player.dataset.speed) || 5;
-                    switch(e.key) {
-                        case "ArrowLeft": player.style.left = (parseInt(player.style.left || 0) - speed) + 'px'; break;
-                        case "ArrowRight": player.style.left = (parseInt(player.style.left || 0) + speed) + 'px'; break;
-                        case "ArrowUp": player.style.top = (parseInt(player.style.top || 0) - speed) + 'px'; break;
-                        case "ArrowDown": player.style.top = (parseInt(player.style.top || 0) + speed) + 'px'; break;
+                    switch(direction) {
+                        case 'left': player.style.left = (parseInt(player.style.left || 0) - speed) + 'px'; break;
+                        case 'right': player.style.left = (parseInt(player.style.left || 0) + speed) + 'px'; break;
                     }
+                    checkCollisions();
+                }
 
-                    // Check collisions
-                    const powerups = document.querySelectorAll('.game-powerup');
-                    powerups.forEach(powerup => {
-                        if (this.checkCollision(player, powerup)) {
-                            const effect = powerup.dataset.effect;
-                            const duration = parseInt(powerup.dataset.duration);
-                            gameState.addPowerup(effect, duration);
-                            powerup.remove();
-                        }
+                function stopPlayer() {
+                    const player = document.querySelector('.game-player');
+                    if (!player) return;
+                    player.style.transition = 'none';
+                }
+
+                function playerAction() {
+                    const player = document.querySelector('.game-player');
+                    if (!player) return;
+                    player.dispatchEvent(new CustomEvent('action'));
+                    checkCollisions();
+                }
+            </script>
+        `;
+
+        // Add power-up element
+        const powerupHtml = `
+            <div class="game-powerup" data-collision="true" data-effect="speed" data-duration="5000" style="width: 16px; height: 16px; background-color: rgb(255, 255, 0); position: absolute; border-radius: 50%; animation: float 2s infinite ease-in-out;">
+                <script>
+                    this.addEventListener('collision', () => {
+                        gameState.addPowerup(this.dataset.effect, parseInt(this.dataset.duration));
+                        this.remove();
                     });
+                </script>
+            </div>
+        `;
 
-                    // Check portals
-                    const portals = document.querySelectorAll('.game-portal');
-                    portals.forEach(portal => {
-                        if (this.checkCollision(player, portal)) {
-                            gameState.level = parseInt(portal.dataset.targetLevel);
-                            gameState.saveCheckpoint();
-                        }
+        // Add level progression elements
+        const portalHtml = `
+            <div class="game-portal" data-collision="true" data-next-level="true" style="width: 48px; height: 48px; background: linear-gradient(45deg, #00f, #f0f); border-radius: 50%; animation: pulse 2s infinite;">
+                <script>
+                    this.addEventListener('collision', () => {
+                        gameState.level++;
+                        document.dispatchEvent(new CustomEvent('nextLevel'));
                     });
-                });
-            </script>${html}`;
-        }
+                </script>
+            </div>
+        `;
 
-        // Add random game elements
-        const numElements = Math.floor(Math.random() * 3) + 1;
-        for (let i = 0; i < numElements; i++) {
-            const element =
-                gameElements[Math.floor(Math.random() * gameElements.length)];
-            html = html.replace("</div>", `${element.html}</div>`);
-        }
+        const checkpointHtml = `
+            <div class="game-checkpoint" data-collision="true" data-save-point="true" style="width: 32px; height: 32px; background-color: #2196F3; position: absolute; border-radius: 4px;">
+                <script>
+                    this.addEventListener('collision', () => {
+                        localStorage.setItem('checkpoint', JSON.stringify({
+                            position: document.querySelector('.game-player').style.left,
+                            score: gameState.score,
+                            health: gameState.health,
+                            level: gameState.level
+                        }));
+                    });
+                </script>
+            </div>
+        `;
 
-        return html;
-    }
-
-    private checkCollision(el1: Element, el2: Element): boolean {
-        const rect1 = el1.getBoundingClientRect();
-        const rect2 = el2.getBoundingClientRect();
-        return !(
-            rect1.right < rect2.left ||
-            rect1.left > rect2.right ||
-            rect1.bottom < rect2.top ||
-            rect1.top > rect2.bottom
+        // Insert all elements before closing body tag
+        const insertPosition = html.lastIndexOf("</div>");
+        return (
+            html.slice(0, insertPosition) +
+            collisionScript +
+            gameStateScript +
+            controlsHtml +
+            powerupHtml +
+            portalHtml +
+            checkpointHtml +
+            html.slice(insertPosition)
         );
     }
 }
