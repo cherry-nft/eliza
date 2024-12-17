@@ -7,22 +7,32 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  TextField,
   Button,
   Grid
 } from '@mui/material';
+import { GamePattern } from '../../../src/types/patterns';
 
 interface ControlsProps {
   onEvolve?: () => void;
   onReset?: () => void;
   onParameterChange?: (param: string, value: any) => void;
+  selectedPattern?: GamePattern | null;
 }
 
 const Controls: React.FC<ControlsProps> = ({
   onEvolve,
   onReset,
   onParameterChange = () => {},
+  selectedPattern
 }) => {
+  const patternTypes = [
+    'animation',
+    'layout',
+    'interaction',
+    'style',
+    'game_mechanic'
+  ] as const;
+
   return (
     <Box>
       <Typography variant="h6" gutterBottom>
@@ -35,13 +45,18 @@ const Controls: React.FC<ControlsProps> = ({
           <FormControl fullWidth>
             <InputLabel>Pattern Type</InputLabel>
             <Select
-              value="animation"
-              onChange={(e) => onParameterChange('type', e.target.value)}
+              value={patternTypes.includes(selectedPattern?.type as any) ? selectedPattern?.type : 'style'}
+              onChange={(e) => {
+                console.log('Pattern type changed:', e.target.value);
+                onParameterChange('type', e.target.value);
+              }}
+              label="Pattern Type"
             >
-              <MenuItem value="animation">Animation</MenuItem>
-              <MenuItem value="layout">Layout</MenuItem>
-              <MenuItem value="interaction">Interaction</MenuItem>
-              <MenuItem value="style">Style</MenuItem>
+              {patternTypes.map((type) => (
+                <MenuItem key={type} value={type}>
+                  {type.charAt(0).toUpperCase() + type.slice(1).replace('_', ' ')}
+                </MenuItem>
+              ))}
             </Select>
           </FormControl>
         </Grid>
