@@ -281,4 +281,111 @@ describe("PatternEvolution", () => {
             expect(mockStaging.validatePattern).toHaveBeenCalled();
         });
     });
+
+    describe("game mechanics", () => {
+        it("should add game elements with collision detection", async () => {
+            mockVectorDb.findSimilarPatterns.mockResolvedValueOnce([]);
+            mockStaging.validatePattern.mockImplementation(
+                async (pattern) => pattern
+            );
+
+            const result = await evolution.evolvePattern(mockPattern, {
+                populationSize: 4,
+                generationLimit: 2,
+                mutationRate: 1, // Force mutations
+            });
+
+            // Check for collision-enabled elements
+            expect(result.pattern.content.html).toMatch(
+                /data-collision="true"/
+            );
+            expect(result.pattern.content.html).toMatch(
+                /getBoundingClientRect/
+            );
+        });
+
+        it("should add player controls", async () => {
+            mockVectorDb.findSimilarPatterns.mockResolvedValueOnce([]);
+            mockStaging.validatePattern.mockImplementation(
+                async (pattern) => pattern
+            );
+
+            const result = await evolution.evolvePattern(mockPattern, {
+                populationSize: 4,
+                generationLimit: 2,
+                mutationRate: 1,
+            });
+
+            // Check for keyboard and touch controls
+            expect(result.pattern.content.html).toMatch(
+                /document\.addEventListener\("keydown"/
+            );
+            expect(result.pattern.content.html).toMatch(
+                /class="game-controls"/
+            );
+        });
+
+        it("should add power-ups and game state management", async () => {
+            mockVectorDb.findSimilarPatterns.mockResolvedValueOnce([]);
+            mockStaging.validatePattern.mockImplementation(
+                async (pattern) => pattern
+            );
+
+            const result = await evolution.evolvePattern(mockPattern, {
+                populationSize: 4,
+                generationLimit: 2,
+                mutationRate: 1,
+            });
+
+            // Check for power-ups and game state
+            expect(result.pattern.content.html).toMatch(/class="game-powerup/);
+            expect(result.pattern.content.html).toMatch(/gameState\s*=/);
+            expect(result.pattern.content.html).toMatch(
+                /updateScore|updateHealth/
+            );
+        });
+
+        it("should add level progression elements", async () => {
+            mockVectorDb.findSimilarPatterns.mockResolvedValueOnce([]);
+            mockStaging.validatePattern.mockImplementation(
+                async (pattern) => pattern
+            );
+
+            const result = await evolution.evolvePattern(mockPattern, {
+                populationSize: 4,
+                generationLimit: 2,
+                mutationRate: 1,
+            });
+
+            // Check for level elements
+            expect(result.pattern.content.html).toMatch(
+                /class="game-portal"|class="game-checkpoint"/
+            );
+            expect(result.pattern.content.html).toMatch(
+                /data-next-level="true"|data-save-point="true"/
+            );
+        });
+
+        it("should maintain game state across mutations", async () => {
+            mockVectorDb.findSimilarPatterns.mockResolvedValueOnce([]);
+            mockStaging.validatePattern.mockImplementation(
+                async (pattern) => pattern
+            );
+
+            const result = await evolution.evolvePattern(mockPattern, {
+                populationSize: 4,
+                generationLimit: 2,
+                mutationRate: 1,
+            });
+
+            // Check for game state persistence
+            expect(result.pattern.content.html).toMatch(/gameState/);
+            expect(result.pattern.content.html).toMatch(
+                /score|health|level|powerups|combo/
+            );
+            expect(result.pattern.content.html).toMatch(
+                /updateScore|updateHealth|addPowerup|removePowerup/
+            );
+        });
+    });
 });
