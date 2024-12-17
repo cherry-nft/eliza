@@ -57,6 +57,7 @@ describe("VectorDatabase", () => {
 
         // Initialize database
         db = new VectorDatabase();
+        await db.initialize(mockRuntime);
     });
 
     afterEach(() => {
@@ -66,15 +67,11 @@ describe("VectorDatabase", () => {
 
     describe("Eliza Infrastructure Integration", () => {
         it("should use runtime's embedding cache", async () => {
-            await db.initialize(mockRuntime);
             expect(mockRuntime.getEmbeddingCache).toHaveBeenCalled();
             expect(mockRuntime.getVectorOperations).toHaveBeenCalled();
         });
 
         it("should initialize vector operations", async () => {
-            // Re-initialize to verify the call
-            await db.initialize(mockRuntime);
-
             expect(mockVectorOps.initialize).toHaveBeenCalledWith(
                 expect.objectContaining({
                     tableName: "game_patterns",
@@ -348,6 +345,4 @@ describe("VectorDatabase", () => {
             expect(results[0].similarity).toBeGreaterThan(0.9);
         });
     });
-
-    // ... rest of the test suites ...
 });
