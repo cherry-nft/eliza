@@ -369,6 +369,11 @@ export class PatternEvolution extends Service {
             usage_count: 0,
         };
 
+        // Add game mechanics to the offspring
+        newPattern.content.html = this.addGameMechanics(
+            newPattern.content.html
+        );
+
         // Validate through staging service
         return await this.staging.validatePattern(newPattern);
     }
@@ -376,9 +381,27 @@ export class PatternEvolution extends Service {
     private async crossoverContent(content1: any, content2: any): Promise<any> {
         if (!content1 || !content2) return content1 || content2;
 
+        // Extract elements from both parents
+        const elements1 = content1.html.match(/<div[^>]*>.*?<\/div>/gs) || [];
+        const elements2 = content2.html.match(/<div[^>]*>.*?<\/div>/gs) || [];
+
+        // Combine elements from both parents
+        const combinedElements = [...elements1, ...elements2];
+
+        // Select a random subset of elements
+        const selectedElements = combinedElements
+            .sort(() => Math.random() - 0.5)
+            .slice(0, Math.floor((elements1.length + elements2.length) / 2));
+
+        // Combine CSS rules and animations
+        const css1 = content1.css || "";
+        const css2 = content2.css || "";
+        const combinedCss = this.crossoverCss(css1, css2);
+
+        // Create new content
         const newContent = {
-            html: this.crossoverHtml(content1.html, content2.html),
-            css: this.crossoverCss(content1.css, content2.css),
+            html: `<div class="container">${selectedElements.join("\n")}</div>`,
+            css: combinedCss,
             context: content1.context,
             metadata: { ...content1.metadata },
         };
@@ -392,26 +415,10 @@ export class PatternEvolution extends Service {
             });
         }
 
+        // Add game mechanics
+        newContent.html = this.addGameMechanics(newContent.html);
+
         return newContent;
-    }
-
-    private crossoverHtml(html1: string, html2: string): string {
-        if (!html1 || !html2) return html1 || html2;
-
-        // Extract elements from both parents
-        const elements1 = html1.match(/<div[^>]*>.*?<\/div>/gs) || [];
-        const elements2 = html2.match(/<div[^>]*>.*?<\/div>/gs) || [];
-
-        // Combine elements from both parents
-        const combinedElements = [...elements1, ...elements2];
-
-        // Select a random subset of elements
-        const selectedElements = combinedElements
-            .sort(() => Math.random() - 0.5)
-            .slice(0, Math.floor((elements1.length + elements2.length) / 2));
-
-        // Wrap in a container
-        return `<div class="container">${selectedElements.join("\n")}</div>`;
     }
 
     private crossoverCss(css1: string, css2: string): string {
@@ -520,23 +527,23 @@ export class PatternEvolution extends Service {
         const elements = [
             {
                 type: "player",
-                html: `<div class="game-player" data-collision="true" style="width: 32px; height: 32px; background-color: rgb(255, 0, 0); position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);"></div>`,
+                html: `<div class="game-player" data-collision="true" style="width: 32px; height: 32px; background-color: rgb(255, 0, 0); position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);" data-speed="5"></div>`,
             },
             {
                 type: "collectible",
-                html: `<div class="game-collectible" data-collision="true" style="width: 16px; height: 16px; background-color: rgb(255, 255, 0); position: absolute; border-radius: 50%; animation: float 2s infinite ease-in-out;"></div>`,
+                html: `<div class="game-collectible" data-collision="true" style="width: 16px; height: 16px; background-color: rgb(255, 255, 0); position: absolute; border-radius: 50%; animation: float 2s infinite ease-in-out;" data-points="10"></div>`,
             },
             {
                 type: "obstacle",
-                html: `<div class="game-obstacle" data-collision="true" style="width: 24px; height: 24px; background-color: rgb(255, 0, 0); position: absolute;"></div>`,
+                html: `<div class="game-obstacle" data-collision="true" style="width: 24px; height: 24px; background-color: rgb(255, 0, 0); position: absolute;" data-damage="20"></div>`,
             },
             {
                 type: "portal",
-                html: `<div class="game-portal" data-collision="true" style="width: 40px; height: 40px; background: radial-gradient(circle, #4CAF50 0%, transparent 100%); position: absolute; animation: pulse 2s infinite;"></div>`,
+                html: `<div class="game-portal" data-collision="true" style="width: 40px; height: 40px; background: radial-gradient(circle, #4CAF50 0%, transparent 100%); position: absolute; animation: pulse 2s infinite;" data-next-level="true"></div>`,
             },
             {
                 type: "checkpoint",
-                html: `<div class="game-checkpoint" data-collision="true" style="width: 32px; height: 32px; background-color: #2196F3; position: absolute; border-radius: 4px;"></div>`,
+                html: `<div class="game-checkpoint" data-collision="true" style="width: 32px; height: 32px; background-color: #2196F3; position: absolute; border-radius: 4px;" data-save-point="true"></div>`,
             },
         ];
 
@@ -685,8 +692,7 @@ export class PatternEvolution extends Service {
         // Add game state management
         const gameStateScript = `
             <script>
-                window.gameState = {};
-                gameState = {
+                window.gameState = {
                     score: 0,
                     health: 100,
                     powerups: [],
@@ -704,14 +710,32 @@ export class PatternEvolution extends Service {
                     addPowerup: function(effect, duration) {
                         this.powerups.push({ effect, expires: Date.now() + duration });
                         setTimeout(() => this.removePowerup(effect), duration);
+                        document.dispatchEvent(new CustomEvent('powerupAdded', { detail: { effect, duration } }));
                     },
                     removePowerup: function(effect) {
                         this.powerups = this.powerups.filter(p => p.effect !== effect);
+                        document.dispatchEvent(new CustomEvent('powerupRemoved', { detail: { effect } }));
+                    },
+                    hasPowerup: function(effect) {
+                        return this.powerups.some(p => p.effect === effect && p.expires > Date.now());
                     },
                     gameOver: function() {
                         document.dispatchEvent(new CustomEvent('gameOver', { detail: { score: this.score } }));
                     }
                 };
+
+                // Initialize game state display
+                document.addEventListener('DOMContentLoaded', () => {
+                    const scoreDisplay = document.createElement('div');
+                    scoreDisplay.className = 'game-score';
+                    scoreDisplay.innerHTML = '<span>0</span>';
+                    document.body.appendChild(scoreDisplay);
+
+                    const healthDisplay = document.createElement('div');
+                    healthDisplay.className = 'game-health';
+                    healthDisplay.innerHTML = '<span>100</span>';
+                    document.body.appendChild(healthDisplay);
+                });
             </script>
         `;
 
@@ -767,9 +791,10 @@ export class PatternEvolution extends Service {
         const powerupHtml = `
             <div class="game-powerup" data-collision="true" data-effect="speed" data-duration="5000" style="width: 16px; height: 16px; background-color: rgb(255, 255, 0); position: absolute; border-radius: 50%; animation: float 2s infinite ease-in-out;">
                 <script>
-                    this.addEventListener('collision', () => {
-                        gameState.addPowerup(this.dataset.effect, parseInt(this.dataset.duration));
-                        this.remove();
+                    document.querySelector('.game-powerup').addEventListener('collision', (e) => {
+                        const powerup = e.target;
+                        window.gameState.powerups.push({ effect: powerup.dataset.effect, expires: Date.now() + parseInt(powerup.dataset.duration) });
+                        powerup.remove();
                     });
                 </script>
             </div>
@@ -779,9 +804,9 @@ export class PatternEvolution extends Service {
         const portalHtml = `
             <div class="game-portal" data-collision="true" data-next-level="true" style="width: 48px; height: 48px; background: linear-gradient(45deg, #00f, #f0f); border-radius: 50%; animation: pulse 2s infinite;">
                 <script>
-                    this.addEventListener('collision', () => {
-                        gameState.level++;
-                        document.dispatchEvent(new CustomEvent('nextLevel'));
+                    document.querySelector('.game-portal').addEventListener('collision', () => {
+                        window.gameState.level++;
+                        document.dispatchEvent(new CustomEvent('nextLevel', { detail: { level: window.gameState.level } }));
                     });
                 </script>
             </div>
@@ -790,13 +815,14 @@ export class PatternEvolution extends Service {
         const checkpointHtml = `
             <div class="game-checkpoint" data-collision="true" data-save-point="true" style="width: 32px; height: 32px; background-color: #2196F3; position: absolute; border-radius: 4px;">
                 <script>
-                    this.addEventListener('collision', () => {
+                    document.querySelector('.game-checkpoint').addEventListener('collision', () => {
                         localStorage.setItem('checkpoint', JSON.stringify({
                             position: document.querySelector('.game-player').style.left,
-                            score: gameState.score,
-                            health: gameState.health,
-                            level: gameState.level
+                            score: window.gameState.score,
+                            health: window.gameState.health,
+                            level: window.gameState.level
                         }));
+                        document.dispatchEvent(new CustomEvent('checkpoint', { detail: { saved: true } }));
                     });
                 </script>
             </div>

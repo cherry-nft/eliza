@@ -285,9 +285,14 @@ describe("PatternEvolution", () => {
     describe("game mechanics", () => {
         it("should add game elements with collision detection", async () => {
             mockVectorDb.findSimilarPatterns.mockResolvedValueOnce([]);
-            mockStaging.validatePattern.mockImplementation(
-                async (pattern) => pattern
-            );
+            mockStaging.validatePattern.mockImplementation(async (pattern) => {
+                // Ensure collision detection is added
+                const html = pattern.content.html;
+                expect(html).toMatch(/data-collision="true"/);
+                expect(html).toMatch(/checkCollisions\(\)/);
+                expect(html).toMatch(/getBoundingClientRect/);
+                return pattern;
+            });
 
             const result = await evolution.evolvePattern(mockPattern, {
                 populationSize: 4,
@@ -295,20 +300,28 @@ describe("PatternEvolution", () => {
                 mutationRate: 1, // Force mutations
             });
 
-            // Check for collision-enabled elements
+            // Verify collision detection implementation
             expect(result.pattern.content.html).toMatch(
-                /data-collision="true"/
+                /setInterval\(checkCollisions/
             );
             expect(result.pattern.content.html).toMatch(
-                /getBoundingClientRect/
+                /collision.*detail.*player/
+            );
+            expect(result.pattern.content.html).toMatch(
+                /class="game-player".*data-collision="true"/
             );
         });
 
         it("should add player controls", async () => {
             mockVectorDb.findSimilarPatterns.mockResolvedValueOnce([]);
-            mockStaging.validatePattern.mockImplementation(
-                async (pattern) => pattern
-            );
+            mockStaging.validatePattern.mockImplementation(async (pattern) => {
+                // Ensure player controls are added
+                const html = pattern.content.html;
+                expect(html).toMatch(/document\.addEventListener\("keydown"/);
+                expect(html).toMatch(/class="game-controls"/);
+                expect(html).toMatch(/movePlayer\(/);
+                return pattern;
+            });
 
             const result = await evolution.evolvePattern(mockPattern, {
                 populationSize: 4,
@@ -316,20 +329,29 @@ describe("PatternEvolution", () => {
                 mutationRate: 1,
             });
 
-            // Check for keyboard and touch controls
+            // Verify player controls implementation
             expect(result.pattern.content.html).toMatch(
-                /document\.addEventListener\("keydown"/
+                /ArrowLeft|ArrowRight|ArrowUp|ArrowDown/
             );
             expect(result.pattern.content.html).toMatch(
-                /class="game-controls"/
+                /ontouchstart="movePlayer/
             );
+            expect(result.pattern.content.html).toMatch(
+                /class="control-left"|class="control-right"/
+            );
+            expect(result.pattern.content.html).toMatch(/playerAction\(\)/);
         });
 
         it("should add power-ups and game state management", async () => {
             mockVectorDb.findSimilarPatterns.mockResolvedValueOnce([]);
-            mockStaging.validatePattern.mockImplementation(
-                async (pattern) => pattern
-            );
+            mockStaging.validatePattern.mockImplementation(async (pattern) => {
+                // Ensure power-ups and game state are added
+                const html = pattern.content.html;
+                expect(html).toMatch(/class="game-powerup"/);
+                expect(html).toMatch(/window\.gameState\s*=/);
+                expect(html).toMatch(/addPowerup|removePowerup/);
+                return pattern;
+            });
 
             const result = await evolution.evolvePattern(mockPattern, {
                 populationSize: 4,
@@ -337,9 +359,12 @@ describe("PatternEvolution", () => {
                 mutationRate: 1,
             });
 
-            // Check for power-ups and game state
-            expect(result.pattern.content.html).toMatch(/class="game-powerup/);
-            expect(result.pattern.content.html).toMatch(/gameState\s*=/);
+            // Verify power-up system implementation
+            expect(result.pattern.content.html).toMatch(/data-effect="speed"/);
+            expect(result.pattern.content.html).toMatch(
+                /data-duration="[0-9]+"/
+            );
+            expect(result.pattern.content.html).toMatch(/gameState\.powerups/);
             expect(result.pattern.content.html).toMatch(
                 /updateScore|updateHealth/
             );
@@ -347,9 +372,17 @@ describe("PatternEvolution", () => {
 
         it("should add level progression elements", async () => {
             mockVectorDb.findSimilarPatterns.mockResolvedValueOnce([]);
-            mockStaging.validatePattern.mockImplementation(
-                async (pattern) => pattern
-            );
+            mockStaging.validatePattern.mockImplementation(async (pattern) => {
+                // Ensure level progression elements are added
+                const html = pattern.content.html;
+                expect(html).toMatch(
+                    /class="game-portal"|class="game-checkpoint"/
+                );
+                expect(html).toMatch(
+                    /data-next-level="true"|data-save-point="true"/
+                );
+                return pattern;
+            });
 
             const result = await evolution.evolvePattern(mockPattern, {
                 populationSize: 4,
@@ -357,20 +390,23 @@ describe("PatternEvolution", () => {
                 mutationRate: 1,
             });
 
-            // Check for level elements
+            // Verify level progression implementation
+            expect(result.pattern.content.html).toMatch(/gameState\.level/);
+            expect(result.pattern.content.html).toMatch(/nextLevel|checkpoint/);
             expect(result.pattern.content.html).toMatch(
-                /class="game-portal"|class="game-checkpoint"/
-            );
-            expect(result.pattern.content.html).toMatch(
-                /data-next-level="true"|data-save-point="true"/
+                /localStorage\.setItem/
             );
         });
 
         it("should maintain game state across mutations", async () => {
             mockVectorDb.findSimilarPatterns.mockResolvedValueOnce([]);
-            mockStaging.validatePattern.mockImplementation(
-                async (pattern) => pattern
-            );
+            mockStaging.validatePattern.mockImplementation(async (pattern) => {
+                // Ensure game state is maintained
+                const html = pattern.content.html;
+                expect(html).toMatch(/window\.gameState/);
+                expect(html).toMatch(/score|health|level|powerups|combo/);
+                return pattern;
+            });
 
             const result = await evolution.evolvePattern(mockPattern, {
                 populationSize: 4,
@@ -378,14 +414,48 @@ describe("PatternEvolution", () => {
                 mutationRate: 1,
             });
 
-            // Check for game state persistence
-            expect(result.pattern.content.html).toMatch(/gameState/);
+            // Verify game state persistence
             expect(result.pattern.content.html).toMatch(
-                /score|health|level|powerups|combo/
+                /gameState\s*=\s*{[^}]*score/
             );
             expect(result.pattern.content.html).toMatch(
-                /updateScore|updateHealth|addPowerup|removePowerup/
+                /updateScore:\s*function/
             );
+            expect(result.pattern.content.html).toMatch(
+                /updateHealth:\s*function/
+            );
+            expect(result.pattern.content.html).toMatch(
+                /addPowerup:\s*function/
+            );
+            expect(result.pattern.content.html).toMatch(
+                /removePowerup:\s*function/
+            );
+            expect(result.pattern.content.html).toMatch(/gameOver:\s*function/);
+        });
+
+        it("should properly handle game events and collisions", async () => {
+            mockVectorDb.findSimilarPatterns.mockResolvedValueOnce([]);
+            mockStaging.validatePattern.mockImplementation(async (pattern) => {
+                // Ensure event handling is implemented
+                const html = pattern.content.html;
+                expect(html).toMatch(
+                    /addEventListener\(['"](collision|gameOver|nextLevel)/
+                );
+                expect(html).toMatch(/dispatchEvent\(new\s+CustomEvent/);
+                return pattern;
+            });
+
+            const result = await evolution.evolvePattern(mockPattern, {
+                populationSize: 4,
+                generationLimit: 2,
+                mutationRate: 1,
+            });
+
+            // Verify event handling implementation
+            expect(result.pattern.content.html).toMatch(/checkCollisions\(\)/);
+            expect(result.pattern.content.html).toMatch(/collision.*detail/);
+            expect(result.pattern.content.html).toMatch(/gameOver.*detail/);
+            expect(result.pattern.content.html).toMatch(/nextLevel.*detail/);
         });
     });
 });
