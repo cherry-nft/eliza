@@ -19,96 +19,13 @@ config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-async function testEmbeddingGeneration() {
-    console.log("[Test] Starting embedding generation test...");
+async function testServerIntegration() {
+    console.log("[Test] Starting full server integration test...");
+    console.log("[Test] Node version:", process.version);
+    console.log("[Test] Current working directory:", process.cwd());
 
     try {
-        // Load a single pattern from patterns.json
-        const patternsPath = path.join(
-            __dirname,
-            "../../../src/data/patterns.json"
-        );
-        const patterns = JSON.parse(readFileSync(patternsPath, "utf-8"));
-        const sourcePattern = patterns[0]; // Use the first pattern
-
-        // Mock storage for patterns
-        const storedPatterns = new Map<string, any>();
-
-        // Initialize runtime dependencies with proper mocks
-        const databaseAdapter = {
-            query: async (sql: string, params?: any[]) => {
-                console.log("[Database] Executing query:", sql);
-                if (params) {
-                    console.log("[Database] With params:", params);
-                }
-                return { rows: [] };
-            },
-            transaction: async (callback: (client: any) => Promise<void>) => {
-                return callback(databaseAdapter);
-            },
-            createMemory: async (memory: any) => {
-                console.log("[Database] Creating memory:", memory);
-                storedPatterns.set(memory.id, memory);
-                return memory;
-            },
-            getMemory: async (id: string) => {
-                console.log("[Database] Getting memory:", id);
-                return storedPatterns.get(id) || null;
-            },
-            updateMemory: async (memory: any) => {
-                console.log("[Database] Updating memory:", memory);
-                storedPatterns.set(memory.id, memory);
-            },
-            deleteMemory: async (id: string) => {
-                console.log("[Database] Deleting memory:", id);
-                storedPatterns.delete(id);
-            },
-            searchMemories: async (params: any) => {
-                console.log("[Database] Searching memories:", params);
-                return Array.from(storedPatterns.values());
-            },
-            searchMemoriesByEmbedding: async (
-                embedding: number[],
-                params: any
-            ) => {
-                console.log("[Database] Searching by embedding");
-                return Array.from(storedPatterns.values());
-            },
-        } as unknown as DatabaseAdapter<any>;
-
-        const memoryManager = {
-            createMemory: async (memory: any) => {
-                console.log("[MemoryManager] Creating memory:", memory);
-                storedPatterns.set(memory.id, memory);
-                return memory;
-            },
-            getMemory: async (id: string) => {
-                console.log("[MemoryManager] Getting memory:", id);
-                return storedPatterns.get(id) || null;
-            },
-            updateMemory: async (memory: any) => {
-                console.log("[MemoryManager] Updating memory:", memory);
-                storedPatterns.set(memory.id, memory);
-            },
-            deleteMemory: async (id: string) => {
-                console.log("[MemoryManager] Deleting memory:", id);
-                storedPatterns.delete(id);
-            },
-            searchMemories: async (params: any) => {
-                console.log("[MemoryManager] Searching memories:", params);
-                return Array.from(storedPatterns.values());
-            },
-            searchMemoriesByEmbedding: async (
-                embedding: number[],
-                params: any
-            ) => {
-                console.log("[MemoryManager] Searching by embedding");
-                return Array.from(storedPatterns.values());
-            },
-            databaseAdapter,
-        } as unknown as MemoryManager;
-
-        // Initialize vector operations with OpenAI
+        // Initialize runtime with real vector operations
         const vectorOperations = {
             async initialize(config: any) {
                 console.log("[VectorOps] Initializing with config:", config);
@@ -160,9 +77,88 @@ async function testEmbeddingGeneration() {
             },
         };
 
+        // Initialize in-memory storage
+        const storedPatterns = new Map<string, any>();
+
+        // Create memory manager with storage
+        const memoryManager = {
+            runtime: null as any,
+            tableName: "game_patterns",
+            initialize: async () => {},
+            createMemory: async (memory: any) => {
+                console.log("[MemoryManager] Creating memory:", memory.id);
+                storedPatterns.set(memory.id, memory);
+            },
+            getMemory: async (id: string, tableName?: string) => {
+                console.log("[MemoryManager] Getting memory:", id);
+                return storedPatterns.get(id) || null;
+            },
+            updateMemory: async (memory: any) => {
+                console.log("[MemoryManager] Updating memory:", memory.id);
+                storedPatterns.set(memory.id, memory);
+            },
+            deleteMemory: async (id: string, tableName?: string) => {
+                console.log("[MemoryManager] Deleting memory:", id);
+                storedPatterns.delete(id);
+            },
+            getMemories: async ({
+                tableName,
+                filter,
+                count = 10,
+                unique = true,
+            }) => {
+                console.log(
+                    "[MemoryManager] Getting memories with filter:",
+                    filter
+                );
+                return Array.from(storedPatterns.values()).slice(0, count);
+            },
+            searchMemoriesByEmbedding: async (
+                embedding: number[],
+                opts?: any
+            ) => {
+                console.log(
+                    "[MemoryManager] Searching by embedding, threshold:",
+                    opts?.match_threshold
+                );
+                return Array.from(storedPatterns.values()).map((memory) => ({
+                    ...memory,
+                    similarity: 0.9,
+                }));
+            },
+            countMemories: async (roomId: string, unique?: boolean) =>
+                storedPatterns.size,
+            addEmbeddingToMemory: async (memory: any) => memory,
+            getCachedEmbeddings: async (content: string) => [],
+            getMemoryById: async (id: string) => storedPatterns.get(id) || null,
+            getMemoriesByRoomIds: async ({
+                roomIds,
+            }: {
+                roomIds: string[];
+            }) => {
+                return Array.from(storedPatterns.values()).filter((memory) =>
+                    roomIds.includes(memory.roomId)
+                );
+            },
+            removeMemory: async (memoryId: string) => {
+                storedPatterns.delete(memoryId);
+            },
+            removeAllMemories: async (roomId: string) => {
+                for (const [id, memory] of storedPatterns.entries()) {
+                    if (memory.roomId === roomId) {
+                        storedPatterns.delete(id);
+                    }
+                }
+            },
+        };
+
         // Create runtime
         const runtime: IAgentRuntime & { logger: typeof elizaLogger } = {
-            databaseAdapter,
+            databaseAdapter: {
+                query: async () => ({ rows: [] }),
+                transaction: async (callback) =>
+                    callback({ query: async () => ({ rows: [] }) }),
+            } as unknown as DatabaseAdapter<any>,
             embeddingCache: {
                 get: async () => null,
                 set: async () => {},
@@ -179,6 +175,9 @@ async function testEmbeddingGeneration() {
             },
         };
 
+        // Set runtime reference
+        memoryManager.runtime = runtime;
+
         // Initialize VectorDatabase
         console.log("\n[Test] Initializing VectorDatabase...");
         const vectorDb = new VectorDatabase();
@@ -192,61 +191,85 @@ async function testEmbeddingGeneration() {
         }
         console.log("[Test] Database health check passed");
 
-        // Prepare text for embedding
-        const textToEmbed = [
-            sourcePattern.pattern_name,
-            sourcePattern.type,
-            sourcePattern.content.context,
-            Array.isArray(sourcePattern.content.implementation.html)
-                ? sourcePattern.content.implementation.html.join("\n")
-                : sourcePattern.content.implementation.html,
-        ].join("\n");
+        // Initialize ClaudeService
+        console.log("\n[Test] Initializing ClaudeService...");
+        const claudeService = new ClaudeService(vectorDb);
+        console.log("[Test] ClaudeService initialized successfully");
 
-        console.log("\n[Test] Pattern selected for embedding test:");
-        console.log("Name:", sourcePattern.pattern_name);
-        console.log("Type:", sourcePattern.type);
-        console.log("Context:", sourcePattern.content.context);
+        // Test 1: Generate a new pattern
+        console.log("\n[Test] Testing pattern generation...");
+        const testPrompt =
+            "Create a simple button that pulses with a subtle glow effect when hovered";
+        const generatedPattern =
+            await claudeService.generatePattern(testPrompt);
+        console.log("[Test] Pattern generated successfully");
+        console.log("Pattern structure:", {
+            title: generatedPattern.title,
+            description: generatedPattern.description,
+            htmlLength: generatedPattern.html?.length || 0,
+            hasPlan: !!generatedPattern.plan,
+        });
 
-        // Generate embedding
-        console.log("\n[Test] Attempting to generate embedding...");
-        const embedding = await vectorOperations.generateEmbedding(textToEmbed);
-        console.log("[Test] Embedding generated successfully!");
-        console.log("Embedding dimension:", embedding.length);
-        console.log("First 5 values:", embedding.slice(0, 5));
-
-        // Create test pattern with embedding
-        const testPattern = {
-            id: randomUUID(),
-            type: sourcePattern.type,
-            pattern_name: sourcePattern.pattern_name,
-            content: sourcePattern.content,
-            embedding: embedding,
-            effectiveness_score: 0.0,
+        // Test 2: Store the generated pattern
+        console.log("\n[Test] Testing pattern storage...");
+        const patternId = randomUUID();
+        const gamePattern = {
+            id: patternId,
+            type: "ui",
+            pattern_name: generatedPattern.title,
+            content: {
+                html: generatedPattern.html,
+                css: generatedPattern.css || [],
+                javascript: generatedPattern.javascript || [],
+            },
+            embedding: await vectorDb.generateEmbedding(
+                generatedPattern.html || ""
+            ),
+            effectiveness_score: 0.8,
             usage_count: 0,
         };
 
-        // Store pattern
-        console.log("\n[Test] Attempting to store pattern...");
-        console.log("Pattern ID:", testPattern.id);
-        console.log("Embedding dimension:", testPattern.embedding.length);
-
-        await vectorDb.storePattern(testPattern);
+        await vectorDb.storePattern(gamePattern);
         console.log("[Test] Pattern stored successfully");
 
-        // Verify storage
-        console.log("\n[Test] Verifying pattern storage...");
-        const storedPattern = await vectorDb.getPatternById(testPattern.id);
-        if (!storedPattern) {
+        // Test 3: Retrieve the stored pattern
+        console.log("\n[Test] Testing pattern retrieval...");
+        const retrievedPattern = await vectorDb.getPatternById(patternId);
+        if (!retrievedPattern) {
             throw new Error("Failed to retrieve stored pattern");
         }
         console.log("[Test] Pattern retrieved successfully");
-        console.log("Retrieved pattern ID:", storedPattern.id);
-        console.log(
-            "Retrieved embedding dimension:",
-            storedPattern.embedding.length
-        );
+        console.log("Retrieved pattern:", {
+            id: retrievedPattern.id,
+            name: retrievedPattern.pattern_name,
+            type: retrievedPattern.type,
+        });
 
-        console.log("\n[Test] All tests completed successfully!");
+        // Test 4: Find similar patterns
+        console.log("\n[Test] Testing similar pattern search...");
+        const similarPatterns = await vectorDb.findSimilarPatterns(
+            retrievedPattern.embedding,
+            retrievedPattern.type,
+            0.85,
+            5
+        );
+        console.log("[Test] Found similar patterns:", similarPatterns.length);
+
+        // Test 5: Generate a pattern with reference to existing patterns
+        console.log("\n[Test] Testing pattern generation with references...");
+        const enhancedPrompt =
+            "Create a button similar to the previous one but with a rainbow gradient effect";
+        const enhancedPattern =
+            await claudeService.generatePattern(enhancedPrompt);
+        console.log("[Test] Enhanced pattern generated successfully");
+        console.log("Enhanced pattern structure:", {
+            title: enhancedPattern.title,
+            description: enhancedPattern.description,
+            htmlLength: enhancedPattern.html?.length || 0,
+            hasPlan: !!enhancedPattern.plan,
+        });
+
+        console.log("\n[Test] All tests completed successfully! 🎉");
         process.exit(0);
     } catch (error) {
         console.error("\n[Test] Test failed:", error);
@@ -255,7 +278,4 @@ async function testEmbeddingGeneration() {
 }
 
 // Run the test
-console.log("[Test] Starting embedding generation test...");
-console.log("[Test] Node version:", process.version);
-console.log("[Test] Current working directory:", process.cwd());
-testEmbeddingGeneration();
+testServerIntegration();
