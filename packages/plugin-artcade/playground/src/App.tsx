@@ -74,7 +74,7 @@ const App: React.FC = () => {
     setLoading(true);
     try {
       console.log('Generating pattern from prompt');
-      const generatedPattern = await clientPatternService.generateFromPrompt(prompt);
+      const generatedPattern = await clientPatternService.generatePattern(prompt);
       console.log('Generated pattern:', generatedPattern);
       setClaudeOutput(generatedPattern);
 
