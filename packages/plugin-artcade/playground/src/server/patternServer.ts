@@ -338,4 +338,37 @@ router.post("/:id/track-usage", async (req, res) => {
     }
 });
 
+// Pattern Retrieval
+router.get("/", async (req, res) => {
+    console.log("[PatternServer] Received request to list all patterns");
+
+    try {
+        const patterns = await req.app.locals.vectorDb.listStoredPatterns();
+        console.log(
+            "[PatternServer] Successfully retrieved patterns:",
+            patterns.length
+        );
+
+        const response: PatternRetrievalResponse = {
+            success: true,
+            data: patterns,
+        };
+        res.json(response);
+    } catch (error) {
+        console.error("[PatternServer] Error retrieving patterns:", error);
+        const response: PatternRetrievalResponse = {
+            success: false,
+            error: {
+                message:
+                    error instanceof Error ? error.message : "Unknown error",
+                details:
+                    error instanceof PatternRetrievalError
+                        ? error.details
+                        : undefined,
+            },
+        };
+        res.status(500).json(response);
+    }
+});
+
 export default router;

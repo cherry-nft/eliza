@@ -10,6 +10,11 @@ import { TokenizationService } from "./services/TokenizationService";
 import { ArtcadeRuntime } from "../../../src/types/runtime";
 import { IMemoryManager } from "@ai16z/eliza";
 import { Memory } from "@ai16z/eliza";
+import { PostgresDatabaseAdapter } from "@ai16z/adapter-postgres";
+import dotenv from "dotenv";
+
+// Load environment variables
+dotenv.config();
 
 // Add constant for memory table name
 const VECTOR_DB_TABLE = "vector_patterns";
@@ -51,92 +56,196 @@ const __dirname = dirname(__filename);
 
 console.log("[Server] Configuration loaded successfully");
 
-// Initialize runtime dependencies with in-memory storage
-const memoryStore = new Map<string, Memory>();
+// Initialize PostgreSQL database adapter
+const databaseAdapter = new PostgresDatabaseAdapter({
+    connectionString:
+        process.env.DATABASE_URL || "postgresql://localhost:5432/artcade",
+    user: process.env.POSTGRES_USER || "postgres",
+    password: process.env.POSTGRES_PASSWORD || "postgres",
+    database: process.env.POSTGRES_DB || "artcade",
+});
 
-const databaseAdapter = {
-    async query(sql: string, params?: any[]) {
-        console.log("[Database] Query:", sql, params);
-        return { rows: [] };
-    },
-    async transaction(callback: (client: any) => Promise<void>) {
-        return callback(databaseAdapter);
-    },
-};
-
+// Initialize memory manager with PostgreSQL
 const memoryManager: IMemoryManager = {
     runtime: null as any,
     initialize: async () => {
-        console.log("[MemoryManager] Initializing");
+        console.log("[MemoryManager] Initializing with PostgreSQL");
+        // Create tables if they don't exist
+        await databaseAdapter.query(`
+            CREATE TABLE IF NOT EXISTS ${VECTOR_DB_TABLE} (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                content JSONB NOT NULL,
+                embedding VECTOR(1536),
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                room_id UUID NOT NULL,
+                user_id UUID NOT NULL,
+                agent_id UUID NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_${VECTOR_DB_TABLE}_room_id ON ${VECTOR_DB_TABLE}(room_id);
+            CREATE INDEX IF NOT EXISTS idx_${VECTOR_DB_TABLE}_embedding ON ${VECTOR_DB_TABLE} USING hnsw (embedding vector_cosine_ops);
+        `);
     },
     createMemory: async (memory: Memory) => {
-        console.log("[MemoryManager] Creating memory:", memory.id);
-        memoryStore.set(memory.id, memory);
+        await databaseAdapter.query(
+            `INSERT INTO ${VECTOR_DB_TABLE} (id, content, embedding, room_id, user_id, agent_id)
+             VALUES ($1, $2, $3, $4, $5, $6)`,
+            [
+                memory.id,
+                memory.content,
+                memory.embedding,
+                memory.roomId,
+                memory.userId,
+                memory.agentId,
+            ]
+        );
     },
     getMemory: async (id: string) => {
-        console.log("[MemoryManager] Getting memory:", id);
-        return memoryStore.get(id) || null;
+        const result = await databaseAdapter.query(
+            `SELECT * FROM ${VECTOR_DB_TABLE} WHERE id = $1`,
+            [id]
+        );
+        return result.rows[0]
+            ? {
+                  id: result.rows[0].id,
+                  content: result.rows[0].content,
+                  embedding: result.rows[0].embedding,
+                  roomId: result.rows[0].room_id,
+                  userId: result.rows[0].user_id,
+                  agentId: result.rows[0].agent_id,
+                  tableName: VECTOR_DB_TABLE,
+                  createdAt: result.rows[0].created_at.getTime(),
+              }
+            : null;
     },
     updateMemory: async (memory: Memory) => {
-        console.log("[MemoryManager] Updating memory:", memory.id);
-        memoryStore.set(memory.id, memory);
+        await databaseAdapter.query(
+            `UPDATE ${VECTOR_DB_TABLE}
+             SET content = $2, embedding = $3, updated_at = CURRENT_TIMESTAMP
+             WHERE id = $1`,
+            [memory.id, memory.content, memory.embedding]
+        );
     },
     deleteMemory: async (id: string) => {
-        console.log("[MemoryManager] Deleting memory:", id);
-        memoryStore.delete(id);
+        await databaseAdapter.query(
+            `DELETE FROM ${VECTOR_DB_TABLE} WHERE id = $1`,
+            [id]
+        );
     },
     getMemories: async (opts: {
-        roomId: `${string}-${string}-${string}-${string}-${string}`;
+        roomId?: string;
         count?: number;
         unique?: boolean;
         start?: number;
         end?: number;
     }) => {
-        console.log("[MemoryManager] Getting memories with options:", opts);
-        const memories = Array.from(memoryStore.values())
-            .filter((memory) => memory.roomId === opts.roomId)
-            .slice(opts.start || 0, opts.end || opts.count || undefined);
-        return memories;
+        const limit = opts.count || 10;
+        const offset = opts.start || 0;
+        const result = await databaseAdapter.query(
+            `SELECT * FROM ${VECTOR_DB_TABLE}
+             ${opts.roomId ? "WHERE room_id = $1" : ""}
+             ORDER BY created_at DESC
+             LIMIT $${opts.roomId ? "2" : "1"} OFFSET $${opts.roomId ? "3" : "2"}`,
+            opts.roomId ? [opts.roomId, limit, offset] : [limit, offset]
+        );
+        return result.rows.map((row) => ({
+            id: row.id,
+            content: row.content,
+            embedding: row.embedding,
+            roomId: row.room_id,
+            userId: row.user_id,
+            agentId: row.agent_id,
+            tableName: VECTOR_DB_TABLE,
+            createdAt: row.created_at.getTime(),
+        }));
     },
     searchMemoriesByEmbedding: async (
         embedding: number[],
         opts?: {
             match_threshold?: number;
             max_results?: number;
+            filter?: Record<string, any>;
         }
     ) => {
-        console.log(
-            "[MemoryManager] Searching by embedding, threshold:",
-            opts?.match_threshold
+        const threshold = opts?.match_threshold || 0.8;
+        const limit = opts?.max_results || 10;
+
+        const result = await databaseAdapter.query(
+            `SELECT *, 1 - (embedding <=> $1) as similarity
+             FROM ${VECTOR_DB_TABLE}
+             WHERE 1 - (embedding <=> $1) > $2
+             ORDER BY similarity DESC
+             LIMIT $3`,
+            [embedding, threshold, limit]
         );
-        return Array.from(memoryStore.values()).map((memory) => ({
-            ...memory,
-            similarity: 0.9,
+
+        return result.rows.map((row) => ({
+            id: row.id,
+            content: row.content,
+            embedding: row.embedding,
+            roomId: row.room_id,
+            userId: row.user_id,
+            agentId: row.agent_id,
+            tableName: VECTOR_DB_TABLE,
+            createdAt: row.created_at.getTime(),
+            similarity: row.similarity,
         }));
     },
-    countMemories: async (roomId: string, unique?: boolean) => {
-        const count = Array.from(memoryStore.values()).filter(
-            (memory) => memory.roomId === roomId
-        ).length;
-        return count;
+    countMemories: async (roomId: string) => {
+        const result = await databaseAdapter.query(
+            `SELECT COUNT(*) FROM ${VECTOR_DB_TABLE} WHERE room_id = $1`,
+            [roomId]
+        );
+        return parseInt(result.rows[0].count);
     },
     addEmbeddingToMemory: async (memory: Memory) => memory,
-    getCachedEmbeddings: async (content: string) => [],
-    getMemoryById: async (id: string) => memoryStore.get(id) || null,
-    getMemoriesByRoomIds: async ({ roomIds }: { roomIds: string[] }) => {
-        return Array.from(memoryStore.values()).filter((memory) =>
-            roomIds.includes(memory.roomId)
+    getCachedEmbeddings: async () => [],
+    getMemoryById: async (id: string) => {
+        const result = await databaseAdapter.query(
+            `SELECT * FROM ${VECTOR_DB_TABLE} WHERE id = $1`,
+            [id]
         );
+        return result.rows[0]
+            ? {
+                  id: result.rows[0].id,
+                  content: result.rows[0].content,
+                  embedding: result.rows[0].embedding,
+                  roomId: result.rows[0].room_id,
+                  userId: result.rows[0].user_id,
+                  agentId: result.rows[0].agent_id,
+                  tableName: VECTOR_DB_TABLE,
+                  createdAt: result.rows[0].created_at.getTime(),
+              }
+            : null;
+    },
+    getMemoriesByRoomIds: async ({ roomIds }: { roomIds: string[] }) => {
+        const result = await databaseAdapter.query(
+            `SELECT * FROM ${VECTOR_DB_TABLE} WHERE room_id = ANY($1)`,
+            [roomIds]
+        );
+        return result.rows.map((row) => ({
+            id: row.id,
+            content: row.content,
+            embedding: row.embedding,
+            roomId: row.room_id,
+            userId: row.user_id,
+            agentId: row.agent_id,
+            tableName: VECTOR_DB_TABLE,
+            createdAt: row.created_at.getTime(),
+        }));
     },
     removeMemory: async (memoryId: string) => {
-        memoryStore.delete(memoryId);
+        await databaseAdapter.query(
+            `DELETE FROM ${VECTOR_DB_TABLE} WHERE id = $1`,
+            [memoryId]
+        );
     },
     removeAllMemories: async (roomId: string) => {
-        for (const [id, memory] of memoryStore.entries()) {
-            if (memory.roomId === roomId) {
-                memoryStore.delete(id);
-            }
-        }
+        await databaseAdapter.query(
+            `DELETE FROM ${VECTOR_DB_TABLE} WHERE room_id = $1`,
+            [roomId]
+        );
     },
 };
 

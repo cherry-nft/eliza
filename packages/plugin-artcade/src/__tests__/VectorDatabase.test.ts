@@ -294,3 +294,24 @@ describe("VectorDatabase", () => {
         });
     });
 });
+
+describe("VectorDatabase Connection", () => {
+    it("should connect to the database", async () => {
+        const db = new VectorDatabase();
+        await db.initialize({
+            databaseAdapter: {
+                query: async () => {
+                    const { Client } = require("pg");
+                    const client = new Client(process.env.DATABASE_URL);
+                    await client.connect();
+                    const result = await client.query("SELECT 1");
+                    await client.end();
+                    return result;
+                },
+            },
+            logger: console,
+        } as any);
+        const isHealthy = await db.healthCheck();
+        expect(isHealthy).toBe(true);
+    });
+});

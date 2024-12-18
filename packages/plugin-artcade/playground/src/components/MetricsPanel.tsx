@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Typography, Grid, Paper } from '@mui/material';
+import { Box, Typography } from '@mui/material';
 import Plot from 'react-plotly.js';
 
 interface MetricsPanelProps {
