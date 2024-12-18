@@ -2,6 +2,7 @@ import {
     GeneratedPattern,
     PatternGenerationError,
     PatternGenerationResponse,
+    PatternStorageResponse,
     PatternValidationError,
 } from "../shared/types/pattern.types";
 import { GamePattern } from "../../../src/types/patterns";
@@ -206,6 +207,84 @@ export class ClientPatternService {
                 options,
             }),
         });
+    }
+
+    async storeExistingPattern(
+        html: string,
+        patternName: string,
+        type: GamePattern["type"] = "game_mechanic"
+    ): Promise<PatternGenerationResponse> {
+        this.logger("info", `Storing existing pattern: ${patternName}`);
+
+        try {
+            const patternData = {
+                content: {
+                    html,
+                    context: "pattern",
+                    metadata: {},
+                },
+                type,
+                pattern_name: patternName,
+            };
+
+            const response =
+                await this.fetchWithLogging<PatternStorageResponse>("/store", {
+                    method: "POST",
+                    body: JSON.stringify(patternData),
+                });
+
+            if (!response.success) {
+                throw new PatternGenerationError(
+                    response.error?.message || "Failed to store pattern",
+                    response.error?.details
+                );
+            }
+
+            return {
+                success: true,
+                data: {
+                    title: patternName,
+                    description: "Stored HTML pattern",
+                    html: html,
+                    plan: {
+                        coreMechanics: [],
+                        visualElements: [],
+                        interactivity: [],
+                        interactionFlow: [],
+                        stateManagement: {
+                            variables: [],
+                            updates: [],
+                        },
+                        assetRequirements: {
+                            scripts: [],
+                            styles: [],
+                            fonts: [],
+                            images: [],
+                            animations: [],
+                        },
+                    },
+                    thumbnail: {
+                        alt: patternName,
+                        backgroundColor: "#ffffff",
+                        elements: [],
+                    },
+                },
+            };
+        } catch (error) {
+            return {
+                success: false,
+                error: {
+                    message:
+                        error instanceof Error
+                            ? error.message
+                            : "Unknown error occurred",
+                    details:
+                        error instanceof PatternGenerationError
+                            ? error.details
+                            : undefined,
+                },
+            };
+        }
     }
 }
 
