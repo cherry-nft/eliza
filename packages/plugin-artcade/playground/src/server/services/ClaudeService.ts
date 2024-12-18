@@ -6,9 +6,9 @@ import {
     PatternServiceInterface,
     PatternValidationError,
 } from "../../shared/types/pattern.types";
-import { VectorDatabase } from "@artcade/plugin/services/VectorDatabase";
+import { VectorDatabase } from "../../../../src/services/VectorDatabase";
 
-class ClaudeService implements PatternServiceInterface {
+export class ClaudeService implements PatternServiceInterface {
     private OPENROUTER_API_KEY: string;
     private readonly API_URL = "https://openrouter.ai/api/v1/chat/completions";
     private readonly PROMPT_TEMPLATE: string;
@@ -55,9 +55,14 @@ class ClaudeService implements PatternServiceInterface {
         );
 
         try {
+            // Create a mock embedding for now (1536 dimensions as required by VectorDatabase)
+            // TODO: Replace with actual embedding generation using vectorOperations
+            console.log("[ClaudeService] Generating embedding for prompt");
+            const embedding = new Array(1536).fill(0);
+
             // Get patterns from VectorDatabase
             const similarPatterns = await this.vectorDb.findSimilarPatterns(
-                prompt,
+                embedding, // Now passing number[] instead of string
                 "all", // or specific type if we can determine it
                 0.85, // similarity threshold
                 3 // number of patterns to return
@@ -356,11 +361,12 @@ class ClaudeService implements PatternServiceInterface {
                         await this.vectorDb.trackClaudeUsage({
                             prompt: userPrompt,
                             generated_html: pattern.html,
+                            similarity_score: 0.9,
                             matched_patterns: this.lastUsedPatterns.map(
                                 (p) => ({
                                     pattern_id: p.id,
-                                    similarity: 0.9, // We should calculate this
-                                    features_used: [], // We should extract these
+                                    similarity: 0.9,
+                                    features_used: [],
                                 })
                             ),
                             quality_assessment: {
@@ -399,5 +405,3 @@ class ClaudeService implements PatternServiceInterface {
         }
     }
 }
-
-export const claudeService = new ClaudeService();
