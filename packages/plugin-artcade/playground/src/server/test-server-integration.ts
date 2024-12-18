@@ -11,6 +11,7 @@ import { SERVER_CONFIG } from "./config/serverConfig";
 import { readFileSync } from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { randomUUID } from "crypto";
 
 // Load environment variables
 config();
@@ -28,15 +29,84 @@ async function testEmbeddingGeneration() {
             "../../../src/data/patterns.json"
         );
         const patterns = JSON.parse(readFileSync(patternsPath, "utf-8"));
-        const testPattern = patterns[0]; // Use the first pattern
+        const sourcePattern = patterns[0]; // Use the first pattern
 
-        // Initialize runtime dependencies
-        const databaseAdapter = new DatabaseAdapter({
-            connectionString: SERVER_CONFIG.DATABASE_URL,
-            schema: "public",
-        });
+        // Mock storage for patterns
+        const storedPatterns = new Map<string, any>();
 
-        const memoryManager = new MemoryManager(databaseAdapter);
+        // Initialize runtime dependencies with proper mocks
+        const databaseAdapter = {
+            query: async (sql: string, params?: any[]) => {
+                console.log("[Database] Executing query:", sql);
+                if (params) {
+                    console.log("[Database] With params:", params);
+                }
+                return { rows: [] };
+            },
+            transaction: async (callback: (client: any) => Promise<void>) => {
+                return callback(databaseAdapter);
+            },
+            createMemory: async (memory: any) => {
+                console.log("[Database] Creating memory:", memory);
+                storedPatterns.set(memory.id, memory);
+                return memory;
+            },
+            getMemory: async (id: string) => {
+                console.log("[Database] Getting memory:", id);
+                return storedPatterns.get(id) || null;
+            },
+            updateMemory: async (memory: any) => {
+                console.log("[Database] Updating memory:", memory);
+                storedPatterns.set(memory.id, memory);
+            },
+            deleteMemory: async (id: string) => {
+                console.log("[Database] Deleting memory:", id);
+                storedPatterns.delete(id);
+            },
+            searchMemories: async (params: any) => {
+                console.log("[Database] Searching memories:", params);
+                return Array.from(storedPatterns.values());
+            },
+            searchMemoriesByEmbedding: async (
+                embedding: number[],
+                params: any
+            ) => {
+                console.log("[Database] Searching by embedding");
+                return Array.from(storedPatterns.values());
+            },
+        } as unknown as DatabaseAdapter<any>;
+
+        const memoryManager = {
+            createMemory: async (memory: any) => {
+                console.log("[MemoryManager] Creating memory:", memory);
+                storedPatterns.set(memory.id, memory);
+                return memory;
+            },
+            getMemory: async (id: string) => {
+                console.log("[MemoryManager] Getting memory:", id);
+                return storedPatterns.get(id) || null;
+            },
+            updateMemory: async (memory: any) => {
+                console.log("[MemoryManager] Updating memory:", memory);
+                storedPatterns.set(memory.id, memory);
+            },
+            deleteMemory: async (id: string) => {
+                console.log("[MemoryManager] Deleting memory:", id);
+                storedPatterns.delete(id);
+            },
+            searchMemories: async (params: any) => {
+                console.log("[MemoryManager] Searching memories:", params);
+                return Array.from(storedPatterns.values());
+            },
+            searchMemoriesByEmbedding: async (
+                embedding: number[],
+                params: any
+            ) => {
+                console.log("[MemoryManager] Searching by embedding");
+                return Array.from(storedPatterns.values());
+            },
+            databaseAdapter,
+        } as unknown as MemoryManager;
 
         // Initialize vector operations with OpenAI
         const vectorOperations = {
@@ -109,29 +179,74 @@ async function testEmbeddingGeneration() {
             },
         };
 
+        // Initialize VectorDatabase
+        console.log("\n[Test] Initializing VectorDatabase...");
+        const vectorDb = new VectorDatabase();
+        await vectorDb.initialize(runtime);
+
+        // Verify database health
+        console.log("\n[Test] Checking database health...");
+        const isHealthy = await vectorDb.healthCheck();
+        if (!isHealthy) {
+            throw new Error("VectorDatabase health check failed");
+        }
+        console.log("[Test] Database health check passed");
+
         // Prepare text for embedding
         const textToEmbed = [
-            testPattern.pattern_name,
-            testPattern.type,
-            testPattern.content.context,
-            Array.isArray(testPattern.content.implementation.html)
-                ? testPattern.content.implementation.html.join("\n")
-                : testPattern.content.implementation.html,
+            sourcePattern.pattern_name,
+            sourcePattern.type,
+            sourcePattern.content.context,
+            Array.isArray(sourcePattern.content.implementation.html)
+                ? sourcePattern.content.implementation.html.join("\n")
+                : sourcePattern.content.implementation.html,
         ].join("\n");
 
         console.log("\n[Test] Pattern selected for embedding test:");
-        console.log("Name:", testPattern.pattern_name);
-        console.log("Type:", testPattern.type);
-        console.log("Context:", testPattern.content.context);
+        console.log("Name:", sourcePattern.pattern_name);
+        console.log("Type:", sourcePattern.type);
+        console.log("Context:", sourcePattern.content.context);
 
         // Generate embedding
         console.log("\n[Test] Attempting to generate embedding...");
         const embedding = await vectorOperations.generateEmbedding(textToEmbed);
-
-        console.log("\n[Test] Embedding generated successfully!");
+        console.log("[Test] Embedding generated successfully!");
         console.log("Embedding dimension:", embedding.length);
         console.log("First 5 values:", embedding.slice(0, 5));
 
+        // Create test pattern with embedding
+        const testPattern = {
+            id: randomUUID(),
+            type: sourcePattern.type,
+            pattern_name: sourcePattern.pattern_name,
+            content: sourcePattern.content,
+            embedding: embedding,
+            effectiveness_score: 0.0,
+            usage_count: 0,
+        };
+
+        // Store pattern
+        console.log("\n[Test] Attempting to store pattern...");
+        console.log("Pattern ID:", testPattern.id);
+        console.log("Embedding dimension:", testPattern.embedding.length);
+
+        await vectorDb.storePattern(testPattern);
+        console.log("[Test] Pattern stored successfully");
+
+        // Verify storage
+        console.log("\n[Test] Verifying pattern storage...");
+        const storedPattern = await vectorDb.getPatternById(testPattern.id);
+        if (!storedPattern) {
+            throw new Error("Failed to retrieve stored pattern");
+        }
+        console.log("[Test] Pattern retrieved successfully");
+        console.log("Retrieved pattern ID:", storedPattern.id);
+        console.log(
+            "Retrieved embedding dimension:",
+            storedPattern.embedding.length
+        );
+
+        console.log("\n[Test] All tests completed successfully!");
         process.exit(0);
     } catch (error) {
         console.error("\n[Test] Test failed:", error);
