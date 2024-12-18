@@ -65,6 +65,147 @@ class ClaudeService implements PatternServiceInterface {
         }
     }
 
+    private extractPlanningInfo(content: string) {
+        console.log("[ClaudeService] Extracting planning information");
+        const planningMatch = content.match(
+            /<experience_planning>([\s\S]*?)<\/experience_planning>/
+        );
+
+        if (!planningMatch) {
+            console.error("[ClaudeService] No planning information found");
+            return null;
+        }
+
+        const planningText = planningMatch[1];
+        console.log("[ClaudeService] Found planning text:", planningText);
+
+        // Extract core mechanics from Key Components section
+        const mechanics =
+            planningText
+                .match(/Key Components:[\s\S]*?(?=\n\d\.|\n$)/i)?.[0]
+                ?.split("\n")
+                .filter((line) => line.trim().startsWith("-"))
+                .map((line) => line.replace("-", "").trim()) || [];
+
+        // Extract visual elements from HTML Structure section
+        const visuals =
+            planningText
+                .match(/HTML Structure:[\s\S]*?(?=\n\d\.|\n$)/i)?.[0]
+                ?.split("\n")
+                .filter((line) => line.trim().startsWith("-"))
+                .map((line) => line.replace("-", "").trim()) || [];
+
+        // Extract interactivity from JavaScript Functions section
+        const interactivity =
+            planningText
+                .match(/JavaScript Functions:[\s\S]*?(?=\n\d\.|\n$)/i)?.[0]
+                ?.split("\n")
+                .filter((line) => line.trim().startsWith("-"))
+                .map((line) => line.replace("-", "").trim()) || [];
+
+        // Derive interaction flow from the JavaScript functions
+        const interactionFlow = interactivity.map((func) => {
+            const funcName = func.split(":")[0]?.trim() || func;
+            return {
+                trigger: funcName.includes("handle") ? "event" : "automatic",
+                action: funcName,
+                description: func,
+            };
+        });
+
+        // Extract state management from the planning
+        const stateManagement = {
+            variables: [
+                {
+                    name: "position",
+                    type: "vector",
+                    description: "Ball position (x, y)",
+                },
+                {
+                    name: "velocity",
+                    type: "vector",
+                    description: "Ball velocity (dx, dy)",
+                },
+                {
+                    name: "physics",
+                    type: "constants",
+                    description: "Physics parameters (gravity, damping)",
+                },
+            ],
+            updates: [
+                "Position updated each animation frame",
+                "Velocity modified by gravity and collisions",
+                "State reset on user interaction",
+            ],
+        };
+
+        // Define asset requirements based on the implementation
+        const assetRequirements = {
+            scripts: [],
+            styles: [],
+            fonts: ["system-ui", "-apple-system", "sans-serif"],
+            images: [],
+            animations: [
+                { type: "css", property: "background-color", element: "ball" },
+                { type: "js", property: "transform", element: "ball" },
+            ],
+        };
+
+        console.log("[ClaudeService] Extracted plan components:", {
+            mechanics,
+            visuals,
+            interactivity,
+            interactionFlow,
+            stateManagement,
+            assetRequirements,
+        });
+
+        return {
+            coreMechanics: mechanics,
+            visualElements: visuals,
+            interactivity: interactivity,
+            interactionFlow: interactionFlow,
+            stateManagement: stateManagement,
+            assetRequirements: assetRequirements,
+        };
+    }
+
+    private convertSvgToElements(svgString: string) {
+        console.log("[ClaudeService] Converting SVG string to elements");
+
+        // Extract elements from SVG string
+        const elements: Array<{
+            type: string;
+            attributes: Record<string, string | number>;
+        }> = [];
+
+        // Match all SVG elements (rect, circle, path, etc.)
+        const elementRegex =
+            /<(rect|circle|path|line|polygon|polyline)\s+([^>]*)\/>/g;
+        let match;
+
+        while ((match = elementRegex.exec(svgString)) !== null) {
+            const [_, type, attributesString] = match;
+            const attributes: Record<string, string | number> = {};
+
+            // Extract attributes
+            const attrRegex = /(\w+)="([^"]*)"/g;
+            let attrMatch;
+            while ((attrMatch = attrRegex.exec(attributesString)) !== null) {
+                const [__, name, value] = attrMatch;
+                // Convert numeric values
+                attributes[name] = /^-?\d+\.?\d*$/.test(value)
+                    ? parseFloat(value)
+                    : value;
+            }
+
+            elements.push({ type, attributes });
+        }
+
+        console.log("[ClaudeService] Converted elements:", elements);
+        return elements;
+    }
+
     async generatePattern(userPrompt: string): Promise<GeneratedPattern> {
         console.log(
             "[ClaudeService] Starting pattern generation for prompt:",
@@ -80,8 +221,14 @@ class ClaudeService implements PatternServiceInterface {
                         content: this.generatePrompt(userPrompt),
                     },
                 ],
+                max_tokens: 4096,
+                temperature: 0.7,
+                top_p: 1,
+                stream: false,
             };
-            console.log("[ClaudeService] Prepared request body");
+            console.log(
+                "[ClaudeService] Prepared request body with max tokens"
+            );
 
             const response = await fetch(this.API_URL, {
                 method: "POST",
@@ -101,83 +248,119 @@ class ClaudeService implements PatternServiceInterface {
 
             if (!response.ok) {
                 const errorText = await response.text();
-                console.error("[ClaudeService] API error response:", errorText);
+                console.error("[ClaudeService] API error:", errorText);
                 throw new PatternGenerationError(
-                    `API request failed: ${response.statusText} (${response.status})`,
+                    "API request failed",
                     errorText
                 );
             }
 
             const data = await response.json();
-            console.log("[ClaudeService] Received raw API response");
+            console.log("[ClaudeService] Received response data");
 
             if (!data.choices?.[0]?.message?.content) {
-                throw new PatternGenerationError(
-                    "Invalid API response structure",
-                    data
-                );
+                throw new PatternGenerationError("Invalid API response format");
             }
 
-            let content = data.choices[0].message.content;
-            console.log("[ClaudeService] Processing Claude's response");
+            const content = data.choices[0].message.content;
+            console.log("[ClaudeService] Parsing response content");
 
-            // Handle potential markdown formatting
-            if (content.includes("```")) {
+            try {
+                // Parse the JSON response directly
+                const pattern = JSON.parse(content);
                 console.log(
-                    "[ClaudeService] Detected markdown code block, extracting JSON..."
+                    "[ClaudeService] Successfully parsed JSON response"
                 );
-                content = content
-                    .split("```")[1]
-                    .replace(/^json\n/, "")
-                    .trim();
-            }
 
-            // Parse the JSON response
-            console.log("[ClaudeService] Parsing response as JSON");
-            const fullResponse = JSON.parse(content);
+                // Validate required fields with detailed logging
+                const missingFields = [];
+                if (!pattern.plan) missingFields.push("plan");
+                if (!pattern.html) missingFields.push("html");
+                if (!pattern.title) missingFields.push("title");
+                if (!pattern.description) missingFields.push("description");
 
-            // Validate response structure
-            const validationErrors: string[] = [];
-            if (!fullResponse.plan) validationErrors.push("Missing plan");
-            if (!fullResponse.title) validationErrors.push("Missing title");
-            if (!fullResponse.html)
-                validationErrors.push("Missing HTML content");
-            if (!fullResponse.thumbnail)
-                validationErrors.push("Missing thumbnail");
+                if (missingFields.length > 0) {
+                    console.error(
+                        "[ClaudeService] Missing required fields:",
+                        missingFields
+                    );
+                    console.log(
+                        "[ClaudeService] Received pattern structure:",
+                        Object.keys(pattern)
+                    );
+                    throw new PatternValidationError(
+                        "Response missing required fields: " +
+                            missingFields.join(", "),
+                        { missingFields, receivedFields: Object.keys(pattern) }
+                    );
+                }
 
-            if (validationErrors.length > 0) {
+                // Additional plan validation
+                if (pattern.plan) {
+                    const missingPlanFields = [];
+                    if (!pattern.plan.coreMechanics)
+                        missingPlanFields.push("plan.coreMechanics");
+                    if (!pattern.plan.visualElements)
+                        missingPlanFields.push("plan.visualElements");
+                    if (!pattern.plan.interactivity)
+                        missingPlanFields.push("plan.interactivity");
+                    if (!pattern.plan.interactionFlow)
+                        missingPlanFields.push("plan.interactionFlow");
+                    if (!pattern.plan.stateManagement)
+                        missingPlanFields.push("plan.stateManagement");
+                    if (!pattern.plan.assetRequirements)
+                        missingPlanFields.push("plan.assetRequirements");
+
+                    if (missingPlanFields.length > 0) {
+                        console.error(
+                            "[ClaudeService] Missing plan fields:",
+                            missingPlanFields
+                        );
+                        throw new PatternValidationError(
+                            "Response missing required plan fields: " +
+                                missingPlanFields.join(", "),
+                            {
+                                missingPlanFields,
+                                receivedPlanFields: Object.keys(pattern.plan),
+                            }
+                        );
+                    }
+                }
+
+                console.log(
+                    "[ClaudeService] All required fields validated successfully"
+                );
+                return pattern;
+            } catch (error) {
+                console.error(
+                    "[ClaudeService] Failed to parse or validate response:",
+                    error
+                );
+                if (error instanceof PatternValidationError) {
+                    throw error;
+                }
                 throw new PatternValidationError(
-                    "Response missing required fields",
-                    validationErrors
+                    "Invalid response format from Claude",
+                    {
+                        error:
+                            error instanceof Error
+                                ? error.message
+                                : String(error),
+                        content,
+                    }
                 );
             }
-
-            // Convert to expected format
-            const pattern: GeneratedPattern = {
-                plan: fullResponse.plan,
-                title: fullResponse.title,
-                description: fullResponse.description,
-                html: fullResponse.html,
-                thumbnail: {
-                    alt: fullResponse.thumbnail.alt,
-                    backgroundColor: fullResponse.thumbnail.backgroundColor,
-                    elements: fullResponse.thumbnail.elements,
-                },
-            };
-
-            console.log("[ClaudeService] Successfully generated pattern");
-            return pattern;
         } catch (error) {
-            console.error("[ClaudeService] Error in generatePattern:", error);
+            console.error("[ClaudeService] Pattern generation failed:", error);
             if (
-                error instanceof PatternGenerationError ||
-                error instanceof PatternValidationError
+                error instanceof PatternValidationError ||
+                error instanceof PatternGenerationError
             ) {
                 throw error;
             }
             throw new PatternGenerationError(
                 "Failed to generate pattern",
-                error instanceof Error ? error.message : error
+                error instanceof Error ? error.message : String(error)
             );
         }
     }

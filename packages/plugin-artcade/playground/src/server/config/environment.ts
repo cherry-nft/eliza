@@ -26,19 +26,25 @@ export const loadServerConfig = (): ServerConfig => {
     console.log("[ServerConfig] Successfully loaded .env file");
 
     // Construct paths
-    const promptPath = join(__dirname, "../assets/prompts/artcade-prompt.md");
+    const promptPath = join(__dirname, "../../public/artcade-prompt.md");
     console.log("[ServerConfig] Resolved prompt path:", promptPath);
 
-    // Get API key
-    const apiKey = process.env.VITE_OPENROUTER_API_KEY;
+    // Get API key - try both VITE_ prefixed and non-prefixed versions
+    const apiKey =
+        process.env.OPENROUTER_API_KEY || process.env.VITE_OPENROUTER_API_KEY;
+
     if (!apiKey) {
         console.error(
             "[ServerConfig] OpenRouter API key not found in environment variables"
         );
-        console.error(
-            "[ServerConfig] Available environment variables:",
-            Object.keys(process.env).filter((key) => key.startsWith("VITE_"))
-        );
+        console.error("[ServerConfig] Available environment variables:", {
+            viteKeys: Object.keys(process.env).filter((key) =>
+                key.startsWith("VITE_")
+            ),
+            regularKeys: Object.keys(process.env).filter(
+                (key) => !key.startsWith("VITE_")
+            ),
+        });
         throw new Error("OpenRouter API key not found");
     }
     console.log("[ServerConfig] Successfully loaded API key");
@@ -53,6 +59,7 @@ export const loadServerConfig = (): ServerConfig => {
         promptPath: serverConfig.PROMPT_PATH,
         nodeEnv: serverConfig.NODE_ENV,
         hasApiKey: !!serverConfig.OPENROUTER_API_KEY,
+        apiKeyLength: serverConfig.OPENROUTER_API_KEY.length,
     });
 
     return serverConfig;

@@ -14,7 +14,8 @@
         "preview": "vite preview",
         "test": "tsx src/test-script.ts",
         "test:evolution": "tsx src/test-evolution.ts",
-        "test:server": "tsx src/server/test-pattern-server.ts"
+        "test:server": "tsx src/server/test-pattern-server.ts",
+        "test:client": "tsx src/services/test-client-service.ts"
     },
     "dependencies": {
         "@ai16z/plugin-artcade": "workspace:*",
