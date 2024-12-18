@@ -6,14 +6,18 @@ import {
     PatternServiceInterface,
     PatternValidationError,
 } from "../../shared/types/pattern.types";
+import { VectorDatabase } from "@artcade/plugin/services/VectorDatabase";
 
 class ClaudeService implements PatternServiceInterface {
     private OPENROUTER_API_KEY: string;
     private readonly API_URL = "https://openrouter.ai/api/v1/chat/completions";
     private readonly PROMPT_TEMPLATE: string;
+    private vectorDb: VectorDatabase;
+    private lastUsedPatterns: any[] = []; // Track patterns used in generation
 
-    constructor() {
+    constructor(vectorDb: VectorDatabase) {
         console.log("[ClaudeService] Initializing service...");
+        this.vectorDb = vectorDb;
 
         try {
             // Load configuration
@@ -44,25 +48,97 @@ class ClaudeService implements PatternServiceInterface {
         }
     }
 
-    private generatePrompt(userPrompt: string): string {
+    private async findRelevantPatterns(prompt: string): Promise<any[]> {
+        console.log(
+            "[ClaudeService] Finding relevant patterns for prompt:",
+            prompt
+        );
+
+        try {
+            // Get patterns from VectorDatabase
+            const similarPatterns = await this.vectorDb.findSimilarPatterns(
+                prompt,
+                "all", // or specific type if we can determine it
+                0.85, // similarity threshold
+                3 // number of patterns to return
+            );
+
+            console.log(
+                "[ClaudeService] Found similar patterns:",
+                similarPatterns.map((p) => p.pattern.id)
+            );
+
+            // Store for later usage tracking
+            this.lastUsedPatterns = similarPatterns.map((p) => p.pattern);
+
+            return similarPatterns.map((p) => p.pattern);
+        } catch (error) {
+            console.error(
+                "[ClaudeService] Error finding relevant patterns:",
+                error
+            );
+            // Don't fail completely if pattern finding fails
+            return [];
+        }
+    }
+
+    private async generatePrompt(userPrompt: string): Promise<string> {
         console.log(
             "[ClaudeService] Generating prompt for user input:",
             userPrompt
         );
         try {
-            const fullPrompt = this.PROMPT_TEMPLATE.replace(
+            // Find relevant patterns
+            const relevantPatterns =
+                await this.findRelevantPatterns(userPrompt);
+
+            // Extract the most effective parts based on pattern effectiveness
+            const patternExamples = relevantPatterns
+                .sort((a, b) => b.effectiveness_score - a.effectiveness_score)
+                .map((pattern) => ({
+                    code: pattern.content.html,
+                    score: pattern.effectiveness_score,
+                    type: pattern.type,
+                }));
+
+            console.log(
+                "[ClaudeService] Using pattern examples:",
+                patternExamples.map((p) => ({ type: p.type, score: p.score }))
+            );
+
+            // Include patterns in prompt
+            const enhancedPrompt = this.PROMPT_TEMPLATE.replace(
                 "{{user_prompt}}",
                 userPrompt
+            ).replace(
+                "{{pattern_examples}}",
+                this.formatPatternExamples(patternExamples)
             );
-            console.log("[ClaudeService] Successfully generated full prompt");
-            return fullPrompt;
+
+            console.log(
+                "[ClaudeService] Successfully generated enhanced prompt"
+            );
+            return enhancedPrompt;
         } catch (error) {
             console.error("[ClaudeService] Error generating prompt:", error);
-            throw new PatternGenerationError(
-                "Failed to generate prompt",
-                error instanceof Error ? error.message : error
-            );
+            // Fallback to basic prompt if pattern enhancement fails
+            return this.PROMPT_TEMPLATE.replace("{{user_prompt}}", userPrompt);
         }
+    }
+
+    private formatPatternExamples(
+        examples: Array<{ code: string; score: number; type: string }>
+    ): string {
+        return examples
+            .map(
+                (ex) => `
+            Here's a highly effective ${ex.type} pattern (score: ${ex.score}):
+            \`\`\`html
+            ${ex.code}
+            \`\`\`
+        `
+            )
+            .join("\n\n");
     }
 
     private extractPlanningInfo(content: string) {
@@ -218,7 +294,7 @@ class ClaudeService implements PatternServiceInterface {
                 messages: [
                     {
                         role: "user",
-                        content: this.generatePrompt(userPrompt),
+                        content: await this.generatePrompt(userPrompt),
                     },
                 ],
                 max_tokens: 8192,
@@ -264,105 +340,62 @@ class ClaudeService implements PatternServiceInterface {
             }
 
             const content = data.choices[0].message.content;
-            console.log("[ClaudeService] Parsing response content");
+            console.log("[ClaudeService] Processing Claude's response");
 
             try {
-                // Parse the JSON response directly
+                // Parse the JSON response
                 const pattern = JSON.parse(content);
                 console.log(
                     "[ClaudeService] Successfully parsed JSON response"
                 );
 
-                // Validate required fields with detailed logging
-                const missingFields = [];
-                if (!pattern.plan) missingFields.push("plan");
-                if (!pattern.html) missingFields.push("html");
-                if (!pattern.title) missingFields.push("title");
-                if (!pattern.description) missingFields.push("description");
-
-                if (missingFields.length > 0) {
-                    console.error(
-                        "[ClaudeService] Missing required fields:",
-                        missingFields
-                    );
-                    console.log(
-                        "[ClaudeService] Received pattern structure:",
-                        Object.keys(pattern)
-                    );
-                    throw new PatternValidationError(
-                        "Response missing required fields: " +
-                            missingFields.join(", "),
-                        { missingFields, receivedFields: Object.keys(pattern) }
-                    );
-                }
-
-                // Additional plan validation
-                if (pattern.plan) {
-                    const missingPlanFields = [];
-                    if (!pattern.plan.coreMechanics)
-                        missingPlanFields.push("plan.coreMechanics");
-                    if (!pattern.plan.visualElements)
-                        missingPlanFields.push("plan.visualElements");
-                    if (!pattern.plan.interactivity)
-                        missingPlanFields.push("plan.interactivity");
-                    if (!pattern.plan.interactionFlow)
-                        missingPlanFields.push("plan.interactionFlow");
-                    if (!pattern.plan.stateManagement)
-                        missingPlanFields.push("plan.stateManagement");
-                    if (!pattern.plan.assetRequirements)
-                        missingPlanFields.push("plan.assetRequirements");
-
-                    if (missingPlanFields.length > 0) {
+                // Track pattern usage if we used any patterns for generation
+                if (this.lastUsedPatterns.length > 0) {
+                    console.log("[ClaudeService] Tracking pattern usage");
+                    try {
+                        await this.vectorDb.trackClaudeUsage({
+                            prompt: userPrompt,
+                            generated_html: pattern.html,
+                            matched_patterns: this.lastUsedPatterns.map(
+                                (p) => ({
+                                    pattern_id: p.id,
+                                    similarity: 0.9, // We should calculate this
+                                    features_used: [], // We should extract these
+                                })
+                            ),
+                            quality_assessment: {
+                                visual_score: 0.9,
+                                interactive_score: 0.9,
+                                functional_score: 0.9,
+                                performance_score: 0.9,
+                            },
+                        });
+                        console.log(
+                            "[ClaudeService] Successfully tracked pattern usage"
+                        );
+                    } catch (error) {
                         console.error(
-                            "[ClaudeService] Missing plan fields:",
-                            missingPlanFields
+                            "[ClaudeService] Failed to track pattern usage:",
+                            error
                         );
-                        throw new PatternValidationError(
-                            "Response missing required plan fields: " +
-                                missingPlanFields.join(", "),
-                            {
-                                missingPlanFields,
-                                receivedPlanFields: Object.keys(pattern.plan),
-                            }
-                        );
+                        // Don't fail the generation if tracking fails
                     }
                 }
 
-                console.log(
-                    "[ClaudeService] All required fields validated successfully"
-                );
                 return pattern;
             } catch (error) {
                 console.error(
-                    "[ClaudeService] Failed to parse or validate response:",
+                    "[ClaudeService] Failed to parse response:",
                     error
                 );
-                if (error instanceof PatternValidationError) {
-                    throw error;
-                }
                 throw new PatternValidationError(
                     "Invalid response format from Claude",
-                    {
-                        error:
-                            error instanceof Error
-                                ? error.message
-                                : String(error),
-                        content,
-                    }
+                    error instanceof Error ? error.message : String(error)
                 );
             }
         } catch (error) {
             console.error("[ClaudeService] Pattern generation failed:", error);
-            if (
-                error instanceof PatternValidationError ||
-                error instanceof PatternGenerationError
-            ) {
-                throw error;
-            }
-            throw new PatternGenerationError(
-                "Failed to generate pattern",
-                error instanceof Error ? error.message : String(error)
-            );
+            throw error;
         }
     }
 }

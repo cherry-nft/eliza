@@ -2,7 +2,8 @@ import express from "express";
 import cors from "cors";
 import path, { dirname } from "path";
 import { fileURLToPath } from "url";
-import { claudeService } from "../services/ClaudeService";
+import { VectorDatabase } from "@artcade/plugin/services/VectorDatabase";
+import { ClaudeService } from "./services/ClaudeService";
 import patternRouter from "./patternServer";
 import { SERVER_CONFIG } from "./config/serverConfig";
 
@@ -11,6 +12,13 @@ const __dirname = dirname(__filename);
 
 console.log("[Server] Configuration loaded successfully");
 
+// Initialize VectorDatabase
+const vectorDb = new VectorDatabase();
+await vectorDb.initialize(runtime); // We'll need to set up runtime properly
+
+// Initialize ClaudeService with VectorDatabase
+const claudeService = new ClaudeService(vectorDb);
+
 const app = express();
 const port = SERVER_CONFIG.PORT;
 
@@ -18,8 +26,9 @@ const port = SERVER_CONFIG.PORT;
 app.use(cors());
 app.use(express.json());
 
-// Make Claude service available to routes
+// Make services available to routes
 app.locals.claudeService = claudeService;
+app.locals.vectorDb = vectorDb;
 
 // Routes
 app.use("/api/patterns", patternRouter);
