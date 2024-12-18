@@ -46,31 +46,51 @@ export class PatternEvolution extends Service {
     override async initialize(
         runtime: IAgentRuntime & { logger: typeof elizaLogger }
     ): Promise<void> {
+        console.log("Initializing PatternEvolution service");
         this.runtime = runtime;
         this.vectorDb = await runtime.getService(VectorDatabase);
         this.staging = await runtime.getService(PatternStaging);
+        console.log("PatternEvolution service initialized");
     }
 
     async evolvePattern(
         seedPattern: GamePattern,
         config: EvolutionConfig = {}
     ): Promise<EvolutionResult> {
+        console.log("Starting pattern evolution:", {
+            seedPatternId: seedPattern.id,
+            type: seedPattern.type,
+            config,
+        });
+
         const evolutionConfig = { ...this.defaultConfig, ...config };
+        console.log("Evolution config:", evolutionConfig);
 
         try {
             // Find similar patterns to use as potential parents
+            console.log("Finding similar patterns for evolution");
             const similarPatterns = await this.vectorDb.findSimilarPatterns(
                 seedPattern.embedding,
                 seedPattern.type,
                 evolutionConfig.similarityThreshold
             );
+            console.log("Found similar patterns:", {
+                count: similarPatterns.length,
+                patterns: similarPatterns.map((p) => ({
+                    id: p.pattern.id,
+                    type: p.pattern.type,
+                    similarity: p.similarity,
+                })),
+            });
 
             // Initialize population with seed and similar patterns
+            console.log("Initializing population");
             let population = this.initializePopulation(
                 seedPattern,
                 similarPatterns,
                 evolutionConfig.populationSize
             );
+            console.log("Initial population size:", population.length);
 
             let bestResult: EvolutionResult = {
                 pattern: seedPattern,
@@ -78,6 +98,10 @@ export class PatternEvolution extends Service {
                 generation: 0,
                 parentIds: [],
             };
+            console.log("Initial best result:", {
+                fitness: bestResult.fitness,
+                patternId: bestResult.pattern.id,
+            });
 
             // Evolution loop
             for (
@@ -85,19 +109,39 @@ export class PatternEvolution extends Service {
                 generation <= evolutionConfig.generationLimit;
                 generation++
             ) {
+                console.log(`Starting generation ${generation}`);
+
                 // Evaluate fitness for current population
+                console.log("Evaluating population fitness");
                 const evaluatedPopulation = await Promise.all(
-                    population.map(async (pattern) => ({
-                        pattern,
-                        fitness: await this.evaluateFitness(pattern),
-                    }))
+                    population.map(async (pattern) => {
+                        const fitness = await this.evaluateFitness(pattern);
+                        console.log("Pattern fitness:", {
+                            id: pattern.id,
+                            fitness,
+                        });
+                        return { pattern, fitness };
+                    })
                 );
 
                 // Sort by fitness
                 evaluatedPopulation.sort((a, b) => b.fitness - a.fitness);
+                console.log(
+                    "Population sorted by fitness:",
+                    evaluatedPopulation.map((p) => ({
+                        id: p.pattern.id,
+                        fitness: p.fitness,
+                    }))
+                );
 
                 // Check if we've found a better solution
                 if (evaluatedPopulation[0].fitness > bestResult.fitness) {
+                    console.log("Found better solution:", {
+                        oldFitness: bestResult.fitness,
+                        newFitness: evaluatedPopulation[0].fitness,
+                        patternId: evaluatedPopulation[0].pattern.id,
+                    });
+
                     bestResult = {
                         pattern: evaluatedPopulation[0].pattern,
                         fitness: evaluatedPopulation[0].fitness,
@@ -109,22 +153,31 @@ export class PatternEvolution extends Service {
                     if (
                         bestResult.fitness >= evolutionConfig.fitnessThreshold
                     ) {
+                        console.log(
+                            "Reached fitness threshold, stopping evolution"
+                        );
                         break;
                     }
                 }
 
                 // Create next generation
+                console.log("Creating next generation");
                 const nextGeneration: GamePattern[] = [];
 
                 // Elitism - carry over best patterns
                 for (let i = 0; i < evolutionConfig.elitismCount; i++) {
                     nextGeneration.push(evaluatedPopulation[i].pattern);
                 }
+                console.log(
+                    "Added elite patterns:",
+                    evolutionConfig.elitismCount
+                );
 
                 // Fill rest of population with offspring
                 while (nextGeneration.length < evolutionConfig.populationSize) {
                     if (Math.random() < evolutionConfig.crossoverRate) {
                         // Crossover
+                        console.log("Performing crossover");
                         const parent1 = this.selectParent(evaluatedPopulation);
                         const parent2 = this.selectParent(evaluatedPopulation);
                         const offspring = await this.crossover(
@@ -134,6 +187,7 @@ export class PatternEvolution extends Service {
                         nextGeneration.push(offspring);
                     } else {
                         // Mutation
+                        console.log("Performing mutation");
                         const parent = this.selectParent(evaluatedPopulation);
                         const offspring = await this.mutate(
                             parent,
@@ -144,13 +198,26 @@ export class PatternEvolution extends Service {
                 }
 
                 population = nextGeneration;
+                console.log(`Generation ${generation} complete:`, {
+                    populationSize: population.length,
+                    bestFitness: bestResult.fitness,
+                });
             }
 
             // Store the best result in the vector database
+            console.log("Storing best result:", {
+                id: bestResult.pattern.id,
+                fitness: bestResult.fitness,
+                generation: bestResult.generation,
+            });
             await this.vectorDb.storePattern(bestResult.pattern);
 
             return bestResult;
         } catch (error) {
+            console.error("Error during pattern evolution:", {
+                error: error.message,
+                stack: error.stack,
+            });
             this.runtime.logger.error("Error during pattern evolution", {
                 error,
             });
@@ -163,26 +230,78 @@ export class PatternEvolution extends Service {
         similarPatterns: VectorSearchResult[],
         size: number
     ): GamePattern[] {
+        console.log("Initializing population with:", {
+            seedPatternId: seedPattern?.id,
+            similarPatternsCount: similarPatterns?.length,
+            targetSize: size,
+        });
+
         const population: GamePattern[] = [seedPattern];
 
         // Add similar patterns
         population.push(...similarPatterns.map((result) => result.pattern));
 
+        console.log("Population after adding similar patterns:", {
+            currentSize: population.length,
+            patternsWithContent: population.filter((p) => p?.content?.html)
+                .length,
+        });
+
         // Fill remaining slots with mutations of existing patterns
         while (population.length < size) {
             const basePattern =
                 population[Math.floor(Math.random() * population.length)];
-            population.push({
+
+            console.log("Creating variant from base pattern:", {
+                basePatternId: basePattern?.id,
+                hasContent: !!basePattern?.content,
+                contentHtml: !!basePattern?.content?.html,
+            });
+
+            const variant = {
                 ...basePattern,
                 id: uuidv4(),
                 pattern_name: `${basePattern.pattern_name}_variant_${population.length}`,
+                content: {
+                    ...basePattern.content,
+                    html: basePattern.content.html,
+                    css: basePattern.content.css || "",
+                    js: basePattern.content.js || "",
+                    context: basePattern.content.context || "game",
+                    metadata: { ...basePattern.content.metadata },
+                },
+            };
+
+            console.log("Created variant:", {
+                id: variant.id,
+                name: variant.pattern_name,
+                hasContent: !!variant.content,
+                hasHtml: !!variant.content?.html,
             });
+
+            population.push(variant);
         }
+
+        console.log("Final population:", {
+            size: population.length,
+            patternsWithContent: population.filter((p) => p?.content?.html)
+                .length,
+        });
 
         return population;
     }
 
     private async evaluateFitness(pattern: GamePattern): Promise<number> {
+        console.log("Evaluating fitness for pattern:", pattern.id);
+
+        if (!pattern?.content?.html) {
+            console.warn("Pattern missing content or HTML:", {
+                id: pattern?.id,
+                hasContent: !!pattern?.content,
+            });
+            return 0;
+        }
+
         // Combine multiple fitness metrics
         const metrics = await Promise.all([
             this.evaluateComplexity(pattern),
@@ -193,10 +312,23 @@ export class PatternEvolution extends Service {
 
         // Weighted average of metrics
         const weights = [0.3, 0.3, 0.2, 0.2];
-        return metrics.reduce((sum, metric, i) => sum + metric * weights[i], 0);
+        const fitness = metrics.reduce(
+            (sum, metric, i) => sum + metric * weights[i],
+            0
+        );
+
+        console.log("Fitness evaluation complete:", {
+            patternId: pattern.id,
+            metrics,
+            weights,
+            finalFitness: fitness,
+        });
+
+        return fitness;
     }
 
     private async evaluateComplexity(pattern: GamePattern): Promise<number> {
+        console.log("Evaluating complexity for pattern:", pattern.id);
         const content = pattern.content;
         if (!content) return 0;
 
@@ -215,122 +347,121 @@ export class PatternEvolution extends Service {
                 else if (part.includes(">")) depth++;
                 return Math.max(depth, 0);
             }, 0);
-            score += Math.min(maxDepth / 5, 0.25); // Max 0.25 for nesting depth
+            score += Math.min(maxDepth / 5, 0.25); // Max 0.25 for depth
         }
 
-        // Evaluate CSS complexity
-        if (content.css) {
-            // Count rules and properties
-            const ruleCount = (content.css.match(/{[^}]*}/g) || []).length;
-            score += Math.min(ruleCount / 10, 0.25); // Max 0.25 for CSS rules
-
-            // Count animations and transitions
-            const animationCount = (
-                content.css.match(/@keyframes|animation:|transition:/g) || []
-            ).length;
-            score += Math.min(animationCount / 4, 0.25); // Max 0.25 for animations
-        }
+        console.log("Complexity evaluation:", {
+            patternId: pattern.id,
+            score,
+            maxScore,
+        });
 
         return Math.min(score, maxScore);
     }
 
     private async evaluateInteractivity(pattern: GamePattern): Promise<number> {
+        console.log("Evaluating interactivity for pattern:", pattern.id);
         const content = pattern.content;
         if (!content) return 0;
 
         let score = 0;
         const maxScore = 1;
 
-        // Count event listeners
-        const eventListeners = (content.html.match(/on[a-z]+=/gi) || []).length;
-        score += Math.min(eventListeners / 10, 0.3); // Max 0.3 for event listeners
+        // Check for event listeners
+        if (content.js) {
+            const eventListenerCount = (
+                content.js.match(/addEventListener/g) || []
+            ).length;
+            score += Math.min(eventListenerCount / 5, 0.5);
+        }
 
-        // Count interactive classes
-        const interactiveClasses = (
-            content.html.match(/class="[^"]*interactive[^"]*"/g) || []
-        ).length;
-        score += Math.min(interactiveClasses / 5, 0.2); // Max 0.2 for interactive classes
+        // Check for interactive elements
+        if (content.html) {
+            const interactiveElements = (
+                content.html.match(/<button|<input|<select|<a /g) || []
+            ).length;
+            score += Math.min(interactiveElements / 3, 0.5);
+        }
 
-        // Count draggable elements
-        const draggableElements = (
-            content.html.match(/draggable="true"/g) || []
-        ).length;
-        score += Math.min(draggableElements / 3, 0.2); // Max 0.2 for draggable elements
-
-        // Check for game elements
-        const gameElements = (
-            content.html.match(/class="[^"]*game-[^"]*"/g) || []
-        ).length;
-        score += Math.min(gameElements / 4, 0.3); // Max 0.3 for game elements
+        console.log("Interactivity evaluation:", {
+            patternId: pattern.id,
+            score,
+            maxScore,
+        });
 
         return Math.min(score, maxScore);
     }
 
     private async evaluateVisualAppeal(pattern: GamePattern): Promise<number> {
+        console.log("Evaluating visual appeal for pattern:", pattern.id);
         const content = pattern.content;
         if (!content) return 0;
 
         let score = 0;
         const maxScore = 1;
 
-        // Check for color variety
-        const colors = new Set(
-            content.html.match(/(?:color|background-color):\s*([^;}"']+)/g) ||
-                []
-        );
-        score += Math.min(colors.size / 5, 0.25); // Max 0.25 for color variety
-
         // Check for animations
-        const animations = (content.html.match(/animation:[^;}"']+/g) || [])
-            .length;
-        score += Math.min(animations / 5, 0.25); // Max 0.25 for animations
+        if (content.html) {
+            const hasAnimation =
+                content.html.includes("@keyframes") ||
+                content.html.includes("animation:");
+            if (hasAnimation) score += 0.3;
+        }
 
-        // Check for transitions
-        const transitions = (content.html.match(/transition:[^;}"']+/g) || [])
-            .length;
-        score += Math.min(transitions / 3, 0.25); // Max 0.25 for transitions
+        // Check for color variety
+        if (content.metadata?.color_scheme) {
+            score += Math.min(content.metadata.color_scheme.length / 4, 0.3);
+        }
 
-        // Check for layout properties
-        const layoutProps = (
-            content.html.match(/(?:display|grid|flex|position):[^;}"']+/g) || []
-        ).length;
-        score += Math.min(layoutProps / 5, 0.25); // Max 0.25 for layout properties
+        // Check for responsive design
+        if (content.html) {
+            const hasMediaQueries = content.html.includes("@media");
+            if (hasMediaQueries) score += 0.4;
+        }
+
+        console.log("Visual appeal evaluation:", {
+            patternId: pattern.id,
+            score,
+            maxScore,
+        });
 
         return Math.min(score, maxScore);
     }
 
     private async evaluatePerformance(pattern: GamePattern): Promise<number> {
+        console.log("Evaluating performance for pattern:", pattern.id);
         const content = pattern.content;
         if (!content) return 0;
 
-        let score = 1; // Start with perfect score and deduct for potential issues
+        let score = 1; // Start with perfect score and deduct based on issues
         const maxScore = 1;
 
-        // Check DOM size (deduct for excessive elements)
-        const elementCount = (content.html.match(/<[^>]+>/g) || []).length;
-        if (elementCount > 50) score -= 0.2;
-        if (elementCount > 100) score -= 0.2;
+        // Check HTML size
+        if (content.html) {
+            const sizeKB = content.html.length / 1024;
+            if (sizeKB > 50) score -= 0.3;
+            else if (sizeKB > 20) score -= 0.1;
+        }
 
-        // Check animation complexity (deduct for excessive animations)
-        const animationCount = (content.html.match(/animation:[^;}"']+/g) || [])
-            .length;
-        if (animationCount > 10) score -= 0.2;
-        if (animationCount > 20) score -= 0.2;
+        // Check for expensive operations in JS
+        if (content.js) {
+            const hasExpensiveOps =
+                content.js.includes("while") || content.js.includes("for");
+            if (hasExpensiveOps) score -= 0.2;
+        }
 
-        // Check style complexity (deduct for excessive inline styles)
-        const inlineStyles = (content.html.match(/style="[^"]+"/g) || [])
-            .length;
-        if (inlineStyles > 20) score -= 0.2;
-        if (inlineStyles > 40) score -= 0.2;
+        // Check for large inline styles
+        if (content.html) {
+            const inlineStyleCount = (content.html.match(/style="/g) || [])
+                .length;
+            if (inlineStyleCount > 10) score -= 0.2;
+        }
 
-        // Check for expensive operations in event handlers
-        const expensiveOps = (
-            content.html.match(
-                /setTimeout|setInterval|requestAnimationFrame/g
-            ) || []
-        ).length;
-        if (expensiveOps > 5) score -= 0.2;
-        if (expensiveOps > 10) score -= 0.2;
+        console.log("Performance evaluation:", {
+            patternId: pattern.id,
+            score: Math.max(0, score),
+            maxScore,
+        });
 
         return Math.max(0, Math.min(score, maxScore));
     }
@@ -341,498 +472,194 @@ export class PatternEvolution extends Service {
         // Tournament selection
         const tournamentSize = 3;
         const tournament = Array(tournamentSize)
-            .fill(null)
+            .fill(0)
             .map(
                 () =>
                     evaluatedPopulation[
                         Math.floor(Math.random() * evaluatedPopulation.length)
                     ]
             );
+
         tournament.sort((a, b) => b.fitness - a.fitness);
+
+        console.log("Parent selection:", {
+            tournamentSize,
+            selectedPatternId: tournament[0].pattern.id,
+            selectedFitness: tournament[0].fitness,
+        });
+
         return tournament[0].pattern;
-    }
-
-    private async crossover(
-        parent1: GamePattern,
-        parent2: GamePattern
-    ): Promise<GamePattern> {
-        const crossedPattern = await this.crossoverContent(parent1, parent2);
-        return this.staging.validatePattern(crossedPattern);
-    }
-
-    private async crossoverContent(
-        parent1: GamePattern,
-        parent2: GamePattern
-    ): Promise<GamePattern> {
-        const html1 = parent1.content.html;
-        const html2 = parent2.content.html;
-
-        // Extract game elements from both parents
-        const elements1 =
-            html1.match(/<div[^>]*class="[^"]*game-[^"]*"[^>]*>.*?<\/div>/g) ||
-            [];
-        const elements2 =
-            html2.match(/<div[^>]*class="[^"]*game-[^"]*"[^>]*>.*?<\/div>/g) ||
-            [];
-
-        // Combine elements from both parents
-        const combinedElements = [...elements1, ...elements2];
-        const selectedElements = combinedElements
-            .sort(() => Math.random() - 0.5)
-            .slice(0, Math.floor(combinedElements.length / 2));
-
-        // Create new HTML with combined elements
-        let newHtml = html1;
-        const insertPosition = newHtml.lastIndexOf("</div>");
-        if (insertPosition !== -1) {
-            newHtml =
-                newHtml.slice(0, insertPosition) +
-                selectedElements.join("") +
-                newHtml.slice(insertPosition);
-        }
-
-        // Add game mechanics
-        newHtml = this.addGameMechanics(newHtml);
-
-        return {
-            ...parent1,
-            id: uuidv4(),
-            pattern_name: `${parent1.pattern_name}_${parent2.pattern_name}_crossover`,
-            content: { ...parent1.content, html: newHtml },
-        };
     }
 
     private async mutate(
         pattern: GamePattern,
         mutationRate: number
     ): Promise<GamePattern> {
-        const mutatedPattern = { ...pattern };
-        const content = mutatedPattern.content;
-
-        // Available mutation operators
-        const operators = [
-            "add_interaction",
-            "modify_style",
-            "add_animation",
-            "change_layout",
-            "add_game_element",
-        ];
-
-        // Log available operators
-        this.runtime.logger.debug("Available mutation operators:", operators);
-
-        // Always apply layout mutation first to ensure layout styles are present
-        content.html = this.applyLayoutMutation(content.html);
-
-        // Always apply game element mutation to ensure game elements are present
-        content.html = this.applyGameElementMutation(content.html);
-
-        // Add at least one more game element to ensure variety
-        content.html = this.applyGameElementMutation(content.html);
-
-        // Apply additional mutations based on rate
-        let mutationCount = 3; // Start at 3 since we've already applied 3 mutations
-        while (Math.random() < mutationRate && mutationCount < 10) {
-            // Filter out layout mutation since it's already applied
-            const availableOperators = operators.filter(
-                (op) => op !== "change_layout"
-            );
-            const operator =
-                availableOperators[
-                    Math.floor(Math.random() * availableOperators.length)
-                ];
-            this.runtime.logger.debug(
-                `Applying additional mutation: ${operator}`
-            );
-
-            switch (operator) {
-                case "add_game_element":
-                    content.html = this.applyGameElementMutation(content.html);
-                    break;
-                case "add_interaction":
-                    content.html = this.applyInteractionMutation(content.html);
-                    break;
-                case "modify_style":
-                    content.html = this.applyStyleMutation(content.html);
-                    break;
-                case "add_animation":
-                    content.html = this.applyAnimationMutation(content.html);
-                    break;
-            }
-            mutationCount++;
-        }
-
-        // Add game mechanics
-        content.html = this.addGameMechanics(content.html);
-
-        // Ensure layout styles weren't overwritten
-        if (!content.html.match(/(flex|grid|gap|justify-content)/)) {
-            content.html = this.applyLayoutMutation(content.html);
-        }
-
-        // Validate the mutated pattern
-        return await this.staging.validatePattern({
-            ...mutatedPattern,
-            id: uuidv4(),
-            pattern_name: `${pattern.pattern_name}_mutated_${Date.now()}`,
-            content,
+        console.log("Starting mutation:", {
+            patternId: pattern.id,
+            mutationRate,
         });
+
+        if (!pattern?.content?.html) {
+            console.warn("Cannot mutate pattern without content:", pattern.id);
+            return pattern;
+        }
+
+        try {
+            const dom = new JSDOM(pattern.content.html);
+            const document = dom.window.document;
+
+            // List of possible mutations
+            const mutations = [
+                this.mutateColors.bind(this),
+                this.mutateAnimations.bind(this),
+                this.mutateLayout.bind(this),
+            ];
+
+            // Apply random mutations based on mutation rate
+            for (const mutation of mutations) {
+                if (Math.random() < mutationRate) {
+                    console.log(`Applying mutation: ${mutation.name}`);
+                    await mutation(document);
+                }
+            }
+
+            const mutatedPattern: GamePattern = {
+                ...pattern,
+                id: uuidv4(),
+                pattern_name: `${pattern.pattern_name}_mutated`,
+                content: {
+                    ...pattern.content,
+                    html: dom.serialize(),
+                },
+            };
+
+            console.log("Mutation complete:", {
+                originalId: pattern.id,
+                mutatedId: mutatedPattern.id,
+            });
+
+            return mutatedPattern;
+        } catch (error) {
+            console.error("Error during mutation:", {
+                patternId: pattern.id,
+                error: error.message,
+            });
+            return pattern;
+        }
     }
 
-    private applyInteractionMutation(html: string): string {
-        const interactions = [
-            {
-                class: "interactive",
-                attr: "onclick=\"this.classList.toggle('active')\"",
-            },
-            {
-                class: "hoverable",
-                attr: "onmouseover=\"this.style.transform='scale(1.1)'\" onmouseout=\"this.style.transform='scale(1)'\"",
-            },
-            {
-                class: "draggable",
-                attr: 'draggable="true" ondragstart="event.dataTransfer.setData(\'text\', event.target.id)"',
-            },
-        ];
+    private async crossover(
+        parent1: GamePattern,
+        parent2: GamePattern
+    ): Promise<GamePattern> {
+        console.log("Starting crossover:", {
+            parent1Id: parent1.id,
+            parent2Id: parent2.id,
+        });
 
-        const interaction =
-            interactions[Math.floor(Math.random() * interactions.length)];
-        return html.replace(
-            /<div/i,
-            `<div class="${interaction.class}" ${interaction.attr}`
-        );
+        if (!parent1?.content?.html || !parent2?.content?.html) {
+            console.warn("Cannot perform crossover - missing content:", {
+                parent1HasContent: !!parent1?.content?.html,
+                parent2HasContent: !!parent2?.content?.html,
+            });
+            return parent1;
+        }
+
+        try {
+            const dom1 = new JSDOM(parent1.content.html);
+            const dom2 = new JSDOM(parent2.content.html);
+
+            // Swap some elements between parents
+            const elements1 =
+                dom1.window.document.querySelectorAll(".game-element");
+            const elements2 =
+                dom2.window.document.querySelectorAll(".game-element");
+
+            if (elements1.length > 0 && elements2.length > 0) {
+                const swapIndex = Math.floor(
+                    Math.random() * Math.min(elements1.length, elements2.length)
+                );
+                const temp = elements1[swapIndex].cloneNode(true);
+                elements1[swapIndex].replaceWith(
+                    elements2[swapIndex].cloneNode(true)
+                );
+                elements2[swapIndex].replaceWith(temp);
+            }
+
+            const offspring: GamePattern = {
+                ...parent1,
+                id: uuidv4(),
+                pattern_name: `${parent1.pattern_name}_${parent2.pattern_name}_offspring`,
+                content: {
+                    ...parent1.content,
+                    html: dom1.serialize(),
+                },
+            };
+
+            console.log("Crossover complete:", {
+                parent1Id: parent1.id,
+                parent2Id: parent2.id,
+                offspringId: offspring.id,
+            });
+
+            return offspring;
+        } catch (error) {
+            console.error("Error during crossover:", {
+                parent1Id: parent1.id,
+                parent2Id: parent2.id,
+                error: error.message,
+            });
+            return parent1;
+        }
     }
 
-    private applyStyleMutation(html: string): string {
-        const styles = [
-            "border: 2px solid #333; box-shadow: 2px 2px 5px rgba(0,0,0,0.2); margin: 10px;",
-            "color: rgb(23, 23, 23); font-weight: bold; text-shadow: 1px 1px 2px rgba(0,0,0,0.1);",
-            "background-color: rgb(168, 168, 168); border-radius: 8px; padding: 10px;",
-        ];
-
-        const style = styles[Math.floor(Math.random() * styles.length)];
-        return html.replace(
-            /style="([^"]*)"/,
-            (match, p1) => `style="${p1}; ${style}"`
-        );
-    }
-
-    private applyAnimationMutation(html: string): string {
-        const animations = [
-            "animation: pulse 2s infinite; transform: scale(1);",
-            "animation: rotate 3s linear infinite; transform-origin: center;",
-            "animation: bounce 1s infinite; transform: translateY(0);",
-        ];
-
-        const animation =
-            animations[Math.floor(Math.random() * animations.length)];
-        return html.replace(
-            /style="([^"]*)"/,
-            (match, p1) => `style="${p1}; ${animation}"`
-        );
-    }
-
-    private applyLayoutMutation(html: string): string {
-        const layouts = [
-            "display: flex; flex-direction: column; gap: 10px; justify-content: space-between;",
-            "display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 15px;",
-            "display: flex; flex-wrap: wrap; gap: 20px; justify-content: center;",
-        ];
-
-        const selectedLayout =
-            layouts[Math.floor(Math.random() * layouts.length)];
-        const doc = new JSDOM(html);
-
-        // Apply layout to multiple elements to ensure it appears in the output
-        const targets = [
-            ".container",
-            ".content",
-            ".progress-tracker",
-            ".box",
-            ".score",
-            ".progress",
-        ];
-
-        targets.forEach((selector) => {
-            const element = doc.window.document.querySelector(selector);
-            if (element) {
-                const currentStyle = element.getAttribute("style") || "";
-                element.setAttribute(
-                    "style",
-                    currentStyle + "; " + selectedLayout
+    private async mutateColors(document: Document): Promise<void> {
+        const styles = document.querySelectorAll("style");
+        styles.forEach((style) => {
+            if (style.textContent) {
+                style.textContent = style.textContent.replace(
+                    /#[0-9a-f]{6}/gi,
+                    () =>
+                        `#${Math.floor(Math.random() * 16777215)
+                            .toString(16)
+                            .padStart(6, "0")}`
                 );
             }
         });
-
-        return doc.window.document.body.innerHTML;
     }
 
-    private applyGameElementMutation(html: string): string {
-        const gameElements = [
-            `<div class="game-player" data-collision="true" data-speed="5" style="width: 32px; height: 32px; background-color: rgb(255, 0, 0); position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);">
-                <script>
-                    document.querySelector('.game-player').addEventListener('collision', (e) => {
-                        const target = e.target;
-                        if (target.classList.contains('game-powerup')) {
-                            window.gameState.addPowerup(target.dataset.effect, parseInt(target.dataset.duration));
-                            target.remove();
-                        } else if (target.classList.contains('game-portal')) {
-                            window.gameState.level++;
-                            document.dispatchEvent(new CustomEvent('nextLevel', { detail: { level: window.gameState.level } }));
-                        }
-                    });
-                </script>
-            </div>`,
-            `<div class="game-score" style="position: absolute; top: 10px; right: 10px; padding: 5px 10px; background-color: rgb(51, 51, 51); color: rgb(255, 255, 255); border-radius: 5px;">Score: 0</div>`,
-            `<div class="game-collectible" data-collision="true" data-points="10" style="width: 16px; height: 16px; background-color: rgb(255, 255, 0); position: absolute; border-radius: 50%; animation: float 2s infinite ease-in-out;"></div>`,
-            `<div class="game-powerup" data-collision="true" data-effect="speed" data-duration="5000" style="width: 16px; height: 16px; background-color: rgb(255, 255, 0); position: absolute; border-radius: 50%; animation: float 2s infinite ease-in-out;">
-                <script>
-                    document.querySelector('.game-powerup').addEventListener('collision', (e) => {
-                        const powerup = e.target;
-                        window.gameState.powerups.push({ effect: powerup.dataset.effect, expires: Date.now() + parseInt(powerup.dataset.duration) });
-                        powerup.remove();
-                    });
-                </script>
-            </div>`,
-        ];
-
-        const element =
-            gameElements[Math.floor(Math.random() * gameElements.length)];
-        const insertPoint = html.lastIndexOf("</div>");
-
-        return insertPoint !== -1
-            ? html.slice(0, insertPoint) + element + html.slice(insertPoint)
-            : html + element;
+    private async mutateAnimations(document: Document): Promise<void> {
+        const styles = document.querySelectorAll("style");
+        styles.forEach((style) => {
+            if (style.textContent) {
+                // Modify animation duration
+                style.textContent = style.textContent.replace(
+                    /animation:.*?(\d+)s/g,
+                    (match, duration) =>
+                        match.replace(
+                            duration,
+                            Math.max(0.5, Math.random() * 3).toFixed(1)
+                        )
+                );
+            }
+        });
     }
 
-    private addCollisionDetection(html: string): string {
-        // Add collision detection to existing game elements if they don't have it
-        return html.replace(
-            /class="(game-player|game-collectible|game-obstacle|game-portal|game-checkpoint)"([^>]*?)(?:data-collision="true")?([^>]*?)>/g,
-            'class="$1"$2 data-collision="true"$3>'
-        );
-    }
-
-    private addLevelProgression(html: string): string {
-        const progressionElements = [
-            `<div class="game-portal" data-collision="true" style="width: 40px; height: 40px; background: radial-gradient(circle, #4CAF50 0%, transparent 100%); position: absolute; animation: pulse 2s infinite;">
-                <div class="portal-label">Next Level</div>
-            </div>`,
-            `<div class="game-checkpoint" data-collision="true" style="width: 32px; height: 32px; background-color: #2196F3; position: absolute; border-radius: 4px;">
-                <div class="checkpoint-label">Checkpoint</div>
-            </div>`,
-        ];
-
-        const element =
-            progressionElements[
-                Math.floor(Math.random() * progressionElements.length)
-            ];
-        const insertPosition = html.lastIndexOf("</div>");
-        return insertPosition !== -1
-            ? html.slice(0, insertPosition) +
-                  element +
-                  html.slice(insertPosition)
-            : html + element;
-    }
-
-    private addGameMechanics(html: string): string {
-        // Ensure all game elements have collision detection
-        let updatedHtml = this.addCollisionDetection(html);
-
-        // Add level progression elements if not present
-        if (
-            !updatedHtml.includes("game-portal") &&
-            !updatedHtml.includes("game-checkpoint")
-        ) {
-            updatedHtml = this.addLevelProgression(updatedHtml);
-        }
-
-        // Insert all elements before closing body tag
-        const insertPosition = updatedHtml.lastIndexOf("</div>");
-        if (insertPosition === -1) return updatedHtml;
-
-        // Add game state management and controls
-        const gameElements = `
-            <script>
-                // Game state management
-                window.gameState = {
-                    score: 0,
-                    health: 100,
-                    level: 1,
-                    powerups: [],
-                    combo: 0,
-                    updateScore: function(points) {
-                        this.score += points * (this.combo + 1);
-                        document.querySelectorAll('.game-score').forEach(el => {
-                            el.textContent = 'Score: ' + this.score;
-                        });
-                    },
-                    updateHealth: function(amount) {
-                        this.health = Math.max(0, Math.min(100, this.health + amount));
-                        document.querySelectorAll('.health-bar').forEach(el => {
-                            el.style.width = this.health + '%';
-                        });
-                        if (this.health <= 0) this.gameOver();
-                    },
-                    addPowerup: function(effect, duration) {
-                        this.powerups.push({ effect, expires: Date.now() + duration });
-                        setTimeout(() => this.removePowerup(effect), duration);
-                        document.dispatchEvent(new CustomEvent('powerupAdded', { detail: { effect, duration } }));
-                    },
-                    removePowerup: function(effect) {
-                        this.powerups = this.powerups.filter(p => p.effect !== effect);
-                        document.dispatchEvent(new CustomEvent('powerupRemoved', { detail: { effect } }));
-                    },
-                    hasPowerup: function(effect) {
-                        return this.powerups.some(p => p.effect === effect && p.expires > Date.now());
-                    },
-                    gameOver: function() {
-                        document.dispatchEvent(new CustomEvent('gameOver', { detail: { score: this.score } }));
-                    }
-                };
-
-                // Player controls
-                document.addEventListener('keydown', (e) => {
-                    const player = document.querySelector('.game-player');
-                    if (!player) return;
-                    const speed = parseInt(player.dataset.speed) || 5;
-                    const speedBoost = gameState.hasPowerup('speed') ? 2 : 1;
-
-                    switch(e.key) {
-                        case 'ArrowLeft':
-                            player.style.left = (parseInt(player.style.left || '0') - speed * speedBoost) + 'px';
-                            break;
-                        case 'ArrowRight':
-                            player.style.left = (parseInt(player.style.left || '0') + speed * speedBoost) + 'px';
-                            break;
-                        case 'ArrowUp':
-                            player.style.top = (parseInt(player.style.top || '0') - speed * speedBoost) + 'px';
-                            break;
-                        case 'ArrowDown':
-                            player.style.top = (parseInt(player.style.top || '0') + speed * speedBoost) + 'px';
-                            break;
-                        case ' ':
-                            player.dispatchEvent(new CustomEvent('action'));
-                            break;
-                    }
-                    checkCollisions();
-                });
-
-                // Mobile controls
-                const controls = document.createElement('div');
-                controls.className = 'game-controls';
-                controls.style.cssText = 'position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); display: flex; gap: 20px;';
-
-                // Create left button
-                const leftBtn = document.createElement('button');
-                leftBtn.className = 'control-left';
-                leftBtn.textContent = '←';
-                leftBtn.addEventListener('touchstart', () => movePlayer('left'));
-                leftBtn.addEventListener('touchend', stopPlayer);
-
-                // Create right button
-                const rightBtn = document.createElement('button');
-                rightBtn.className = 'control-right';
-                rightBtn.textContent = '→';
-                rightBtn.addEventListener('touchstart', () => movePlayer('right'));
-                rightBtn.addEventListener('touchend', stopPlayer);
-
-                // Create action button
-                const actionBtn = document.createElement('button');
-                actionBtn.className = 'control-action';
-                actionBtn.textContent = 'Action';
-                actionBtn.addEventListener('touchstart', playerAction);
-
-                // Add buttons to controls
-                controls.appendChild(leftBtn);
-                controls.appendChild(rightBtn);
-                controls.appendChild(actionBtn);
-
-                document.body.appendChild(controls);
-
-                // Game mechanics
-                function checkCollisions() {
-                    const player = document.querySelector('.game-player');
-                    if (!player) return;
-
-                    document.querySelectorAll('[data-collision="true"]').forEach(element => {
-                        if (element === player) return;
-
-                        const rect1 = player.getBoundingClientRect();
-                        const rect2 = element.getBoundingClientRect();
-
-                        if (!(rect1.right < rect2.left ||
-                            rect1.left > rect2.right ||
-                            rect1.bottom < rect2.top ||
-                            rect1.top > rect2.bottom)) {
-
-                            element.dispatchEvent(new CustomEvent('collision', { detail: { player } }));
-
-                            if (element.classList.contains('game-collectible')) {
-                                gameState.updateScore(parseInt(element.dataset.points || '10'));
-                                element.remove();
-                            } else if (element.classList.contains('game-obstacle')) {
-                                gameState.updateHealth(-parseInt(element.dataset.damage || '20'));
-                            } else if (element.classList.contains('game-portal')) {
-                                gameState.level++;
-                                document.dispatchEvent(new CustomEvent('nextLevel', { detail: { level: gameState.level } }));
-                            } else if (element.classList.contains('game-checkpoint')) {
-                                document.dispatchEvent(new CustomEvent('checkpoint'));
-                            } else if (element.classList.contains('game-powerup')) {
-                                gameState.addPowerup(element.dataset.effect, parseInt(element.dataset.duration));
-                                element.remove();
-                            }
-                        }
-                    });
-                }
-
-                function movePlayer(direction) {
-                    const player = document.querySelector('.game-player');
-                    if (!player) return;
-                    const speed = parseInt(player.dataset.speed) || 5;
-                    const speedBoost = gameState.hasPowerup('speed') ? 2 : 1;
-
-                    switch(direction) {
-                        case 'left':
-                            player.style.left = (parseInt(player.style.left || '0') - speed * speedBoost) + 'px';
-                            break;
-                        case 'right':
-                            player.style.left = (parseInt(player.style.left || '0') + speed * speedBoost) + 'px';
-                            break;
-                    }
-                    checkCollisions();
-                }
-
-                function stopPlayer() {
-                    const player = document.querySelector('.game-player');
-                    if (!player) return;
-                    player.style.transition = 'none';
-                }
-
-                function playerAction() {
-                    const player = document.querySelector('.game-player');
-                    if (!player) return;
-                    player.dispatchEvent(new CustomEvent('action'));
-                    checkCollisions();
-                }
-
-                // Start game loop
-                setInterval(checkCollisions, 100);
-            </script>
-
-            <div class="game-player" data-collision="true" data-speed="5" style="width: 32px; height: 32px; background-color: rgb(255, 0, 0); position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);"></div>
-            <div class="game-portal" data-collision="true" data-next-level="true" style="width: 40px; height: 40px; background: radial-gradient(circle, #4CAF50 0%, transparent 100%); position: absolute; animation: pulse 2s infinite;">
-                <div class="portal-label">Next Level</div>
-            </div>
-            <div class="game-checkpoint" data-collision="true" data-save-point="true" style="width: 32px; height: 32px; background-color: #2196F3; position: absolute; border-radius: 4px;">
-                <div class="checkpoint-label">Checkpoint</div>
-            </div>
-        `;
-
-        return (
-            updatedHtml.slice(0, insertPosition) +
-            gameElements +
-            updatedHtml.slice(insertPosition)
-        );
+    private async mutateLayout(document: Document): Promise<void> {
+        const elements = document.querySelectorAll(".game-element");
+        elements.forEach((element) => {
+            const style = element.getAttribute("style") || "";
+            const newStyle = style
+                .replace(
+                    /width:.*?;/,
+                    `width: ${Math.floor(30 + Math.random() * 40)}px;`
+                )
+                .replace(
+                    /height:.*?;/,
+                    `height: ${Math.floor(30 + Math.random() * 40)}px;`
+                );
+            element.setAttribute("style", newStyle);
+        });
     }
 }

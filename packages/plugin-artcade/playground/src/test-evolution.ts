@@ -10,6 +10,14 @@ class MockPatternStaging extends PatternStagingService {
     private patterns: Map<string, GamePattern> = new Map();
 
     async validatePattern(pattern: GamePattern): Promise<GamePattern> {
+        console.log("Validating pattern:", {
+            id: pattern.id,
+            type: pattern.type,
+            hasContent: !!pattern.content,
+            hasHtml: !!pattern?.content?.html,
+            hasMetadata: !!pattern?.content?.metadata,
+        });
+
         // Basic validation
         const isValid =
             pattern &&
@@ -19,6 +27,9 @@ class MockPatternStaging extends PatternStagingService {
             pattern.content.html;
 
         if (!isValid) {
+            console.error("Pattern validation failed:", {
+                pattern: JSON.stringify(pattern, null, 2),
+            });
             throw new Error("Invalid pattern");
         }
 
@@ -26,11 +37,22 @@ class MockPatternStaging extends PatternStagingService {
     }
 
     async storePattern(pattern: GamePattern): Promise<void> {
+        console.log("Storing pattern:", {
+            id: pattern.id,
+            name: pattern.pattern_name,
+            type: pattern.type,
+        });
         this.patterns.set(pattern.id, pattern);
     }
 
     async getPattern(id: string): Promise<GamePattern | null> {
-        return this.patterns.get(id) || null;
+        const pattern = this.patterns.get(id);
+        console.log("Retrieved pattern:", {
+            id,
+            found: !!pattern,
+            type: pattern?.type,
+        });
+        return pattern || null;
     }
 }
 
@@ -38,21 +60,80 @@ class MockVectorDatabase extends VectorDatabase {
     private patterns: Map<string, GamePattern> = new Map();
 
     async storePattern(pattern: GamePattern): Promise<void> {
+        console.log("VectorDB storing pattern:", {
+            id: pattern.id,
+            name: pattern.pattern_name,
+            type: pattern.type,
+        });
         this.patterns.set(pattern.id, pattern);
-        console.log("Stored pattern:", pattern.id);
     }
 
     async getPattern(id: string): Promise<GamePattern | null> {
-        return this.patterns.get(id) || null;
+        const pattern = this.patterns.get(id);
+        console.log("VectorDB retrieved pattern:", {
+            id,
+            found: !!pattern,
+            type: pattern?.type,
+        });
+        return pattern || null;
     }
 
     async getPatternUsageStats(patternId: string): Promise<any> {
         const pattern = await this.getPattern(patternId);
+        console.log("Getting usage stats for pattern:", {
+            id: patternId,
+            found: !!pattern,
+        });
         return {
             total_uses: pattern?.usage_count || 0,
             successful_uses: pattern?.usage_count || 0,
             average_similarity: 0.85,
             last_used: new Date(),
+        };
+    }
+
+    async findSimilarPatterns(
+        embedding: number[],
+        type: string,
+        threshold: number,
+        limit: number = 5
+    ): Promise<any[]> {
+        console.log("Finding similar patterns:", {
+            type,
+            threshold,
+            limit,
+            embeddingLength: embedding?.length,
+        });
+
+        // Return array of patterns from our stored patterns
+        const patterns = Array.from(this.patterns.values())
+            .filter((p) => p.type === type)
+            .slice(0, limit)
+            .map((pattern) => ({
+                pattern,
+                similarity: 0.9,
+            }));
+
+        console.log("Found similar patterns:", {
+            count: patterns.length,
+            patterns: patterns.map((p) => ({
+                id: p.pattern.id,
+                type: p.pattern.type,
+                similarity: p.similarity,
+            })),
+        });
+
+        return patterns;
+    }
+
+    async extractPatternFeatures(html: string): Promise<any> {
+        console.log("Extracting features from HTML:", {
+            htmlLength: html?.length,
+        });
+        return {
+            elementCount: (html.match(/<[^>]+>/g) || []).length,
+            styleCount: (html.match(/<style[^>]*>/g) || []).length,
+            scriptCount: (html.match(/<script[^>]*>/g) || []).length,
         };
     }
 }
@@ -72,19 +153,39 @@ async function testPatternEvolution() {
         pattern_name: "test-animation",
         content: {
             html: `
-                <div class="game-container">
-                    <div class="game-element character">
-                        <style>
-                            .game-element {
-                                animation: bounce 1s infinite;
-                            }
-                            @keyframes bounce {
-                                0%, 100% { transform: translateY(0); }
-                                50% { transform: translateY(-20px); }
-                            }
-                        </style>
+                <!DOCTYPE html>
+                <html>
+                <body>
+                    <div class="game-container">
+                        <div class="game-element character">
+                            <div class="sprite"></div>
+                            <style>
+                                .game-container {
+                                    width: 100%;
+                                    height: 100%;
+                                    position: relative;
+                                    background: #f0f0f0;
+                                }
+                                .game-element {
+                                    position: absolute;
+                                    width: 50px;
+                                    height: 50px;
+                                    background: #00ff00;
+                                    animation: bounce 1s infinite;
+                                }
+                                .sprite {
+                                    width: 100%;
+                                    height: 100%;
+                                }
+                                @keyframes bounce {
+                                    0%, 100% { transform: translateY(0); }
+                                    50% { transform: translateY(-20px); }
+                                }
+                            </style>
+                        </div>
                     </div>
-                </div>
+                </body>
+                </html>
             `,
             css: "",
             js: "",
@@ -92,7 +193,7 @@ async function testPatternEvolution() {
             metadata: {
                 visual_type: "animation",
                 interaction_type: "character",
-                color_scheme: ["#00ff00"],
+                color_scheme: ["#00ff00", "#f0f0f0"],
                 animation_duration: "1s",
             },
         },
@@ -101,58 +202,13 @@ async function testPatternEvolution() {
         usage_count: 5,
     };
 
-    const secondPattern: GamePattern = {
-        id: "test-pattern-2",
-        type: "animation",
-        pattern_name: "test-animation-2",
-        content: {
-            html: `
-                <div class="game-container">
-                    <div class="game-element player">
-                        <style>
-                            .game-element {
-                                animation: rotate 2s infinite;
-                            }
-                            @keyframes rotate {
-                                from { transform: rotate(0deg); }
-                                to { transform: rotate(360deg); }
-                            }
-                        </style>
-                    </div>
-                </div>
-            `,
-            css: "",
-            js: "",
-            context: "game",
-            metadata: {
-                visual_type: "animation",
-                interaction_type: "player",
-                color_scheme: ["#ff0000"],
-                animation_duration: "2s",
-            },
-        },
-        embedding: Array(1536).fill(0),
-        effectiveness_score: 0.7,
-        usage_count: 3,
-    };
-
-    // Create a population of patterns
-    const patterns = [
-        samplePattern,
-        secondPattern,
-        {
-            ...samplePattern,
-            id: "test-pattern-3",
-            pattern_name: "test-animation-3",
-            effectiveness_score: 0.6,
-        },
-        {
-            ...secondPattern,
-            id: "test-pattern-4",
-            pattern_name: "test-animation-4",
-            effectiveness_score: 0.5,
-        },
-    ];
+    console.log("Created sample pattern:", {
+        id: samplePattern.id,
+        type: samplePattern.type,
+        hasContent: !!samplePattern.content,
+        hasHtml: !!samplePattern?.content?.html,
+        hasMetadata: !!samplePattern?.content?.metadata,
+    });
 
     const runtime = {
         logger: elizaLogger,
@@ -167,14 +223,19 @@ async function testPatternEvolution() {
             delete: async () => {},
         }),
         getVectorOperations: () => ({
-            initialize: async () => {},
-            findSimilar: async () =>
-                patterns.map((pattern, index) => ({
+            initialize: async () => {
+                console.log("Initializing vector operations");
+            },
+            findSimilar: async () => {
+                console.log("Finding similar patterns");
+                return [samplePattern].map((pattern, index) => ({
                     pattern,
                     similarity: 1 - index * 0.1,
-                })),
+                }));
+            },
         }),
         getService: (ServiceClass) => {
+            console.log("Getting service:", ServiceClass.name);
             if (ServiceClass === VectorDatabase) return vectorDb;
             if (ServiceClass === PatternEvolution) return evolutionService;
             if (ServiceClass === PatternStagingService) return stagingService;
@@ -182,14 +243,16 @@ async function testPatternEvolution() {
         },
     };
 
+    console.log("Initializing services...");
     await vectorDb.initialize(runtime);
     await stagingService.initialize(runtime);
     await evolutionService.initialize(runtime);
+    console.log("Services initialized");
 
-    // Store all patterns
-    for (const pattern of patterns) {
-        await stagingService.storePattern(pattern);
-    }
+    // Store pattern
+    console.log("Storing sample pattern...");
+    await stagingService.storePattern(samplePattern);
+    console.log("Sample pattern stored");
 
     console.log("Testing with sample pattern:", samplePattern.pattern_name);
 
@@ -209,11 +272,14 @@ async function testPatternEvolution() {
             0.8,
             5
         );
-        console.log("Similar patterns found:", similarPatterns.length);
-        console.log(
-            "Similarity scores:",
-            similarPatterns.map((p) => p.similarity)
-        );
+        console.log("Similar patterns found:", {
+            count: similarPatterns.length,
+            patterns: similarPatterns.map((p) => ({
+                id: p.pattern.id,
+                type: p.pattern.type,
+                similarity: p.similarity,
+            })),
+        });
 
         // 3. Compare with current implementation
         console.log("\nComparing with current implementation...");
@@ -229,7 +295,16 @@ async function testPatternEvolution() {
                 fitnessThreshold: 0.8,
             }
         );
-        console.log("Current implementation results:", currentResults);
+        console.log("Current implementation results:", {
+            generation: currentResults.generation,
+            fitness: currentResults.fitness,
+            pattern: {
+                id: currentResults.pattern.id,
+                type: currentResults.pattern.type,
+                hasContent: !!currentResults.pattern.content,
+                hasHtml: !!currentResults.pattern?.content?.html,
+            },
+        });
 
         // 4. Analyze differences
         console.log("\nAnalyzing differences between approaches:");
@@ -243,10 +318,24 @@ async function testPatternEvolution() {
         console.log("\nPerformance metrics:");
         const metrics = await vectorDb.getPatternUsageStats(samplePattern.id);
         console.log("Pattern usage stats:", metrics);
+
+        console.log("\nTest completed successfully");
     } catch (error) {
-        console.error("Error during testing:", error);
+        console.error("Error during testing:", {
+            name: error.name,
+            message: error.message,
+            stack: error.stack,
+        });
+        throw error;
     }
 }
 
 // Run the test
-testPatternEvolution().catch(console.error);
+console.log("Starting test execution...");
+testPatternEvolution().catch((error) => {
+    console.error("Test failed:", {
+        name: error.name,
+        message: error.message,
+        stack: error.stack,
+    });
+});
