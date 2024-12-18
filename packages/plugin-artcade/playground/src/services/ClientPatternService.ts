@@ -4,15 +4,13 @@ import {
     PatternGenerationResponse,
     PatternValidationError,
 } from "../shared/types/pattern.types";
+import { GamePattern } from "../../../src/types/patterns";
+import { PatternEffectivenessMetrics } from "../../../src/types/effectiveness";
 import { CLIENT_CONFIG } from "../config/clientConfig";
 
-interface ServiceResponse<T> {
-    success: boolean;
-    data?: T;
-    error?: {
-        message: string;
-        details?: any;
-    };
+interface EvolutionOptions {
+    mutationRate: number;
+    populationSize: number;
 }
 
 export class ClientPatternService {
@@ -39,7 +37,7 @@ export class ClientPatternService {
     private async fetchWithLogging<T>(
         endpoint: string,
         options: RequestInit = {}
-    ): Promise<ServiceResponse<T>> {
+    ): Promise<T> {
         const fullUrl = `${this.baseUrl}${endpoint}`;
         this.logger("info", `Fetching ${endpoint}`, {
             options: { ...options, headers: options.headers },
@@ -62,9 +60,18 @@ export class ClientPatternService {
                     `HTTP error ${response.status}:`,
                     responseData
                 );
-                throw new Error(
+
+                if (responseData.error?.details?.validationErrors) {
+                    throw new PatternValidationError(
+                        responseData.error.message || `Validation failed`,
+                        responseData.error.details.validationErrors
+                    );
+                }
+
+                throw new PatternGenerationError(
                     responseData.error?.message ||
-                        `HTTP error ${response.status}`
+                        `HTTP error ${response.status}`,
+                    responseData.error?.details
                 );
             }
 
@@ -76,9 +83,7 @@ export class ClientPatternService {
             return responseData;
         } catch (error) {
             this.logger("error", `Request failed:`, error);
-            throw error instanceof Error
-                ? error
-                : new Error("Unknown error occurred");
+            throw error;
         }
     }
 
@@ -101,35 +106,106 @@ export class ClientPatternService {
         }
     }
 
-    async generatePattern(prompt: string): Promise<GeneratedPattern> {
+    async generatePattern(prompt: string): Promise<PatternGenerationResponse> {
         this.logger("info", "Generating pattern with prompt:", prompt);
 
         try {
-            const response = await this.fetchWithLogging<GeneratedPattern>(
-                "/generate",
-                {
-                    method: "POST",
-                    body: JSON.stringify({ prompt }),
-                }
-            );
-
-            if (!response.success || !response.data) {
-                throw new PatternGenerationError(
-                    response.error?.message || "Failed to generate pattern",
-                    response.error?.details
+            const response =
+                await this.fetchWithLogging<PatternGenerationResponse>(
+                    "/generate",
+                    {
+                        method: "POST",
+                        body: JSON.stringify({ prompt }),
+                    }
                 );
+
+            return response;
+        } catch (error) {
+            if (
+                error instanceof PatternValidationError ||
+                error instanceof PatternGenerationError
+            ) {
+                return {
+                    success: false,
+                    error: {
+                        message: error.message,
+                        details:
+                            error instanceof PatternValidationError
+                                ? { validationErrors: error.validationErrors }
+                                : error instanceof PatternGenerationError
+                                  ? error.details
+                                  : undefined,
+                    },
+                };
             }
 
-            return response.data;
-        } catch (error) {
-            if (error instanceof PatternGenerationError) {
-                throw error;
-            }
+            return {
+                success: false,
+                error: {
+                    message:
+                        error instanceof Error
+                            ? error.message
+                            : "Unknown error occurred",
+                },
+            };
+        }
+    }
+
+    async getGeneratedPattern(prompt: string): Promise<GeneratedPattern> {
+        const response = await this.generatePattern(prompt);
+        if (!response.success || !response.data) {
             throw new PatternGenerationError(
-                "Failed to generate pattern",
-                error instanceof Error ? error.message : "Unknown error"
+                response.error?.message || "Failed to generate pattern",
+                response.error?.details
             );
         }
+        return response.data;
+    }
+
+    async getAllPatterns(): Promise<GamePattern[]> {
+        return this.fetchWithLogging<GamePattern[]>("/patterns");
+    }
+
+    async searchSimilarPatterns(pattern: GamePattern): Promise<GamePattern[]> {
+        return this.fetchWithLogging<GamePattern[]>(
+            "/patterns/search/similar",
+            {
+                method: "POST",
+                body: JSON.stringify({
+                    html: pattern.content.html,
+                    type: pattern.type,
+                }),
+            }
+        );
+    }
+
+    async comparePatterns(
+        sourceHtml: string,
+        targetPattern: GamePattern
+    ): Promise<PatternEffectivenessMetrics> {
+        return this.fetchWithLogging<PatternEffectivenessMetrics>(
+            "/patterns/compare",
+            {
+                method: "POST",
+                body: JSON.stringify({
+                    sourceHtml,
+                    targetPattern,
+                }),
+            }
+        );
+    }
+
+    async evolvePattern(
+        pattern: GamePattern,
+        options: EvolutionOptions
+    ): Promise<GamePattern> {
+        return this.fetchWithLogging<GamePattern>("/patterns/evolve", {
+            method: "POST",
+            body: JSON.stringify({
+                pattern,
+                options,
+            }),
+        });
     }
 }
 

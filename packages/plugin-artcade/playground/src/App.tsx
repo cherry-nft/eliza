@@ -9,33 +9,39 @@ import { clientPatternService } from './services/ClientPatternService';
 import { GamePattern } from '../../src/types/patterns';
 import { PatternEffectivenessMetrics } from '../../src/types/effectiveness';
 
-const App: React.FC = () => {
-  console.log('App component rendering');
-
-  const [patterns, setPatterns] = useState<GamePattern[]>([]);
-  const [selectedPattern, setSelectedPattern] = useState<GamePattern | null>(null);
-  const [claudeOutput, setClaudeOutput] = useState<{
+interface ClaudeOutput {
     plan: {
-      coreMechanics: string[];
-      visualElements: string[];
-      interactionFlow: string[];
-      stateManagement: string[];
-      assetRequirements: string[];
+        coreMechanics: string[];
+        visualElements: string[];
+        interactionFlow: Array<{
+            trigger: string;
+            action: string;
+            description: string;
+        }>;
+        stateManagement: string[];
+        assetRequirements: string[];
     };
     title: string;
     description: string;
     html: string;
     thumbnail: {
-      alt: string;
-      backgroundColor: string;
-      elements: Array<{
-        type: "rect" | "circle" | "path";
-        attributes: Record<string, string>;
-      }>;
+        alt: string;
+        backgroundColor: string;
+        elements: Array<{
+            type: "rect" | "circle" | "path";
+            attributes: Record<string, string>;
+        }>;
     };
-  } | null>(null);
+}
+
+const App: React.FC = () => {
+  console.log('App component rendering');
+
+  const [patterns, setPatterns] = useState<GamePattern[]>([]);
+  const [selectedPattern, setSelectedPattern] = useState<GamePattern | null>(null);
+  const [claudeOutput, setClaudeOutput] = useState<ClaudeOutput | null>(null);
   const [metrics, setMetrics] = useState<PatternEffectivenessMetrics | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState<boolean>(false);
 
   useEffect(() => {
     console.log('Initial useEffect running');
@@ -74,23 +80,46 @@ const App: React.FC = () => {
     setLoading(true);
     try {
       console.log('Generating pattern from prompt');
-      const generatedPattern = await clientPatternService.generatePattern(prompt);
-      console.log('Generated pattern:', generatedPattern);
-      setClaudeOutput(generatedPattern);
+      const response = await clientPatternService.generatePattern(prompt);
+      console.log('Generated pattern response:', response);
+
+      if (!response.success || !response.data) {
+        throw new Error(response.error?.message || 'Failed to generate pattern');
+      }
+
+      const isValidClaudeOutput = (data: any): data is ClaudeOutput => {
+        return (
+          data &&
+          typeof data === 'object' &&
+          'plan' in data &&
+          'title' in data &&
+          'description' in data &&
+          'html' in data &&
+          'thumbnail' in data &&
+          typeof data.plan === 'object' &&
+          Array.isArray(data.plan.coreMechanics)
+        );
+      };
+
+      if (!isValidClaudeOutput(response.data)) {
+        throw new Error('Invalid pattern data structure received');
+      }
+
+      setClaudeOutput(response.data);
 
       if (patterns.length > 0) {
         console.log('Creating game pattern from Claude output');
         const generatedGamePattern: GamePattern = {
           id: 'generated',
           type: 'game_mechanic',
-          pattern_name: generatedPattern.title,
+          pattern_name: response.data.title,
           content: {
-            html: generatedPattern.html,
+            html: response.data.html,
             context: 'game',
             metadata: {
-              game_mechanics: generatedPattern.plan.coreMechanics.map(mechanic => ({
+              game_mechanics: response.data.plan.coreMechanics.map((mechanic: string) => ({
                 type: mechanic,
-                properties: {}
+                properties: {} as Record<string, any>
               }))
             }
           },
@@ -109,7 +138,7 @@ const App: React.FC = () => {
           setSelectedPattern(similarPatterns[0]);
 
           console.log('Comparing patterns');
-          const metrics = await clientPatternService.comparePatterns(generatedPattern.html, similarPatterns[0]);
+          const metrics = await clientPatternService.comparePatterns(response.data.html, similarPatterns[0]);
           console.log('Pattern comparison metrics:', metrics);
           setMetrics(metrics);
         }
@@ -139,9 +168,9 @@ const App: React.FC = () => {
           html: claudeOutput.html,
           context: 'game',
           metadata: {
-            game_mechanics: claudeOutput.plan.coreMechanics.map(mechanic => ({
+            game_mechanics: claudeOutput.plan.coreMechanics.map((mechanic: string) => ({
               type: mechanic,
-              properties: {}
+              properties: {} as Record<string, any>
             }))
           }
         },
