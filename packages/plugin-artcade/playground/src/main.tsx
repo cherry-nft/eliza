@@ -2,6 +2,10 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { ThemeProvider, createTheme, CssBaseline } from '@mui/material';
 import App from './App';
+import { validateEnv } from './config/clientEnv';
+
+// Validate environment variables early
+validateEnv();
 
 const theme = createTheme({
   palette: {

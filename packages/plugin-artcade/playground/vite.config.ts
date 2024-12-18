@@ -38,6 +38,7 @@ export default defineConfig(({ mode }) => {
             ],
             exclude: [
                 "@ai16z/plugin-artcade",
+                "onnxruntime-node",
                 "@anush008/tokenizers",
                 "@anush008/tokenizers-darwin-universal",
             ],
@@ -55,12 +56,13 @@ export default defineConfig(({ mode }) => {
             commonjsOptions: {
                 exclude: [
                     "@ai16z/plugin-artcade/**",
+                    "onnxruntime-node/**",
                     "@anush008/tokenizers/**",
                     "@anush008/tokenizers-darwin-universal/**",
                 ],
             },
             rollupOptions: {
-                external: ["path", "url"],
+                external: ["path", "url", "onnxruntime-node", /\.node$/],
             },
         },
         ssr: {

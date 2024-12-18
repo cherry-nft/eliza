@@ -4,6 +4,7 @@ import {
     PatternGenerationResponse,
     PatternValidationError,
 } from "../shared/types/pattern.types";
+import { CLIENT_CONFIG } from "../config/clientConfig";
 
 interface ServiceResponse<T> {
     success: boolean;
@@ -18,7 +19,7 @@ export class ClientPatternService {
     private readonly baseUrl: string;
     private readonly logger: (level: "info" | "error", ...args: any[]) => void;
 
-    constructor(baseUrl = "http://localhost:3001/api/patterns") {
+    constructor(baseUrl = CLIENT_CONFIG.API_BASE_URL) {
         this.baseUrl = baseUrl;
         this.logger = this.createLogger();
         this.logger("info", "Service initialized");

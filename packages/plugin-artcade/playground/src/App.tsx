@@ -5,7 +5,7 @@ import EmbeddingVisualizer from './components/EmbeddingVisualizer';
 import MetricsPanel from './components/MetricsPanel';
 import Controls from './components/Controls';
 import PromptInput from './components/PromptInput';
-import { patternService } from './services/PG-PatternService';
+import { clientPatternService } from './services/ClientPatternService';
 import { GamePattern } from '../../src/types/patterns';
 import { PatternEffectivenessMetrics } from '../../src/types/effectiveness';
 
@@ -41,8 +41,12 @@ const App: React.FC = () => {
     console.log('Initial useEffect running');
     const initializePatterns = async () => {
       console.log('Initializing patterns');
-      await patternService.initialize();
-      const loadedPatterns = await patternService.getPatterns();
+      const isHealthy = await clientPatternService.healthCheck();
+      if (!isHealthy) {
+        console.error('Pattern service health check failed');
+        return;
+      }
+      const loadedPatterns = await clientPatternService.getAllPatterns();
       console.log('Loaded patterns:', loadedPatterns);
       setPatterns(loadedPatterns);
       if (loadedPatterns.length > 0) {
@@ -70,7 +74,7 @@ const App: React.FC = () => {
     setLoading(true);
     try {
       console.log('Generating pattern from prompt');
-      const generatedPattern = await patternService.generateFromPrompt(prompt);
+      const generatedPattern = await clientPatternService.generateFromPrompt(prompt);
       console.log('Generated pattern:', generatedPattern);
       setClaudeOutput(generatedPattern);
 
@@ -97,7 +101,7 @@ const App: React.FC = () => {
         console.log('Created game pattern:', generatedGamePattern);
 
         console.log('Searching for similar patterns');
-        const similarPatterns = await patternService.searchSimilarPatterns(generatedGamePattern);
+        const similarPatterns = await clientPatternService.searchSimilarPatterns(generatedGamePattern);
         console.log('Found similar patterns:', similarPatterns);
 
         if (similarPatterns.length > 0) {
@@ -105,7 +109,7 @@ const App: React.FC = () => {
           setSelectedPattern(similarPatterns[0]);
 
           console.log('Comparing patterns');
-          const metrics = await patternService.comparePatterns(generatedPattern.html, similarPatterns[0]);
+          const metrics = await clientPatternService.comparePatterns(generatedPattern.html, similarPatterns[0]);
           console.log('Pattern comparison metrics:', metrics);
           setMetrics(metrics);
         }
@@ -148,7 +152,7 @@ const App: React.FC = () => {
       console.log('Current pattern for evolution:', currentPattern);
 
       console.log('Evolving pattern');
-      const evolvedPattern = await patternService.evolvePattern(currentPattern, {
+      const evolvedPattern = await clientPatternService.evolvePattern(currentPattern, {
         mutationRate: 0.3,
         populationSize: 10
       });
@@ -161,7 +165,7 @@ const App: React.FC = () => {
       });
 
       console.log('Searching for similar patterns to evolved pattern');
-      const similarPatterns = await patternService.searchSimilarPatterns(evolvedPattern);
+      const similarPatterns = await clientPatternService.searchSimilarPatterns(evolvedPattern);
       console.log('Found similar patterns:', similarPatterns);
 
       if (similarPatterns.length > 0) {
@@ -169,7 +173,7 @@ const App: React.FC = () => {
         setSelectedPattern(similarPatterns[0]);
 
         console.log('Comparing evolved pattern');
-        const metrics = await patternService.comparePatterns(evolvedPattern.content.html, similarPatterns[0]);
+        const metrics = await clientPatternService.comparePatterns(evolvedPattern.content.html, similarPatterns[0]);
         console.log('Evolution comparison metrics:', metrics);
         setMetrics(metrics);
       }
