@@ -183,7 +183,8 @@ const App: React.FC = () => {
       console.log('Evolving pattern');
       const evolvedPattern = await clientPatternService.evolvePattern(currentPattern, {
         mutationRate: 0.3,
-        populationSize: 10
+        populationSize: 10,
+        patternType: "game_mechanic"
       });
       console.log('Evolved pattern:', evolvedPattern);
 

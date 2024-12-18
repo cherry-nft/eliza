@@ -198,15 +198,121 @@ export class ClientPatternService {
 
     async evolvePattern(
         pattern: GamePattern,
-        options: EvolutionOptions
+        options: EvolutionOptions & {
+            patternType:
+                | "animation"
+                | "layout"
+                | "interaction"
+                | "style"
+                | "game_mechanic";
+        }
     ): Promise<GamePattern> {
-        return this.fetchWithLogging<GamePattern>("/patterns/evolve", {
-            method: "POST",
-            body: JSON.stringify({
-                pattern,
-                options,
-            }),
-        });
+        this.logger("info", "Evolving pattern with options:", options);
+
+        try {
+            // Configure evolution based on pattern type
+            const evolutionConfig = {
+                populationSize: options.populationSize,
+                maxGenerations: 1, // We want immediate feedback for the UI
+                mutationRate: options.mutationRate,
+                crossoverRate: 0.8,
+                elitismCount: 1,
+                tournamentSize: 3,
+            };
+
+            // Create targeted mutation operators based on pattern type
+            const mutationOperators = this.createTargetedMutationOperators(
+                options.patternType
+            );
+
+            const response = await this.fetchWithLogging<{
+                success: boolean;
+                data?: {
+                    evolved_html: string;
+                    applied_patterns: string[];
+                    fitness_scores: Record<string, number>;
+                };
+            }>("/patterns/evolve", {
+                method: "POST",
+                body: JSON.stringify({
+                    pattern: {
+                        html: pattern.content.html,
+                        type: options.patternType,
+                        mutation_operators: mutationOperators,
+                    },
+                    config: evolutionConfig,
+                }),
+            });
+
+            if (!response.success || !response.data) {
+                throw new Error("Evolution failed");
+            }
+
+            // Create evolved pattern with the same structure as original
+            return {
+                ...pattern,
+                content: {
+                    ...pattern.content,
+                    html: response.data.evolved_html,
+                    metadata: {
+                        ...pattern.content.metadata,
+                        evolution: {
+                            parent_pattern_id: pattern.id,
+                            applied_patterns: response.data.applied_patterns,
+                            mutation_type: options.patternType,
+                            fitness_scores: response.data.fitness_scores,
+                        },
+                    },
+                },
+            };
+        } catch (error) {
+            this.logger("error", "Evolution failed:", error);
+            throw error;
+        }
+    }
+
+    private createTargetedMutationOperators(
+        patternType: GamePattern["type"]
+    ): Array<{
+        name: string;
+        weight: number;
+        type: string;
+    }> {
+        switch (patternType) {
+            case "animation":
+                return [
+                    { name: "add_transition", weight: 1, type: "css" },
+                    { name: "add_keyframe", weight: 1, type: "css" },
+                    { name: "modify_timing", weight: 0.5, type: "css" },
+                ];
+            case "layout":
+                return [
+                    { name: "adjust_grid", weight: 1, type: "css" },
+                    { name: "modify_flexbox", weight: 1, type: "css" },
+                    { name: "update_positioning", weight: 0.5, type: "css" },
+                ];
+            case "interaction":
+                return [
+                    { name: "add_event_listener", weight: 1, type: "js" },
+                    { name: "enhance_controls", weight: 1, type: "js" },
+                    { name: "add_feedback", weight: 0.5, type: "js" },
+                ];
+            case "style":
+                return [
+                    { name: "update_colors", weight: 1, type: "css" },
+                    { name: "modify_typography", weight: 1, type: "css" },
+                    { name: "enhance_visuals", weight: 0.5, type: "css" },
+                ];
+            case "game_mechanic":
+                return [
+                    { name: "add_scoring", weight: 1, type: "js" },
+                    { name: "enhance_collision", weight: 1, type: "js" },
+                    { name: "add_powerup", weight: 0.5, type: "js" },
+                    { name: "add_obstacle", weight: 0.5, type: "js" },
+                ];
+            default:
+                return [];
+        }
     }
 
     async storeExistingPattern(

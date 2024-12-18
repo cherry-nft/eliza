@@ -17,6 +17,12 @@ export interface GamePattern {
                 type: string;
                 properties: Record<string, any>;
             }>;
+            evolution?: {
+                parent_pattern_id: string;
+                applied_patterns: string[];
+                mutation_type: GamePattern["type"];
+                fitness_scores: Record<string, number>;
+            };
         };
     };
     embedding: number[];
