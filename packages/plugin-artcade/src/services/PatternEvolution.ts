@@ -544,6 +544,8 @@ export class PatternEvolution extends Service {
                                 overflow: hidden;
                                 background-color: #f0f0f0;
                                 display: flex;
+                                flex-direction: column;
+                                gap: 1rem;
                                 justify-content: center;
                                 align-items: center;
                             }
@@ -766,29 +768,65 @@ export class PatternEvolution extends Service {
             const mutationCount = Math.floor(Math.random() * 3) + 2;
             console.log(`Applying ${mutationCount} mutations`);
 
-            for (let i = 0; i < mutationCount; i++) {
+            // Always apply layout mutation first
+            console.log("Applying first mutation: change_layout");
+            try {
+                const layoutStyleTag = $.querySelector("style");
+                if (layoutStyleTag) {
+                    const layoutStyles = [
+                        ".game-container { display: flex; flex-direction: column; gap: 1rem; justify-content: center; align-items: center; }",
+                        ".game-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 15px; justify-content: center; }",
+                        ".game-container { display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; align-items: center; }",
+                        ".game-container { display: grid; grid-template-areas: 'header header' 'nav main' 'footer footer'; gap: 10px; justify-content: stretch; }",
+                    ];
+                    const selectedLayout =
+                        layoutStyles[
+                            Math.floor(Math.random() * layoutStyles.length)
+                        ];
+                    if (!layoutStyleTag.textContent.includes(selectedLayout)) {
+                        layoutStyleTag.textContent += "\n" + selectedLayout;
+                        console.log("Added layout styles:", selectedLayout);
+                    }
+                }
+            } catch (err) {
+                console.error("Error applying layout mutation:", err);
+            }
+
+            // Apply remaining random mutations
+            for (let i = 1; i < mutationCount; i++) {
                 const operator =
                     mutationOperators[
                         Math.floor(Math.random() * mutationOperators.length)
                     ];
-                console.log(`Applying mutation operator: ${operator}`);
+                console.log(`Applying additional mutation: ${operator}`);
 
                 try {
                     switch (operator) {
                         case "add_game_element":
                             console.log("Adding game element");
                             const elements = [
-                                '<div class="enemy game-element" style="left: ' +
+                                '<div class="game-player" style="width: 32px; height: 32px; background-color: #00f; position: absolute; left: ' +
                                     (Math.random() * 80 + 10) +
                                     "%; top: " +
                                     (Math.random() * 80 + 10) +
                                     '%;"></div>',
-                                '<div class="collectible game-element" style="left: ' +
+                                '<div class="game-score" style="position: absolute; top: 10px; right: 10px; padding: 5px 10px; background-color: #333; color: #fff; border-radius: 5px;">Score: 0</div>',
+                                '<div class="game-collectible" style="width: 16px; height: 16px; background-color: #ff0; position: absolute; border-radius: 50%; animation: float 2s infinite ease-in-out; left: ' +
                                     (Math.random() * 80 + 10) +
                                     "%; top: " +
                                     (Math.random() * 80 + 10) +
                                     '%;"></div>',
-                                '<div class="power-up game-element" style="left: ' +
+                                '<div class="game-powerup" style="width: 24px; height: 24px; background-color: #0f0; position: absolute; border-radius: 4px; animation: pulse 1s infinite; left: ' +
+                                    (Math.random() * 80 + 10) +
+                                    "%; top: " +
+                                    (Math.random() * 80 + 10) +
+                                    '%;"></div>',
+                                '<div class="game-portal" style="width: 40px; height: 40px; background-color: #f0f; position: absolute; border-radius: 50%; animation: rotate 3s infinite linear; left: ' +
+                                    (Math.random() * 80 + 10) +
+                                    "%; top: " +
+                                    (Math.random() * 80 + 10) +
+                                    '%;"></div>',
+                                '<div class="game-checkpoint" style="width: 32px; height: 32px; background-color: #0ff; position: absolute; border: 2px solid #fff; left: ' +
                                     (Math.random() * 80 + 10) +
                                     "%; top: " +
                                     (Math.random() * 80 + 10) +
@@ -798,10 +836,10 @@ export class PatternEvolution extends Service {
                                 elements[
                                     Math.floor(Math.random() * elements.length)
                                 ];
-                            const container =
+                            const gameContainer =
                                 $.querySelector(".game-container");
-                            if (container) {
-                                container.appendChild(parse(element));
+                            if (gameContainer) {
+                                gameContainer.appendChild(parse(element));
                                 console.log("Added game element:", element);
                             }
                             break;
@@ -862,13 +900,13 @@ export class PatternEvolution extends Service {
 
                         case "change_layout":
                             console.log("Modifying layout");
-                            const layoutStyleTag = $.querySelector("style");
-                            if (layoutStyleTag) {
+                            const rootContainer = $.querySelector(".container");
+                            if (rootContainer) {
                                 const layoutStyles = [
-                                    ".game-container { display: flex; flex-direction: column; gap: 1rem; justify-content: center; align-items: center; }",
-                                    ".game-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 15px; justify-content: center; }",
-                                    ".game-container { display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; align-items: center; }",
-                                    ".game-container { display: grid; grid-template-areas: 'header header' 'nav main' 'footer footer'; gap: 10px; justify-content: stretch; }",
+                                    "display: flex; flex-direction: column; gap: 1rem; justify-content: center; align-items: center;",
+                                    "display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 15px; justify-content: center;",
+                                    "display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; align-items: center;",
+                                    "display: grid; grid-template-areas: 'header header' 'nav main' 'footer footer'; gap: 10px; justify-content: stretch;",
                                 ];
                                 const selectedLayout =
                                     layoutStyles[
@@ -876,18 +914,37 @@ export class PatternEvolution extends Service {
                                             Math.random() * layoutStyles.length
                                         )
                                     ];
-                                if (
-                                    !layoutStyleTag.textContent.includes(
-                                        selectedLayout
-                                    )
-                                ) {
-                                    layoutStyleTag.textContent +=
-                                        "\n" + selectedLayout;
-                                    console.log(
-                                        "Added layout styles:",
-                                        selectedLayout
-                                    );
+                                const currentStyle =
+                                    rootContainer.getAttribute("style") || "";
+                                const newStyle = `${currentStyle} ${selectedLayout}`;
+                                rootContainer.setAttribute("style", newStyle);
+                                console.log("Layout mutation details:", {
+                                    selectedLayout,
+                                    currentStyle,
+                                    newStyle,
+                                    containerHtml: rootContainer.toString(),
+                                });
+
+                                // Also add to style tag for persistence
+                                const styleTag = $.querySelector("style");
+                                if (styleTag) {
+                                    const containerStyle = `.container { ${selectedLayout} }`;
+                                    if (
+                                        !styleTag.textContent.includes(
+                                            containerStyle
+                                        )
+                                    ) {
+                                        styleTag.textContent += `\n${containerStyle}`;
+                                        console.log(
+                                            "Added layout styles to style tag:",
+                                            containerStyle
+                                        );
+                                    }
                                 }
+                            } else {
+                                console.warn(
+                                    "No root container found for layout mutation"
+                                );
                             }
                             break;
                     }
