@@ -15,6 +15,8 @@ export interface PatternEffectivenessMetrics {
         interactive: number;
         functional: number;
         performance: number;
+        accessibility: number;
+        code_quality: number;
     };
     usage_stats: {
         total_uses: number;

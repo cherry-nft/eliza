@@ -8,7 +8,8 @@ import {
   Select,
   MenuItem,
   Button,
-  Grid
+  Grid,
+  Alert
 } from '@mui/material';
 import { GamePattern } from '../../../src/types/patterns';
 
@@ -17,13 +18,15 @@ interface ControlsProps {
   onReset?: () => void;
   onParameterChange?: (param: string, value: any) => void;
   selectedPattern?: GamePattern | null;
+  evolutionErrors?: string[];
 }
 
 const Controls: React.FC<ControlsProps> = ({
   onEvolve,
   onReset,
   onParameterChange = () => {},
-  selectedPattern
+  selectedPattern,
+  evolutionErrors = []
 }) => {
   const patternTypes = [
     'animation',
@@ -38,6 +41,14 @@ const Controls: React.FC<ControlsProps> = ({
       <Typography variant="h6" gutterBottom>
         Pattern Controls
       </Typography>
+
+      {evolutionErrors.length > 0 && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {evolutionErrors.map((error, index) => (
+            <div key={index}>{error}</div>
+          ))}
+        </Alert>
+      )}
 
       <Grid container spacing={3}>
         {/* Pattern Type Selection */}

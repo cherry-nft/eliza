@@ -34,6 +34,26 @@ interface ClaudeOutput {
     };
 }
 
+interface EvolutionParameters {
+  mutationRate: number;
+  populationSize: number;
+  patternType: GamePattern["type"];
+}
+
+const validateEvolutionParams = (params: EvolutionParameters): string[] => {
+  const errors: string[] = [];
+  if (params.mutationRate < 0 || params.mutationRate > 1) {
+    errors.push('Mutation rate must be between 0 and 1');
+  }
+  if (params.populationSize < 5 || params.populationSize > 50) {
+    errors.push('Population size must be between 5 and 50');
+  }
+  if (!["animation", "layout", "interaction", "style", "game_mechanic"].includes(params.patternType)) {
+    errors.push('Invalid pattern type');
+  }
+  return errors;
+};
+
 const App: React.FC = () => {
   console.log('App component rendering');
 
@@ -42,6 +62,19 @@ const App: React.FC = () => {
   const [claudeOutput, setClaudeOutput] = useState<ClaudeOutput | null>(null);
   const [metrics, setMetrics] = useState<PatternEffectivenessMetrics | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
+  const [evolutionParams, setEvolutionParams] = useState<EvolutionParameters>({
+    mutationRate: 0.3,
+    populationSize: 10,
+    patternType: "game_mechanic"
+  });
+  const [evolutionErrors, setEvolutionErrors] = useState<string[]>([]);
+
+  // Validate evolution parameters when they change
+  useEffect(() => {
+    console.log('Evolution parameters changed:', evolutionParams);
+    const errors = validateEvolutionParams(evolutionParams);
+    setEvolutionErrors(errors);
+  }, [evolutionParams]);
 
   useEffect(() => {
     console.log('Initial useEffect running');
@@ -151,42 +184,54 @@ const App: React.FC = () => {
   };
 
   const handleEvolvePattern = async () => {
-    console.log('Handling evolve pattern');
+    console.log('Starting pattern evolution process');
     if (!claudeOutput) {
-      console.log('No Claude output to evolve');
+      console.error('Evolution failed: No Claude output to evolve');
+      return;
+    }
+
+    const errors = validateEvolutionParams(evolutionParams);
+    if (errors.length > 0) {
+      console.error('Evolution failed: Invalid parameters:', errors);
       return;
     }
 
     setLoading(true);
     try {
-      console.log('Creating current pattern for evolution');
+      console.log('Creating pattern for evolution with params:', evolutionParams);
       const currentPattern: GamePattern = {
         id: 'current',
-        type: selectedPattern?.type || 'game_mechanic',
+        type: selectedPattern?.type || evolutionParams.patternType,
         pattern_name: claudeOutput.title,
         content: {
           html: claudeOutput.html,
-          context: 'game',
+          context: 'evolution',
           metadata: {
             game_mechanics: claudeOutput.plan.coreMechanics.map((mechanic: string) => ({
               type: mechanic,
               properties: {} as Record<string, any>
-            }))
+            })),
+            evolution: {
+              parent_pattern_id: selectedPattern?.id || 'root',
+              applied_patterns: [],
+              mutation_type: evolutionParams.patternType,
+              fitness_scores: {}
+            }
           }
         },
         embedding: [],
-        effectiveness_score: 1.0,
+        effectiveness_score: selectedPattern?.effectiveness_score || 0,
         usage_count: 0
       };
-      console.log('Current pattern for evolution:', currentPattern);
+      console.log('Created base pattern for evolution:', currentPattern);
 
-      console.log('Evolving pattern');
-      const evolvedPattern = await clientPatternService.evolvePattern(currentPattern, {
-        mutationRate: 0.3,
-        populationSize: 10,
-        patternType: "game_mechanic"
-      });
-      console.log('Evolved pattern:', evolvedPattern);
+      console.log('Starting evolution with parameters:', evolutionParams);
+      const evolvedPattern = await clientPatternService.evolvePattern(currentPattern, evolutionParams);
+      console.log('Evolution complete. Evolved pattern:', evolvedPattern);
+
+      if (evolvedPattern.content.metadata.evolution?.fitness_scores) {
+        console.log('Evolution fitness scores:', evolvedPattern.content.metadata.evolution.fitness_scores);
+      }
 
       console.log('Updating Claude output with evolved pattern');
       setClaudeOutput({
@@ -196,19 +241,27 @@ const App: React.FC = () => {
 
       console.log('Searching for similar patterns to evolved pattern');
       const similarPatterns = await clientPatternService.searchSimilarPatterns(evolvedPattern);
-      console.log('Found similar patterns:', similarPatterns);
+      console.log('Found similar patterns:', similarPatterns.length);
+      console.log('Similar patterns:', similarPatterns);
 
       if (similarPatterns.length > 0) {
-        console.log('Setting selected pattern:', similarPatterns[0]);
+        console.log('Setting selected pattern to most similar:', similarPatterns[0]);
         setSelectedPattern(similarPatterns[0]);
 
-        console.log('Comparing evolved pattern');
+        console.log('Comparing evolved pattern with selected similar pattern');
         const metrics = await clientPatternService.comparePatterns(evolvedPattern.content.html, similarPatterns[0]);
         console.log('Evolution comparison metrics:', metrics);
         setMetrics(metrics);
       }
     } catch (error) {
-      console.error('Error evolving pattern:', error);
+      console.error('Evolution process failed:', error);
+      if (error instanceof Error) {
+        console.error('Error details:', {
+          message: error.message,
+          stack: error.stack,
+          name: error.name
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -230,16 +283,42 @@ const App: React.FC = () => {
             <Controls
               selectedPattern={selectedPattern}
               onEvolve={handleEvolvePattern}
+              evolutionErrors={evolutionErrors}
               onReset={() => {
+                console.log('Resetting to default state');
                 setClaudeOutput(null);
                 setSelectedPattern(patterns[0]);
+                setEvolutionParams({
+                  mutationRate: 0.3,
+                  populationSize: 10,
+                  patternType: "game_mechanic"
+                });
               }}
               onParameterChange={(param, value) => {
+                console.log('Parameter change requested:', { param, value });
                 if (param === 'type' && selectedPattern) {
+                  const newType = value as GamePattern['type'];
+                  console.log('Updating pattern type:', newType);
                   setSelectedPattern({
                     ...selectedPattern,
-                    type: value as GamePattern['type']
+                    type: newType
                   });
+                  setEvolutionParams(prev => ({
+                    ...prev,
+                    patternType: newType
+                  }));
+                } else if (param === 'mutationRate') {
+                  console.log('Updating mutation rate:', value);
+                  setEvolutionParams(prev => ({
+                    ...prev,
+                    mutationRate: value as number
+                  }));
+                } else if (param === 'populationSize') {
+                  console.log('Updating population size:', value);
+                  setEvolutionParams(prev => ({
+                    ...prev,
+                    populationSize: value as number
+                  }));
                 }
               }}
             />
@@ -296,21 +375,36 @@ const App: React.FC = () => {
                 interactive: metrics.quality_scores.interactive,
                 functional: metrics.quality_scores.functional,
                 performance: metrics.quality_scores.performance,
-                accessibility: 0.5,
-                codeQuality: 0.5
+                accessibility: metrics.quality_scores.accessibility,
+                codeQuality: metrics.quality_scores.code_quality
               } : undefined}
             />
             <Controls
               selectedPattern={selectedPattern}
               onEvolve={handleEvolvePattern}
+              evolutionErrors={evolutionErrors}
               onParameterChange={(param, value) => {
                 console.log('Parameter changed in second Controls:', param, value);
                 if (param === 'type' && selectedPattern) {
-                  console.log('Updating pattern type to:', value);
+                  const newType = value as GamePattern['type'];
                   setSelectedPattern({
                     ...selectedPattern,
-                    type: value as GamePattern['type']
+                    type: newType
                   });
+                  setEvolutionParams(prev => ({
+                    ...prev,
+                    patternType: newType
+                  }));
+                } else if (param === 'mutationRate') {
+                  setEvolutionParams(prev => ({
+                    ...prev,
+                    mutationRate: value as number
+                  }));
+                } else if (param === 'populationSize') {
+                  setEvolutionParams(prev => ({
+                    ...prev,
+                    populationSize: value as number
+                  }));
                 }
               }}
             />

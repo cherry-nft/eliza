@@ -191,6 +191,7 @@ export class ClientPatternService {
                 body: JSON.stringify({
                     sourceHtml,
                     targetPattern,
+                    include_extended_metrics: true,
                 }),
             }
         );
