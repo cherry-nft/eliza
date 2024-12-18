@@ -29,6 +29,8 @@
         "dev": "tsup src/index.ts --format esm,cjs --watch",
         "viewer": "NODE_OPTIONS=\"--loader ts-node/esm\" node test-harness/server.ts",
         "viewer:dev": "nodemon -r ts-node/register test-harness/server.ts",
-        "test:evolution": "node --loader ts-node/esm playground/src/test-evolution.ts"
+        "test:evolution": "node --loader ts-node/esm playground/src/test-evolution.ts",
+        "test:integration": "tsx playground/src/server/test-integration.ts",
+        "test:generations": "tsx playground/src/server/test-generations.ts"
     }
 }

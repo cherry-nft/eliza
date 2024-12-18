@@ -55,14 +55,13 @@ export class ClaudeService implements PatternServiceInterface {
         );
 
         try {
-            // Create a mock embedding for now (1536 dimensions as required by VectorDatabase)
-            // TODO: Replace with actual embedding generation using vectorOperations
+            // Generate embedding using vectorOperations
             console.log("[ClaudeService] Generating embedding for prompt");
-            const embedding = new Array(1536).fill(0);
+            const embedding = await this.vectorDb.generateEmbedding(prompt);
 
             // Get patterns from VectorDatabase
             const similarPatterns = await this.vectorDb.findSimilarPatterns(
-                embedding, // Now passing number[] instead of string
+                embedding,
                 "all", // or specific type if we can determine it
                 0.85, // similarity threshold
                 3 // number of patterns to return
@@ -396,7 +395,7 @@ export class ClaudeService implements PatternServiceInterface {
                 );
                 throw new PatternValidationError(
                     "Invalid response format from Claude",
-                    error instanceof Error ? error.message : String(error)
+                    [error instanceof Error ? error.message : String(error)]
                 );
             }
         } catch (error) {

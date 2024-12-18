@@ -805,4 +805,15 @@ export class VectorDatabase extends Service {
             )
         );
     }
+
+    async generateEmbedding(text: string): Promise<number[]> {
+        try {
+            if (!this.runtime?.vectorOperations) {
+                throw new DatabaseError("Vector operations not initialized");
+            }
+            return await this.runtime.vectorOperations.generateEmbedding(text);
+        } catch (error) {
+            throw new DatabaseError("Failed to generate embedding", error);
+        }
+    }
 }

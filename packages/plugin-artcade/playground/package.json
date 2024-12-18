@@ -17,7 +17,8 @@
         "test:server": "tsx src/server/test-pattern-server.ts",
         "test:client": "tsx src/services/test-client-service.ts",
         "test:patterns": "tsx src/services/test-pattern-variations.ts",
-        "test:integration": "tsx src/server/test-server-integration.ts"
+        "test:integration": "tsx src/server/test-server-integration.ts",
+        "test:generations": "tsx src/server/test-generations.ts"
     },
     "dependencies": {
         "@ai16z/plugin-artcade": "workspace:*",
