@@ -26,9 +26,9 @@ async function testClientService() {
                 setTimeout(
                     () =>
                         reject(
-                            new Error("Pattern generation timed out after 30s")
+                            new Error("Pattern generation timed out after 60s")
                         ),
-                    30000
+                    60000
                 )
             );
 

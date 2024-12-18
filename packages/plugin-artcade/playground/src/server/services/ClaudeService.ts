@@ -221,7 +221,7 @@ class ClaudeService implements PatternServiceInterface {
                         content: this.generatePrompt(userPrompt),
                     },
                 ],
-                max_tokens: 4096,
+                max_tokens: 8192,
                 temperature: 0.7,
                 top_p: 1,
                 stream: false,
@@ -239,6 +239,7 @@ class ClaudeService implements PatternServiceInterface {
                     "X-Title": "Cursor",
                 },
                 body: JSON.stringify(requestBody),
+                signal: AbortSignal.timeout(60000),
             });
 
             console.log(
