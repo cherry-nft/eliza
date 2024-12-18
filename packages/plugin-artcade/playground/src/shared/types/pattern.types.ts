@@ -88,3 +88,122 @@ export interface PatternGenerationResponse {
         details?: any;
     };
 }
+
+// Pattern storage and retrieval types
+export interface StoredPattern {
+    id: string;
+    type: string;
+    pattern_name: string;
+    content: {
+        html: string;
+        css?: string[];
+        javascript?: string[];
+    };
+    embedding: number[];
+    effectiveness_score: number;
+    usage_count: number;
+}
+
+export interface PatternStorageRequest {
+    type: string;
+    pattern_name: string;
+    content: {
+        html: string;
+        css?: string[];
+        javascript?: string[];
+    };
+}
+
+export interface PatternStorageResponse {
+    success: boolean;
+    data?: StoredPattern;
+    error?: {
+        message: string;
+        details?: any;
+    };
+}
+
+export interface PatternRetrievalResponse {
+    success: boolean;
+    data?: StoredPattern;
+    error?: {
+        message: string;
+        details?: any;
+    };
+}
+
+export interface SimilarPatternsRequest {
+    patternId?: string;
+    html?: string;
+    type?: string;
+    threshold?: number;
+    limit?: number;
+}
+
+export interface SimilarPattern extends StoredPattern {
+    similarity: number;
+}
+
+export interface SimilarPatternsResponse {
+    success: boolean;
+    data?: SimilarPattern[];
+    error?: {
+        message: string;
+        details?: any;
+    };
+}
+
+export interface PatternUsageContext {
+    prompt?: string;
+    generated_html?: string;
+    quality_scores?: {
+        visual: number;
+        interactive: number;
+        functional: number;
+        performance: number;
+    };
+}
+
+export interface PatternUsageResponse {
+    success: boolean;
+    data?: {
+        pattern_id: string;
+        new_score: number;
+        usage_count: number;
+    };
+    error?: {
+        message: string;
+        details?: any;
+    };
+}
+
+// Error types for storage and retrieval
+export class PatternStorageError extends Error {
+    constructor(
+        message: string,
+        public readonly details?: any
+    ) {
+        super(message);
+        this.name = "PatternStorageError";
+    }
+}
+
+export class PatternRetrievalError extends Error {
+    constructor(
+        message: string,
+        public readonly details?: any
+    ) {
+        super(message);
+        this.name = "PatternRetrievalError";
+    }
+}
+
+export class PatternSearchError extends Error {
+    constructor(
+        message: string,
+        public readonly details?: any
+    ) {
+        super(message);
+        this.name = "PatternSearchError";
+    }
+}

@@ -18,13 +18,73 @@ const __dirname = dirname(__filename);
 
 console.log("[Server] Configuration loaded successfully");
 
-// Initialize runtime dependencies
-const databaseAdapter = new DatabaseAdapter({
-    connectionString: SERVER_CONFIG.DATABASE_URL,
-    schema: "public",
-});
+// Initialize runtime dependencies with in-memory storage
+const memoryStore = new Map<string, any>();
 
-const memoryManager = new MemoryManager(databaseAdapter);
+const databaseAdapter = {
+    async query(sql: string, params?: any[]) {
+        console.log("[Database] Query:", sql, params);
+        return { rows: [] };
+    },
+    async transaction(callback: (client: any) => Promise<void>) {
+        return callback(databaseAdapter);
+    },
+};
+
+const memoryManager = {
+    runtime: null as any,
+    tableName: "game_patterns",
+    initialize: async () => {},
+    createMemory: async (memory: any) => {
+        console.log("[MemoryManager] Creating memory:", memory.id);
+        memoryStore.set(memory.id, memory);
+    },
+    getMemory: async (id: string, tableName?: string) => {
+        console.log("[MemoryManager] Getting memory:", id);
+        return memoryStore.get(id) || null;
+    },
+    updateMemory: async (memory: any) => {
+        console.log("[MemoryManager] Updating memory:", memory.id);
+        memoryStore.set(memory.id, memory);
+    },
+    deleteMemory: async (id: string, tableName?: string) => {
+        console.log("[MemoryManager] Deleting memory:", id);
+        memoryStore.delete(id);
+    },
+    getMemories: async ({ tableName, filter, count = 10, unique = true }) => {
+        console.log("[MemoryManager] Getting memories with filter:", filter);
+        return Array.from(memoryStore.values()).slice(0, count);
+    },
+    searchMemoriesByEmbedding: async (embedding: number[], opts?: any) => {
+        console.log(
+            "[MemoryManager] Searching by embedding, threshold:",
+            opts?.match_threshold
+        );
+        return Array.from(memoryStore.values()).map((memory) => ({
+            ...memory,
+            similarity: 0.9,
+        }));
+    },
+    countMemories: async (roomId: string, unique?: boolean) => memoryStore.size,
+    addEmbeddingToMemory: async (memory: any) => memory,
+    getCachedEmbeddings: async (content: string) => [],
+    getMemoryById: async (id: string) => memoryStore.get(id) || null,
+    getMemoriesByRoomIds: async ({ roomIds }: { roomIds: string[] }) => {
+        return Array.from(memoryStore.values()).filter((memory) =>
+            roomIds.includes(memory.roomId)
+        );
+    },
+    removeMemory: async (memoryId: string) => {
+        memoryStore.delete(memoryId);
+    },
+    removeAllMemories: async (roomId: string) => {
+        for (const [id, memory] of memoryStore.entries()) {
+            if (memory.roomId === roomId) {
+                memoryStore.delete(id);
+            }
+        }
+    },
+};
 
 // Proper embedding cache implementation
 const embeddingCache = {
@@ -99,22 +159,11 @@ const vectorOperations = {
             throw error;
         }
     },
-
-    async store(id: string, embedding: number[]) {
-        console.log("[VectorOps] Storing embedding for:", id);
-        // Actual storage is handled by VectorDatabase
-    },
-
-    async findSimilar(embedding: number[], limit?: number) {
-        console.log("[VectorOps] Finding similar embeddings, limit:", limit);
-        // Actual similarity search is handled by VectorDatabase
-        return [];
-    },
 };
 
 // Create runtime object with proper implementations
 const runtime: IAgentRuntime & { logger: typeof elizaLogger } = {
-    databaseAdapter,
+    databaseAdapter: databaseAdapter as any,
     embeddingCache,
     vectorOperations,
     getMemoryManager: () => memoryManager,
@@ -125,6 +174,9 @@ const runtime: IAgentRuntime & { logger: typeof elizaLogger } = {
         warn: (...args) => console.warn("[Warning]", ...args),
     },
 };
+
+// Set runtime reference
+memoryManager.runtime = runtime;
 
 // Initialize VectorDatabase with the proper runtime
 const vectorDb = new VectorDatabase();
