@@ -6,11 +6,17 @@ import { readFileSync } from "fs";
 import { join } from "path";
 
 const TEST_HTML = `<div class="container">
-    <h1>Test Page</h1>
-    <div class="content">
-        <p>This is a test paragraph that will be evolved into something more interactive.</p>
-        <div class="box">
-            <span>Click me!</span>
+    <style>
+        .container { width: 100%; height: 100%; }
+        .game-container { width: 100%; min-height: 300px; }
+    </style>
+    <div class="game-container">
+        <h1>Test Page</h1>
+        <div class="content">
+            <p>This is a test paragraph that will be evolved into something more interactive.</p>
+            <div class="box">
+                <span>Click me!</span>
+            </div>
         </div>
     </div>
 </div>`;
