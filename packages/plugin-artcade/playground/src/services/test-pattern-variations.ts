@@ -1,5 +1,8 @@
 import { clientPatternService } from "./ClientPatternService";
-import { PatternGenerationError } from "../shared/types/pattern.types";
+import {
+    PatternGenerationError,
+    GeneratedPattern,
+} from "../shared/types/pattern.types";
 
 interface TestCase {
     category: string;
@@ -100,7 +103,7 @@ async function testPatternVariations() {
             );
             const duration = Date.now() - startTime;
 
-            // Log basic metrics
+            // Log generation results
             console.log("\n[PatternTest] Generation Results:");
             console.log("----------------------------------------");
             console.log("Title:", pattern.title);
@@ -108,25 +111,37 @@ async function testPatternVariations() {
             console.log("Generation Time:", duration, "ms");
             console.log("HTML Size:", pattern.html.length, "characters");
 
-            // Analyze plan components
-            console.log("\n[PatternTest] Plan Analysis:");
+            // Log plan details
+            console.log("\n[PatternTest] Plan Details:");
             console.log("----------------------------------------");
             console.log("Core Mechanics:", pattern.plan.coreMechanics);
             console.log("Visual Elements:", pattern.plan.visualElements);
             console.log("Interactivity:", pattern.plan.interactivity);
+            console.log("Interaction Flow:", pattern.plan.interactionFlow);
+            console.log("State Management:", pattern.plan.stateManagement);
+            console.log("Asset Requirements:", pattern.plan.assetRequirements);
 
-            // Check for expected features
+            // Simple feature check in all text content
+            const allContent = JSON.stringify({
+                title: pattern.title,
+                description: pattern.description,
+                plan: pattern.plan,
+                html: pattern.html,
+            }).toLowerCase();
+
             const missingFeatures = testCase.expectedFeatures.filter(
-                (feature) => {
-                    const allText = JSON.stringify(pattern).toLowerCase();
-                    return !allText.includes(feature.toLowerCase());
-                }
+                (feature) => !allContent.includes(feature.toLowerCase())
             );
 
+            // Log feature validation
             console.log("\n[PatternTest] Feature Validation:");
             console.log("----------------------------------------");
             console.log("Expected Features:", testCase.expectedFeatures);
-            console.log("Missing Features:", missingFeatures);
+            if (missingFeatures.length > 0) {
+                console.log("Missing Features:", missingFeatures);
+            } else {
+                console.log("All expected features found!");
+            }
 
             // Store results
             results[testCase.name] = {
@@ -160,6 +175,7 @@ async function testPatternVariations() {
             console.log(`  Error: ${result.error}`);
         } else {
             console.log(`  Generation Time: ${result.duration}ms`);
+            console.log(`  HTML Size: ${result.htmlSize} characters`);
             console.log(`  Missing Features: ${result.missingFeatures.length}`);
         }
     });

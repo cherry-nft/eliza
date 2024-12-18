@@ -1,9 +1,31 @@
 export interface PatternPlan {
     coreMechanics: string[];
     visualElements: string[];
-    interactionFlow: string[];
-    stateManagement: string[];
-    assetRequirements: string[];
+    interactivity: string[];
+    interactionFlow: Array<{
+        trigger: string;
+        action: string;
+        description: string;
+    }>;
+    stateManagement: {
+        variables: Array<{
+            name: string;
+            type: string;
+            description: string;
+        }>;
+        updates: string[];
+    };
+    assetRequirements: {
+        scripts: string[];
+        styles: string[];
+        fonts: string[];
+        images: string[];
+        animations: Array<{
+            type: string;
+            property: string;
+            element: string;
+        }>;
+    };
 }
 
 export interface ThumbnailElement {
