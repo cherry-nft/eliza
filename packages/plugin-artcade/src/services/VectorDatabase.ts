@@ -10,6 +10,7 @@ import {
     PatternEffectivenessMetrics,
     ClaudeUsageContext,
 } from "../types/effectiveness";
+import { parse } from "node-html-parser";
 
 // Custom error class for database operations
 class DatabaseError extends Error {
@@ -301,62 +302,35 @@ export class VectorDatabase extends Service {
 
     async storePattern(pattern: GamePattern): Promise<void> {
         try {
-            // Validate embedding dimension before proceeding
-            if (pattern.embedding.length !== this.EMBEDDING_DIMENSION) {
-                throw new DatabaseError(
-                    `Invalid embedding dimension: ${pattern.embedding.length}`
-                );
-            }
+            // Extract features before storing
+            const features = this.extractPatternFeatures(pattern.content.html);
 
-            await this.db.transaction(async (client) => {
-                const {
-                    id,
-                    type,
-                    pattern_name,
-                    content,
-                    embedding,
-                    effectiveness_score,
-                    usage_count,
-                } = pattern;
+            // Generate embedding from features
+            const featureEmbedding = [
+                features.visual.hasAnimations ? 1 : 0,
+                features.visual.colorCount / 10,
+                features.interactive.eventListeners.length / 5,
+                features.interactive.hasUserInput ? 1 : 0,
+                features.functional.hasGameLogic ? 1 : 0,
+                features.functional.complexity,
+            ];
 
-                // Store pattern with vector operations
-                await this.vectorOps.store(client, {
-                    id,
-                    type,
-                    pattern_name,
-                    content,
-                    embedding,
-                    effectiveness_score,
-                    usage_count,
-                });
+            // Combine with existing embedding if present
+            pattern.embedding = pattern.embedding.length
+                ? pattern.embedding
+                : Array(this.EMBEDDING_DIMENSION)
+                      .fill(0)
+                      .map((_, i) =>
+                          i < featureEmbedding.length ? featureEmbedding[i] : 0
+                      );
 
-                await this.logOperation({
-                    operation: "STORE_PATTERN",
-                    pattern_id: id,
-                    metadata: { type, pattern_name },
-                    performed_at: new Date(),
-                });
-
-                // Clear embedding cache for this pattern type
-                await this.embeddingCache.delete(`${type}_*`);
-            });
-
-            this.runtime.logger.debug(
-                `Stored pattern: ${pattern.pattern_name}`,
-                {
-                    id: pattern.id,
-                    type: pattern.type,
-                }
-            );
+            // Continue with existing store logic
+            await super.storePattern(pattern);
         } catch (error) {
-            this.runtime.logger.error(
-                `Failed to store pattern: ${pattern.pattern_name}`,
-                { error }
-            );
-            if (error instanceof DatabaseError) {
-                throw error;
-            }
-            throw new DatabaseError("Store failed", error);
+            this.runtime.logger.error("Failed to store pattern with features", {
+                error,
+            });
+            throw new DatabaseError("Store with features failed", error);
         }
     }
 
@@ -700,5 +674,85 @@ export class VectorDatabase extends Service {
             .split(/\W+/)
             .filter((word) => word.length > 3)
             .slice(0, 10);
+    }
+
+    private extractPatternFeatures(html: string): PatternFeatures {
+        // Natural language: Extract key features from HTML content to create a fingerprint
+        const root = parse(html);
+
+        return {
+            visual: {
+                hasAnimations:
+                    html.includes("@keyframes") || html.includes("animation"),
+                colorCount: (html.match(/#[0-9a-f]{3,6}|rgb|rgba|hsl/gi) || [])
+                    .length,
+                layoutType: this.detectLayoutType(html),
+            },
+            interactive: {
+                eventListeners: this.extractEventListeners(html),
+                hasUserInput:
+                    html.includes("input") ||
+                    html.includes("button") ||
+                    html.includes("form"),
+                stateChanges:
+                    html.includes("useState") ||
+                    html.includes("setState") ||
+                    html.includes("classList.toggle"),
+            },
+            functional: {
+                hasGameLogic: this.detectGameLogic(html),
+                dataManagement:
+                    html.includes("data-") || html.includes("useState"),
+                complexity: this.calculateComplexity(html),
+            },
+        };
+    }
+
+    private detectLayoutType(html: string): "flex" | "grid" | "standard" {
+        if (html.includes("display: grid") || html.includes("grid-template"))
+            return "grid";
+        if (html.includes("display: flex")) return "flex";
+        return "standard";
+    }
+
+    private extractEventListeners(html: string): string[] {
+        const events = html.match(/on[A-Z][a-zA-Z]+=|addEventListener/g) || [];
+        return events.map((e) =>
+            e.replace("on", "").replace("=", "").toLowerCase()
+        );
+    }
+
+    private detectGameLogic(html: string): boolean {
+        const gamePatterns = [
+            "score",
+            "health",
+            "level",
+            "game",
+            "player",
+            "collision",
+            "requestAnimationFrame",
+            "gameLoop",
+            "update",
+        ];
+        return gamePatterns.some((pattern) => html.includes(pattern));
+    }
+
+    private calculateComplexity(html: string): number {
+        const root = parse(html);
+        const depth = this.calculateDOMDepth(root);
+        const elements = root.querySelectorAll("*").length;
+        const scripts = (html.match(/<script/g) || []).length;
+
+        // Normalize to 0-1 range
+        return Math.min(depth * 0.2 + elements * 0.01 + scripts * 0.1, 1);
+    }
+
+    private calculateDOMDepth(node: any, depth: number = 0): number {
+        if (!node.childNodes || node.childNodes.length === 0) return depth;
+        return Math.max(
+            ...node.childNodes.map((child) =>
+                this.calculateDOMDepth(child, depth + 1)
+            )
+        );
     }
 }

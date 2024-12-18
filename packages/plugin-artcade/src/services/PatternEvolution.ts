@@ -1,6 +1,9 @@
 import { Service, IAgentRuntime, elizaLogger } from "@ai16z/eliza";
 import { VectorDatabase, VectorSearchResult } from "./VectorDatabase";
-import { PatternStaging, GamePattern } from "./PatternStaging";
+import {
+    PatternStagingService as PatternStaging,
+    GamePattern,
+} from "./PatternStaging";
 import { v4 as uuidv4 } from "uuid";
 import { JSDOM } from "jsdom";
 

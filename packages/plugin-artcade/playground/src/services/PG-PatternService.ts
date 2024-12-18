@@ -177,6 +177,15 @@ class PlaygroundPatternService {
         console.log("Original HTML:", html);
         console.log("Mutation rate:", mutationRate);
 
+        // Add unique identifier to prevent variable name conflicts
+        const uniqueId = crypto.randomUUID().split("-")[0];
+        html = html.replace(/const keyboard=/g, `const keyboard_${uniqueId}=`);
+        html = html.replace(
+            /getElementById\('keyboard'\)/g,
+            `getElementById('keyboard_${uniqueId}')`
+        );
+        html = html.replace(/id='keyboard'/g, `id='keyboard_${uniqueId}'`);
+
         const mutations = [
             this.addInteractivity,
             this.enhanceVisuals,

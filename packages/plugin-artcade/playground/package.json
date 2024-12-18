@@ -10,12 +10,15 @@
         "dev": "vite",
         "build": "tsc && vite build",
         "preview": "vite preview",
-        "test": "tsx src/test-script.ts"
+        "test": "tsx src/test-script.ts",
+        "test:evolution": "tsx src/test-evolution.ts"
     },
     "dependencies": {
+        "@ai16z/plugin-artcade": "workspace:*",
         "@emotion/react": "^11.11.0",
         "@emotion/styled": "^11.11.0",
         "@mui/material": "^5.13.0",
+        "node-html-parser": "^6.1.12",
         "plotly.js": "^2.24.2",
         "react": "^18.2.0",
         "react-dom": "^18.2.0",
@@ -29,7 +32,7 @@
         "@types/react-plotly.js": "^2.6.0",
         "@types/three": "^0.152.1",
         "@vitejs/plugin-react": "^4.0.0",
-        "tsx": "^4.7.0",
+        "tsx": "^4.19.2",
         "typescript": "^5.0.4",
         "vite": "^4.3.9",
         "vite-plugin-md": "^0.21.5"
