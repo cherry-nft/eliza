@@ -13,6 +13,38 @@ import {
     elizaLogger,
 } from "@ai16z/eliza";
 
+// Add shutdown function
+async function shutdownGracefully() {
+    console.log("[Server] Initiating graceful shutdown...");
+    try {
+        // Log memory usage before cleanup
+        const memUsage = process.memoryUsage();
+        console.log("[Server] Memory usage before cleanup:", {
+            heapUsed: `${Math.round(memUsage.heapUsed / 1024 / 1024)}MB`,
+            heapTotal: `${Math.round(memUsage.heapTotal / 1024 / 1024)}MB`,
+            rss: `${Math.round(memUsage.rss / 1024 / 1024)}MB`,
+        });
+
+        // Cleanup vector database
+        console.log("[Server] Starting VectorDatabase cleanup...");
+        await vectorDb.cleanup();
+        console.log("[Server] VectorDatabase cleanup completed successfully");
+
+        console.log("[Server] Shutdown completed successfully");
+        process.exit(0);
+    } catch (error) {
+        console.error("[Server] Error during shutdown:", error);
+        if (error instanceof Error) {
+            console.error("[Server] Shutdown error details:", {
+                name: error.name,
+                message: error.message,
+                stack: error.stack,
+            });
+        }
+        process.exit(1);
+    }
+}
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
@@ -179,11 +211,53 @@ const runtime: IAgentRuntime & { logger: typeof elizaLogger } = {
 memoryManager.runtime = runtime;
 
 // Initialize VectorDatabase with the proper runtime
+console.log("[Server] Starting VectorDatabase initialization...");
+console.log("[Server] Runtime configuration:", {
+    hasEmbeddingCache: !!runtime.embeddingCache,
+    hasVectorOps: !!runtime.vectorOperations,
+    hasMemoryManager: !!runtime.getMemoryManager(),
+    databaseAdapter: !!runtime.databaseAdapter,
+});
+
 const vectorDb = new VectorDatabase();
-await vectorDb.initialize(runtime);
+try {
+    const startTime = Date.now();
+    await vectorDb.initialize(runtime);
+    const initDuration = Date.now() - startTime;
+    console.log(
+        `[Server] VectorDatabase initialization took ${initDuration}ms`
+    );
+
+    // Perform health check
+    console.log("[Server] Running VectorDatabase health check...");
+    const isHealthy = await vectorDb.healthCheck();
+    if (!isHealthy) {
+        throw new Error("VectorDatabase failed health check");
+    }
+    console.log("[Server] VectorDatabase health check passed");
+
+    // Log memory state after initialization
+    const memUsage = process.memoryUsage();
+    console.log("[Server] Memory usage after VectorDB init:", {
+        heapUsed: `${Math.round(memUsage.heapUsed / 1024 / 1024)}MB`,
+        heapTotal: `${Math.round(memUsage.heapTotal / 1024 / 1024)}MB`,
+    });
+} catch (error) {
+    console.error("[Server] VectorDatabase initialization failed:", error);
+    if (error instanceof Error) {
+        console.error("[Server] Initialization error details:", {
+            name: error.name,
+            message: error.message,
+            stack: error.stack,
+        });
+    }
+    process.exit(1);
+}
 
 // Initialize ClaudeService with VectorDatabase
+console.log("[Server] Initializing ClaudeService...");
 const claudeService = new ClaudeService(vectorDb);
+console.log("[Server] ClaudeService initialized successfully");
 
 const app = express();
 const port = SERVER_CONFIG.PORT;
@@ -199,7 +273,7 @@ app.locals.vectorDb = vectorDb;
 // Routes
 app.use("/api/patterns", patternRouter);
 
-// Error handling
+// Error handling middleware
 app.use(
     (
         err: Error,
@@ -208,10 +282,56 @@ app.use(
         next: express.NextFunction
     ) => {
         console.error("[Server] Error:", err.stack);
-        res.status(500).json({ error: err.message });
+        res.status(500).json({
+            success: false,
+            error: {
+                message: err.message,
+                details:
+                    process.env.NODE_ENV === "development"
+                        ? err.stack
+                        : undefined,
+            },
+        });
     }
 );
 
-app.listen(port, () => {
-    console.log(`[Server] Pattern server running on port ${port}`);
-});
+// Setup graceful shutdown
+process.on("SIGTERM", shutdownGracefully);
+process.on("SIGINT", shutdownGracefully);
+
+// Start server
+try {
+    const server = app.listen(port, () => {
+        console.log("[Server] ====================================");
+        console.log(`[Server] Pattern server running on port ${port}`);
+        console.log("[Server] Services initialized:");
+        console.log("- VectorDatabase: ✓");
+        console.log("- ClaudeService: ✓");
+        console.log("- Pattern Router: ✓");
+        console.log("[Server] Health check endpoint:");
+        console.log(`http://localhost:${port}/api/patterns/health`);
+        console.log("[Server] ====================================");
+    });
+
+    // Add server error handler
+    server.on("error", (error: Error) => {
+        console.error("[Server] Server error:", error);
+        if (error instanceof Error) {
+            console.error("[Server] Server error details:", {
+                name: error.name,
+                message: error.message,
+                stack: error.stack,
+            });
+        }
+    });
+} catch (error) {
+    console.error("[Server] Failed to start server:", error);
+    if (error instanceof Error) {
+        console.error("[Server] Startup error details:", {
+            name: error.name,
+            message: error.message,
+            stack: error.stack,
+        });
+    }
+    process.exit(1);
+}
