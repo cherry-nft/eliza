@@ -12,6 +12,7 @@ import {
     IAgentRuntime,
     elizaLogger,
 } from "@ai16z/eliza";
+import { TokenizationService } from "./services/TokenizationService";
 
 // Add shutdown function
 async function shutdownGracefully() {
@@ -210,6 +211,20 @@ const runtime: IAgentRuntime & { logger: typeof elizaLogger } = {
 // Set runtime reference
 memoryManager.runtime = runtime;
 
+// Initialize services
+console.log("[Server] Starting services initialization...");
+
+// Initialize TokenizationService
+console.log("[Server] Initializing TokenizationService...");
+const tokenizationService = new TokenizationService();
+try {
+    await tokenizationService.initialize();
+    console.log("[Server] TokenizationService initialized successfully");
+} catch (error) {
+    console.error("[Server] Failed to initialize TokenizationService:", error);
+    process.exit(1);
+}
+
 // Initialize VectorDatabase with the proper runtime
 console.log("[Server] Starting VectorDatabase initialization...");
 console.log("[Server] Runtime configuration:", {
@@ -269,6 +284,7 @@ app.use(express.json());
 // Make services available to routes
 app.locals.claudeService = claudeService;
 app.locals.vectorDb = vectorDb;
+app.locals.tokenizationService = tokenizationService;
 
 // Routes
 app.use("/api/patterns", patternRouter);
@@ -308,6 +324,7 @@ try {
         console.log("- VectorDatabase: ✓");
         console.log("- ClaudeService: ✓");
         console.log("- Pattern Router: ✓");
+        console.log("- TokenizationService: ✓");
         console.log("[Server] Health check endpoint:");
         console.log(`http://localhost:${port}/api/patterns/health`);
         console.log("[Server] ====================================");

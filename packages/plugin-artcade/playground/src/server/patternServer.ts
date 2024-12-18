@@ -16,6 +16,7 @@ import {
     PatternSearchError,
     PatternUsageContext,
 } from "../shared/types/pattern.types";
+import { TokenizationService } from "./services/TokenizationService";
 
 const router = express.Router();
 
@@ -23,6 +24,54 @@ const router = express.Router();
 router.get("/health", (req, res) => {
     console.log("[PatternServer] Health check requested");
     res.json({ status: "healthy", timestamp: new Date().toISOString() });
+});
+
+// Add tokenization endpoint
+router.post("/tokenize", async (req, res) => {
+    console.log("[PatternServer] Received tokenization request");
+    try {
+        const { text } = req.body;
+        if (!text || typeof text !== "string") {
+            console.error(
+                "[PatternServer] Invalid tokenization request: No text provided"
+            );
+            return res.status(400).json({
+                success: false,
+                error: {
+                    message: "Text is required for tokenization",
+                    details: { provided: typeof text },
+                },
+            });
+        }
+
+        const tokenizationService = req.app.locals
+            .tokenizationService as TokenizationService;
+        if (!tokenizationService) {
+            throw new Error("TokenizationService not available");
+        }
+
+        const result = await tokenizationService.tokenize(text);
+        console.log("[PatternServer] Tokenization successful", {
+            inputLength: text.length,
+            tokenCount: result.tokenCount,
+        });
+
+        res.json({
+            success: true,
+            data: result,
+        });
+    } catch (error) {
+        console.error("[PatternServer] Tokenization error:", error);
+        res.status(500).json({
+            success: false,
+            error: {
+                message:
+                    error instanceof Error ? error.message : "Unknown error",
+                details:
+                    process.env.NODE_ENV === "development" ? error : undefined,
+            },
+        });
+    }
 });
 
 // Pattern Generation
