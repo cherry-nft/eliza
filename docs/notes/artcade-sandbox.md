@@ -1,5 +1,84 @@
 # Artcade Sandbox Testing Questions
 
+---
+
+_Current State_
+
+Main Components Overview
+
+- PromptInput (PromptInput.tsx)
+    - Purpose: Entry point for user prompts to generate new patterns
+    - Features: Text input field with submit button and loading state
+    - Development Focus:
+        - Improve prompt suggestions/examples
+        - Add validation for prompt quality
+        - Consider adding a prompt template system
+- Pattern Preview (PatternPreview.tsx)
+    - Purpose: Displays the generated HTML pattern in a sandboxed iframe
+    - Features: Live preview with CSS and JS support
+    - Development Focus:
+        - Add error boundary for failed renders
+        - Implement resize controls
+        - Add view modes (mobile/desktop)
+- Controls (Controls.tsx)
+    - Purpose: Pattern evolution and parameter controls
+    - Features: Population size, mutation rate, pattern type selection
+    - Development Focus:
+        - Add more evolution parameters
+        - Implement parameter presets
+        - Add real-time parameter validation
+- Metrics Panel (MetricsPanel.tsx)
+    - Purpose: Visualizes pattern quality metrics
+    - Features: Radar chart showing various quality aspects
+    - Development Focus:
+        - Add historical metrics tracking
+        - Implement metric explanations
+        - Add comparison view between patterns
+- Embedding Visualizer (EmbeddingVisualizer.tsx)
+    - Purpose: Visualizes pattern relationships in embedding space
+    - Features: 2D scatter plot of pattern embeddings
+    - Development Focus:
+        - Implement proper dimensionality reduction (PCA/t-SNE)
+        - Add clustering visualization
+        - Implement interactive selection
+
+Workflow Analysis
+Your current workflow aligns well with the backend infrastructure we've built. Here's how it maps:
+
+- Pattern Generation
+    - ✅ Working: Prompt submission → Claude generation → HTML output
+    - ✅ Working: Pattern storage and retrieval
+    - ✅ Working: Embedding generation and similarity search
+- Pattern Evolution
+    - ✅ Working: Pattern mutation and combination
+    - ✅ Working: Quality metrics calculation
+    - ✅ Working: Similar pattern comparison
+- Pattern Storage
+    - ✅ Working: Vector database integration
+    - ✅ Working: Pattern type classification
+    - ✅ Working: Effectiveness scoring
+
+Suggested Workflow Adjustments
+
+- Immediate Improvements:
+    - Add intermediate feedback during pattern generation
+    - Implement progressive loading of similar patterns
+    - Add pattern history tracking
+- Architecture Optimizations:
+    - Cache frequently used patterns client-side
+    - Implement batch operations for pattern evolution
+    - Add websocket connection for real-time updates
+- User Experience Enhancements:
+    - Add pattern favorites/bookmarks
+    - Implement pattern sharing
+    - Add pattern combination interface
+
+---
+
+---
+
+_Previous State_
+
 # Claude Proposes...
 
 We must adapt the playground to include:
