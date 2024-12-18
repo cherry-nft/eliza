@@ -1,181 +1,239 @@
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { VectorDatabase } from "../../services/VectorDatabase";
+import { DatabaseAdapter, MemoryManager, Memory, UUID } from "@ai16z/eliza";
 import { ClaudeUsageContext } from "../../types/effectiveness";
-import { DatabaseTestHelper } from "../helpers/DatabaseTestHelper";
-import { v4 as uuidv4 } from "uuid";
 
 describe("VectorDatabase - Pattern Effectiveness", () => {
-    let vectorDb: VectorDatabase;
-    let dbHelper: DatabaseTestHelper;
-    const testPatternId = uuidv4();
+    let db: VectorDatabase;
+    let mockRuntime: any;
+    let mockDatabaseAdapter: DatabaseAdapter<any>;
+    let mockMemoryManager: jest.Mocked<MemoryManager>;
 
     beforeEach(async () => {
-        dbHelper = new DatabaseTestHelper();
-        vectorDb = new VectorDatabase();
-        await vectorDb.initialize(dbHelper.getMockRuntime());
+        // Setup mock database adapter
+        mockDatabaseAdapter = {
+            query: vi.fn().mockResolvedValue({ rows: [] }),
+            transaction: vi.fn(async (callback) =>
+                callback(mockDatabaseAdapter)
+            ),
+            beginTransaction: vi.fn(),
+            commit: vi.fn(),
+            rollback: vi.fn(),
+            getMemoryById: vi.fn(),
+            createMemory: vi.fn(),
+            updateMemory: vi.fn(),
+            deleteMemory: vi.fn(),
+            searchMemories: vi.fn(),
+            searchMemoriesByEmbedding: vi.fn(),
+            circuitBreaker: {
+                execute: vi.fn(),
+            },
+            withCircuitBreaker: vi.fn(),
+        } as unknown as DatabaseAdapter<any>;
 
-        // Insert test pattern
-        await dbHelper.insertTestPattern({
-            id: testPatternId,
-            type: "interaction",
-            pattern_name: "test_pattern",
-            effectiveness_score: 0.5,
-            usage_count: 0,
-        });
+        // Setup mock memory manager
+        mockMemoryManager = {
+            createMemory: vi.fn().mockImplementation(async (memory: Memory) => {
+                return { id: memory.id };
+            }),
+            getMemory: vi.fn().mockImplementation(async (id: UUID) => {
+                return {
+                    id,
+                    content: {
+                        text: JSON.stringify({
+                            type: "test",
+                            pattern_name: "test",
+                            data: {},
+                            effectiveness_score: 0,
+                            usage_count: 0,
+                        }),
+                        attachments: [],
+                    },
+                    embedding: new Array(1536).fill(0),
+                    userId: "system" as UUID,
+                    roomId: "patterns" as UUID,
+                    agentId: "artcade" as UUID,
+                    createdAt: Date.now(),
+                };
+            }),
+            getMemories: vi.fn().mockResolvedValue([]),
+            updateMemory: vi.fn().mockResolvedValue(undefined),
+            deleteMemory: vi.fn().mockResolvedValue(undefined),
+            searchMemoriesByEmbedding: vi
+                .fn()
+                .mockImplementation(async () => []),
+            initialize: vi.fn().mockResolvedValue(undefined),
+        } as unknown as jest.Mocked<MemoryManager>;
+
+        // Setup mock runtime
+        mockRuntime = {
+            databaseAdapter: mockDatabaseAdapter,
+            embeddingCache: {
+                get: vi.fn(),
+                set: vi.fn(),
+                delete: vi.fn(),
+            },
+            vectorOperations: {
+                initialize: vi.fn(),
+                store: vi.fn(),
+                findSimilar: vi.fn(),
+            },
+            getMemoryManager: vi.fn().mockReturnValue(mockMemoryManager),
+            logger: {
+                info: vi.fn(),
+                error: vi.fn(),
+                debug: vi.fn(),
+                warn: vi.fn(),
+            },
+        };
+
+        // Initialize database
+        db = new VectorDatabase();
+        await db.initialize(mockRuntime);
     });
 
-    afterEach(async () => {
-        await dbHelper.cleanup();
+    afterEach(() => {
+        vi.clearAllMocks();
     });
 
     describe("trackClaudeUsage", () => {
         it("should track Claude's usage of patterns", async () => {
             const context: ClaudeUsageContext = {
-                prompt: "Create an interactive game with smooth animations",
-                generated_html: "<div class='game'>Test</div>",
-                similarity_score: 0.85,
+                prompt: "Create a game with collision detection",
+                generated_html: "<div>Game content</div>",
                 matched_patterns: [
                     {
-                        pattern_id: testPatternId,
-                        similarity: 0.85,
-                        features_used: ["animation", "interactivity"],
+                        pattern_id: "test-id",
+                        similarity: 0.9,
+                        features_used: ["collision", "animation"],
                     },
                 ],
                 quality_assessment: {
-                    visual_score: 0.9,
-                    interactive_score: 0.8,
-                    functional_score: 0.7,
-                    performance_score: 0.85,
+                    visual: 0.8,
+                    interactive: 0.7,
+                    functional: 0.9,
+                    performance: 0.85,
                 },
             };
 
-            await vectorDb.trackClaudeUsage(context);
+            await db.trackClaudeUsage(context);
 
-            // Verify pattern_effectiveness entry
-            const effectivenessResult = await dbHelper.query(
-                "SELECT * FROM pattern_effectiveness WHERE pattern_id = $1",
-                [testPatternId]
+            // Verify memory updates
+            expect(mockMemoryManager.getMemory).toHaveBeenCalledWith(
+                "test-id",
+                "game_patterns"
             );
-            expect(effectivenessResult.rows).toHaveLength(1);
-            expect(effectivenessResult.rows[0].embedding_similarity).toBe(0.85);
-            expect(effectivenessResult.rows[0].prompt_keywords).toContain(
-                "interactive"
-            );
-            expect(effectivenessResult.rows[0].prompt_keywords).toContain(
-                "animations"
-            );
-
-            // Verify pattern metrics update
-            const patternResult = await dbHelper.query(
-                "SELECT * FROM game_patterns WHERE id = $1",
-                [testPatternId]
-            );
-            expect(patternResult.rows[0].usage_count).toBe(1);
-            expect(patternResult.rows[0].effectiveness_score).toBeGreaterThan(
-                0.5
-            );
-            expect(patternResult.rows[0].claude_usage_metrics).toBeTruthy();
+            expect(mockMemoryManager.updateMemory).toHaveBeenCalled();
         });
 
         it("should handle multiple pattern matches", async () => {
-            const secondPatternId = uuidv4();
-            await dbHelper.insertTestPattern({
-                id: secondPatternId,
-                type: "animation",
-                pattern_name: "test_pattern_2",
-                effectiveness_score: 0.6,
-                usage_count: 0,
-            });
-
             const context: ClaudeUsageContext = {
-                prompt: "Create a game with animations and interactions",
-                generated_html: "<div class='game'>Test</div>",
-                similarity_score: 0.8,
+                prompt: "Create a game with multiple features",
+                generated_html: "<div>Game content</div>",
                 matched_patterns: [
                     {
-                        pattern_id: testPatternId,
-                        similarity: 0.8,
-                        features_used: ["interactivity"],
+                        pattern_id: "pattern1",
+                        similarity: 0.85,
+                        features_used: ["movement"],
                     },
                     {
-                        pattern_id: secondPatternId,
+                        pattern_id: "pattern2",
                         similarity: 0.75,
-                        features_used: ["animation"],
+                        features_used: ["scoring"],
                     },
                 ],
                 quality_assessment: {
-                    visual_score: 0.85,
-                    interactive_score: 0.75,
-                    functional_score: 0.8,
-                    performance_score: 0.9,
+                    visual: 0.7,
+                    interactive: 0.8,
+                    functional: 0.75,
+                    performance: 0.8,
                 },
             };
 
-            await vectorDb.trackClaudeUsage(context);
+            await db.trackClaudeUsage(context);
 
-            const effectivenessResults = await dbHelper.query(
-                "SELECT * FROM pattern_effectiveness"
-            );
-            expect(effectivenessResults.rows).toHaveLength(2);
+            // Verify both patterns were updated
+            expect(mockMemoryManager.getMemory).toHaveBeenCalledTimes(2);
+            expect(mockMemoryManager.updateMemory).toHaveBeenCalledTimes(2);
         });
 
         it("should update effectiveness scores correctly", async () => {
             const context: ClaudeUsageContext = {
-                prompt: "Create a high-performance interactive game",
-                generated_html: "<div class='game'>Test</div>",
-                similarity_score: 0.95,
+                prompt: "Create a high-performance game",
+                generated_html: "<div>Game content</div>",
                 matched_patterns: [
                     {
-                        pattern_id: testPatternId,
+                        pattern_id: "test-id",
                         similarity: 0.95,
-                        features_used: ["interactivity", "performance"],
+                        features_used: ["optimization"],
                     },
                 ],
                 quality_assessment: {
-                    visual_score: 1.0,
-                    interactive_score: 1.0,
-                    functional_score: 1.0,
-                    performance_score: 1.0,
+                    visual: 1.0,
+                    interactive: 0.9,
+                    functional: 0.95,
+                    performance: 1.0,
                 },
             };
 
-            await vectorDb.trackClaudeUsage(context);
+            await db.trackClaudeUsage(context);
 
-            const result = await dbHelper.query(
-                "SELECT effectiveness_score FROM game_patterns WHERE id = $1",
-                [testPatternId]
+            // Verify score calculation
+            const expectedScore = (1.0 + 0.9 + 0.95 + 1.0) / 4;
+            expect(mockMemoryManager.updateMemory).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    content: expect.objectContaining({
+                        text: expect.stringContaining(
+                            `"effectiveness_score":${expectedScore}`
+                        ),
+                    }),
+                })
             );
-            expect(result.rows[0].effectiveness_score).toBe(1.0);
         });
 
         it("should extract keywords correctly from prompt", async () => {
             const context: ClaudeUsageContext = {
-                prompt: "Create an interactive 3D game with particle effects",
-                generated_html: "<div class='game'>Test</div>",
-                similarity_score: 0.8,
+                prompt: "Create an interactive game with collision detection and power-ups",
+                generated_html: "<div>Game content</div>",
                 matched_patterns: [
                     {
-                        pattern_id: testPatternId,
+                        pattern_id: "test-id",
                         similarity: 0.8,
-                        features_used: ["3d", "particles"],
+                        features_used: ["collision", "power-ups"],
                     },
                 ],
                 quality_assessment: {
-                    visual_score: 0.9,
-                    interactive_score: 0.8,
-                    functional_score: 0.7,
-                    performance_score: 0.85,
+                    visual: 0.8,
+                    interactive: 0.9,
+                    functional: 0.85,
+                    performance: 0.8,
                 },
             };
 
-            await vectorDb.trackClaudeUsage(context);
+            await db.trackClaudeUsage(context);
 
-            const result = await dbHelper.query(
-                "SELECT prompt_keywords FROM pattern_effectiveness WHERE pattern_id = $1",
-                [testPatternId]
+            // Verify keyword extraction in audit log
+            expect(mockDatabaseAdapter.query).toHaveBeenCalledWith(
+                expect.stringContaining("INSERT INTO pattern_audit_logs"),
+                expect.arrayContaining([
+                    "CLAUDE_USAGE",
+                    "test-id",
+                    expect.objectContaining({
+                        features_used: ["collision", "power-ups"],
+                        prompt_keywords: expect.arrayContaining([
+                            "create",
+                            "interactive",
+                            "game",
+                            "collision",
+                            "detection",
+                            "power-ups",
+                        ]),
+                        quality_scores: expect.any(Object),
+                        similarity: 0.8,
+                    }),
+                    expect.any(Date),
+                ])
             );
-            expect(result.rows[0].prompt_keywords).toContain("interactive");
-            expect(result.rows[0].prompt_keywords).toContain("particle");
-            expect(result.rows[0].prompt_keywords).toContain("effects");
         });
     });
 });

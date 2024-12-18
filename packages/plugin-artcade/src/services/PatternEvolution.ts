@@ -6,6 +6,7 @@ import {
 } from "./PatternStaging";
 import { v4 as uuidv4 } from "uuid";
 import { JSDOM } from "jsdom";
+import { parse } from "node-html-parser";
 
 export interface EvolutionConfig {
     populationSize?: number;
@@ -48,179 +49,129 @@ export class PatternEvolution extends Service {
     ): Promise<void> {
         console.log("Initializing PatternEvolution service");
         this.runtime = runtime;
-        this.vectorDb = await runtime.getService(VectorDatabase);
-        this.staging = await runtime.getService(PatternStaging);
+
+        // Create and initialize dependencies
+        this.vectorDb = new VectorDatabase();
+        await this.vectorDb.initialize(runtime);
+
+        this.staging = new PatternStaging();
+        await this.staging.initialize(runtime);
+
         console.log("PatternEvolution service initialized");
     }
 
     async evolvePattern(
         seedPattern: GamePattern,
-        config: EvolutionConfig = {}
+        config: EvolutionConfig
     ): Promise<EvolutionResult> {
-        console.log("Starting pattern evolution:", {
-            seedPatternId: seedPattern.id,
-            type: seedPattern.type,
-            config,
-        });
-
-        const evolutionConfig = { ...this.defaultConfig, ...config };
-        console.log("Evolution config:", evolutionConfig);
-
         try {
-            // Find similar patterns to use as potential parents
-            console.log("Finding similar patterns for evolution");
+            const {
+                populationSize = 4,
+                generationLimit = 10,
+                fitnessThreshold = 0.8,
+                elitismCount = 1,
+            } = config;
+
+            // Initialize population
             const similarPatterns = await this.vectorDb.findSimilarPatterns(
                 seedPattern.embedding,
                 seedPattern.type,
-                evolutionConfig.similarityThreshold
+                0.7,
+                populationSize - 1
             );
-            console.log("Found similar patterns:", {
-                count: similarPatterns.length,
-                patterns: similarPatterns.map((p) => ({
-                    id: p.pattern.id,
-                    type: p.pattern.type,
-                    similarity: p.similarity,
-                })),
-            });
 
-            // Initialize population with seed and similar patterns
-            console.log("Initializing population");
             let population = this.initializePopulation(
                 seedPattern,
                 similarPatterns,
-                evolutionConfig.populationSize
+                populationSize
             );
-            console.log("Initial population size:", population.length);
 
             let bestResult: EvolutionResult = {
                 pattern: seedPattern,
-                fitness: await this.evaluateFitness(seedPattern),
+                fitness: await this.calculateFitness(seedPattern),
                 generation: 0,
-                parentIds: [],
             };
-            console.log("Initial best result:", {
-                fitness: bestResult.fitness,
-                patternId: bestResult.pattern.id,
-            });
 
             // Evolution loop
             for (
                 let generation = 1;
-                generation <= evolutionConfig.generationLimit;
+                generation <= generationLimit;
                 generation++
             ) {
-                console.log(`Starting generation ${generation}`);
-
-                // Evaluate fitness for current population
-                console.log("Evaluating population fitness");
-                const evaluatedPopulation = await Promise.all(
+                // Validate and update fitness for current population
+                const validatedPopulation = await Promise.all(
                     population.map(async (pattern) => {
-                        const fitness = await this.evaluateFitness(pattern);
-                        console.log("Pattern fitness:", {
-                            id: pattern.id,
-                            fitness,
-                        });
-                        return { pattern, fitness };
+                        const validated =
+                            await this.staging.validatePattern(pattern);
+                        return {
+                            pattern: validated,
+                            fitness: await this.calculateFitness(validated),
+                        };
                     })
                 );
 
                 // Sort by fitness
-                evaluatedPopulation.sort((a, b) => b.fitness - a.fitness);
-                console.log(
-                    "Population sorted by fitness:",
-                    evaluatedPopulation.map((p) => ({
-                        id: p.pattern.id,
-                        fitness: p.fitness,
-                    }))
-                );
+                validatedPopulation.sort((a, b) => b.fitness - a.fitness);
 
-                // Check if we've found a better solution
-                if (evaluatedPopulation[0].fitness > bestResult.fitness) {
-                    console.log("Found better solution:", {
-                        oldFitness: bestResult.fitness,
-                        newFitness: evaluatedPopulation[0].fitness,
-                        patternId: evaluatedPopulation[0].pattern.id,
-                    });
-
+                // Check if we've reached the fitness threshold
+                if (validatedPopulation[0].fitness >= fitnessThreshold) {
                     bestResult = {
-                        pattern: evaluatedPopulation[0].pattern,
-                        fitness: evaluatedPopulation[0].fitness,
+                        pattern: validatedPopulation[0].pattern,
+                        fitness: validatedPopulation[0].fitness,
                         generation,
-                        parentIds: [seedPattern.id],
                     };
-
-                    // If we've reached our fitness threshold, we can stop
-                    if (
-                        bestResult.fitness >= evolutionConfig.fitnessThreshold
-                    ) {
-                        console.log(
-                            "Reached fitness threshold, stopping evolution"
-                        );
-                        break;
-                    }
+                    break;
                 }
+
+                // Select elite patterns
+                const elites = validatedPopulation
+                    .slice(0, elitismCount)
+                    .map((p) => p.pattern);
 
                 // Create next generation
-                console.log("Creating next generation");
-                const nextGeneration: GamePattern[] = [];
+                const nextGeneration = [...elites];
 
-                // Elitism - carry over best patterns
-                for (let i = 0; i < evolutionConfig.elitismCount; i++) {
-                    nextGeneration.push(evaluatedPopulation[i].pattern);
-                }
-                console.log(
-                    "Added elite patterns:",
-                    evolutionConfig.elitismCount
-                );
-
-                // Fill rest of population with offspring
-                while (nextGeneration.length < evolutionConfig.populationSize) {
-                    if (Math.random() < evolutionConfig.crossoverRate) {
-                        // Crossover
-                        console.log("Performing crossover");
-                        const parent1 = this.selectParent(evaluatedPopulation);
-                        const parent2 = this.selectParent(evaluatedPopulation);
+                // Fill rest with crossover and mutation
+                while (nextGeneration.length < populationSize) {
+                    if (Math.random() < 0.5 && population.length >= 2) {
+                        const parent1 = this.selectParent(validatedPopulation);
+                        const parent2 = this.selectParent(validatedPopulation);
                         const offspring = await this.crossover(
                             parent1,
                             parent2
                         );
                         nextGeneration.push(offspring);
                     } else {
-                        // Mutation
-                        console.log("Performing mutation");
-                        const parent = this.selectParent(evaluatedPopulation);
-                        const offspring = await this.mutate(
-                            parent,
-                            evolutionConfig.mutationRate
-                        );
-                        nextGeneration.push(offspring);
+                        const parent = this.selectParent(validatedPopulation);
+                        const mutated = await this.mutate(parent);
+                        nextGeneration.push(mutated);
                     }
                 }
 
                 population = nextGeneration;
+
+                // Update best result if we found a better one
+                const currentBest = validatedPopulation[0];
+                if (currentBest.fitness > bestResult.fitness) {
+                    bestResult = {
+                        pattern: currentBest.pattern,
+                        fitness: currentBest.fitness,
+                        generation,
+                    };
+                }
+
                 console.log(`Generation ${generation} complete:`, {
                     populationSize: population.length,
                     bestFitness: bestResult.fitness,
                 });
             }
 
-            // Store the best result in the vector database
-            console.log("Storing best result:", {
-                id: bestResult.pattern.id,
-                fitness: bestResult.fitness,
-                generation: bestResult.generation,
-            });
+            // Store the best result
             await this.vectorDb.storePattern(bestResult.pattern);
 
             return bestResult;
         } catch (error) {
-            console.error("Error during pattern evolution:", {
-                error: error.message,
-                stack: error.stack,
-            });
-            this.runtime.logger.error("Error during pattern evolution", {
-                error,
-            });
+            console.error("Error during pattern evolution:", error);
             throw error;
         }
     }
@@ -291,179 +242,68 @@ export class PatternEvolution extends Service {
         return population;
     }
 
-    private async evaluateFitness(pattern: GamePattern): Promise<number> {
-        console.log("Evaluating fitness for pattern:", pattern.id);
+    private async calculateFitness(pattern: GamePattern): Promise<number> {
+        // Calculate fitness based on multiple factors
+        const baseScore = pattern.effectiveness_score || 0;
+        const complexityScore = this.calculateComplexityScore(pattern);
+        const interactivityScore = this.calculateInteractivityScore(pattern);
+        const gameplayScore = this.calculateGameplayScore(pattern);
 
-        if (!pattern?.content?.html) {
-            console.warn("Pattern missing content or HTML:", {
-                id: pattern?.id,
-                hasContent: !!pattern?.content,
-            });
-            return 0;
-        }
-
-        // Combine multiple fitness metrics
-        const metrics = await Promise.all([
-            this.evaluateComplexity(pattern),
-            this.evaluateInteractivity(pattern),
-            this.evaluateVisualAppeal(pattern),
-            this.evaluatePerformance(pattern),
-        ]);
-
-        // Weighted average of metrics
-        const weights = [0.3, 0.3, 0.2, 0.2];
-        const fitness = metrics.reduce(
-            (sum, metric, i) => sum + metric * weights[i],
-            0
+        // Weighted combination of scores
+        return (
+            baseScore * 0.3 +
+            complexityScore * 0.2 +
+            interactivityScore * 0.2 +
+            gameplayScore * 0.3
         );
-
-        console.log("Fitness evaluation complete:", {
-            patternId: pattern.id,
-            metrics,
-            weights,
-            finalFitness: fitness,
-        });
-
-        return fitness;
     }
 
-    private async evaluateComplexity(pattern: GamePattern): Promise<number> {
-        console.log("Evaluating complexity for pattern:", pattern.id);
-        const content = pattern.content;
-        if (!content) return 0;
+    private calculateComplexityScore(pattern: GamePattern): number {
+        const html = pattern.content?.html || "";
+        const hasCollisions = /collision|intersect|overlap/.test(html);
+        const hasGameState = /gameState|score|level/.test(html);
+        const hasAnimations = /@keyframes|animation|transition/.test(html);
+        const hasLayout = /flex|grid|gap|justify-content/.test(html);
 
         let score = 0;
-        const maxScore = 1;
+        if (hasCollisions) score += 0.25;
+        if (hasGameState) score += 0.25;
+        if (hasAnimations) score += 0.25;
+        if (hasLayout) score += 0.25;
 
-        // Evaluate HTML complexity
-        if (content.html) {
-            // Count elements
-            const elementCount = (content.html.match(/<[^>]+>/g) || []).length;
-            score += Math.min(elementCount / 20, 0.25); // Max 0.25 for element count
-
-            // Count nested depth
-            const maxDepth = content.html.split("<").reduce((depth, part) => {
-                if (part.trim().startsWith("/")) depth--;
-                else if (part.includes(">")) depth++;
-                return Math.max(depth, 0);
-            }, 0);
-            score += Math.min(maxDepth / 5, 0.25); // Max 0.25 for depth
-        }
-
-        console.log("Complexity evaluation:", {
-            patternId: pattern.id,
-            score,
-            maxScore,
-        });
-
-        return Math.min(score, maxScore);
+        return score;
     }
 
-    private async evaluateInteractivity(pattern: GamePattern): Promise<number> {
-        console.log("Evaluating interactivity for pattern:", pattern.id);
-        const content = pattern.content;
-        if (!content) return 0;
+    private calculateInteractivityScore(pattern: GamePattern): number {
+        const html = pattern.content?.html || "";
+        const hasControls = /keydown|click|mousedown/.test(html);
+        const hasPowerUps = /power-up|boost|upgrade/.test(html);
+        const hasEvents = /addEventListener|on\w+="/.test(html);
+        const hasDraggable = /draggable|drag/.test(html);
 
         let score = 0;
-        const maxScore = 1;
+        if (hasControls) score += 0.25;
+        if (hasPowerUps) score += 0.25;
+        if (hasEvents) score += 0.25;
+        if (hasDraggable) score += 0.25;
 
-        // Check for event listeners
-        if (content.js) {
-            const eventListenerCount = (
-                content.js.match(/addEventListener/g) || []
-            ).length;
-            score += Math.min(eventListenerCount / 5, 0.5);
-        }
-
-        // Check for interactive elements
-        if (content.html) {
-            const interactiveElements = (
-                content.html.match(/<button|<input|<select|<a /g) || []
-            ).length;
-            score += Math.min(interactiveElements / 3, 0.5);
-        }
-
-        console.log("Interactivity evaluation:", {
-            patternId: pattern.id,
-            score,
-            maxScore,
-        });
-
-        return Math.min(score, maxScore);
+        return score;
     }
 
-    private async evaluateVisualAppeal(pattern: GamePattern): Promise<number> {
-        console.log("Evaluating visual appeal for pattern:", pattern.id);
-        const content = pattern.content;
-        if (!content) return 0;
+    private calculateGameplayScore(pattern: GamePattern): number {
+        const html = pattern.content?.html || "";
+        const hasLevels = /level|stage|phase/.test(html);
+        const hasScoring = /score|points|highscore/.test(html);
+        const hasGameLoop = /setInterval|requestAnimationFrame/.test(html);
+        const hasGameEvents = /gameOver|levelUp|powerUp/.test(html);
 
         let score = 0;
-        const maxScore = 1;
+        if (hasLevels) score += 0.25;
+        if (hasScoring) score += 0.25;
+        if (hasGameLoop) score += 0.25;
+        if (hasGameEvents) score += 0.25;
 
-        // Check for animations
-        if (content.html) {
-            const hasAnimation =
-                content.html.includes("@keyframes") ||
-                content.html.includes("animation:");
-            if (hasAnimation) score += 0.3;
-        }
-
-        // Check for color variety
-        if (content.metadata?.color_scheme) {
-            score += Math.min(content.metadata.color_scheme.length / 4, 0.3);
-        }
-
-        // Check for responsive design
-        if (content.html) {
-            const hasMediaQueries = content.html.includes("@media");
-            if (hasMediaQueries) score += 0.4;
-        }
-
-        console.log("Visual appeal evaluation:", {
-            patternId: pattern.id,
-            score,
-            maxScore,
-        });
-
-        return Math.min(score, maxScore);
-    }
-
-    private async evaluatePerformance(pattern: GamePattern): Promise<number> {
-        console.log("Evaluating performance for pattern:", pattern.id);
-        const content = pattern.content;
-        if (!content) return 0;
-
-        let score = 1; // Start with perfect score and deduct based on issues
-        const maxScore = 1;
-
-        // Check HTML size
-        if (content.html) {
-            const sizeKB = content.html.length / 1024;
-            if (sizeKB > 50) score -= 0.3;
-            else if (sizeKB > 20) score -= 0.1;
-        }
-
-        // Check for expensive operations in JS
-        if (content.js) {
-            const hasExpensiveOps =
-                content.js.includes("while") || content.js.includes("for");
-            if (hasExpensiveOps) score -= 0.2;
-        }
-
-        // Check for large inline styles
-        if (content.html) {
-            const inlineStyleCount = (content.html.match(/style="/g) || [])
-                .length;
-            if (inlineStyleCount > 10) score -= 0.2;
-        }
-
-        console.log("Performance evaluation:", {
-            patternId: pattern.id,
-            score: Math.max(0, score),
-            maxScore,
-        });
-
-        return Math.max(0, Math.min(score, maxScore));
+        return score;
     }
 
     private selectParent(
@@ -491,62 +331,249 @@ export class PatternEvolution extends Service {
         return tournament[0].pattern;
     }
 
-    private async mutate(
-        pattern: GamePattern,
-        mutationRate: number
-    ): Promise<GamePattern> {
-        console.log("Starting mutation:", {
-            patternId: pattern.id,
-            mutationRate,
-        });
+    private async mutate(pattern: GamePattern): Promise<GamePattern> {
+        const mutationOperators = [
+            "add_interaction",
+            "modify_style",
+            "add_animation",
+            "change_layout",
+            "add_game_element",
+            "add_collision_detection",
+            "add_power_ups",
+            "add_game_state",
+            "add_level_progression",
+        ];
 
-        if (!pattern?.content?.html) {
-            console.warn("Cannot mutate pattern without content:", pattern.id);
-            return pattern;
+        const html = pattern.content?.html || "";
+        const $ = parse(html);
+
+        // Ensure game container exists
+        if (!$.querySelector(".game-container")) {
+            const container = parse('<div class="game-container"></div>');
+            $.querySelector("body")?.appendChild(container);
         }
 
-        try {
-            const dom = new JSDOM(pattern.content.html);
-            const document = dom.window.document;
+        // Apply random number of mutations (2-4)
+        const mutationCount = Math.floor(Math.random() * 3) + 2;
+        console.log(`Applying ${mutationCount} mutations`);
 
-            // List of possible mutations
-            const mutations = [
-                this.mutateColors.bind(this),
-                this.mutateAnimations.bind(this),
-                this.mutateLayout.bind(this),
-            ];
+        for (let i = 0; i < mutationCount; i++) {
+            const operator =
+                mutationOperators[
+                    Math.floor(Math.random() * mutationOperators.length)
+                ];
+            switch (operator) {
+                case "add_collision_detection":
+                    if (!html.includes("checkCollisions")) {
+                        const collisionScript = `
+                            <script>
+                                function checkCollisions() {
+                                    const player = document.querySelector('.player');
+                                    const elements = document.querySelectorAll('.enemy, .power-up');
+                                    elements.forEach(element => {
+                                        if (isColliding(player, element)) {
+                                            dispatchEvent(new CustomEvent('collision', {
+                                                detail: { type: element.className }
+                                            }));
+                                        }
+                                    });
+                                }
+                                function isColliding(a, b) {
+                                    const aRect = a.getBoundingClientRect();
+                                    const bRect = b.getBoundingClientRect();
+                                    return !(
+                                        aRect.top + aRect.height < bRect.top ||
+                                        aRect.top > bRect.top + bRect.height ||
+                                        aRect.left + aRect.width < bRect.left ||
+                                        aRect.left > bRect.left + bRect.width
+                                    );
+                                }
+                                setInterval(checkCollisions, 100);
+                            </script>
+                        `;
+                        $.querySelector("body")?.appendChild(
+                            parse(collisionScript)
+                        );
+                    }
+                    break;
 
-            // Apply random mutations based on mutation rate
-            for (const mutation of mutations) {
-                if (Math.random() < mutationRate) {
-                    console.log(`Applying mutation: ${mutation.name}`);
-                    await mutation(document);
-                }
+                case "add_power_ups":
+                    if (!html.includes("power-up")) {
+                        const powerUpElement = `
+                            <div class="power-up" data-effect="speed" data-duration="5000"></div>
+                            <script>
+                                function handlePowerUp(effect, duration) {
+                                    const player = document.querySelector('.player');
+                                    player.classList.add(effect);
+                                    updateGameState('powerUps', [...gameState.powerUps, { effect, duration }]);
+                                    setTimeout(() => {
+                                        player.classList.remove(effect);
+                                        updateGameState('powerUps', gameState.powerUps.filter(p => p.effect !== effect));
+                                    }, duration);
+                                }
+                            </script>
+                        `;
+                        $.querySelector(".game-container")?.appendChild(
+                            parse(powerUpElement)
+                        );
+                    }
+                    break;
+
+                case "add_game_state":
+                    if (!html.includes("gameState")) {
+                        const gameStateScript = `
+                            <script>
+                                let gameState = {
+                                    score: 0,
+                                    level: 1,
+                                    powerUps: [],
+                                    health: 100
+                                };
+
+                                function updateGameState(key, value) {
+                                    gameState[key] = value;
+                                    dispatchEvent(new CustomEvent('gameStateUpdate', {
+                                        detail: { key, value }
+                                    }));
+                                }
+                            </script>
+                        `;
+                        $.querySelector("body")?.appendChild(
+                            parse(gameStateScript)
+                        );
+                    }
+                    break;
+
+                case "add_level_progression":
+                    if (!html.includes("levelUp")) {
+                        const levelScript = `
+                            <div class="level-display">Level 1</div>
+                            <script>
+                                function levelUp() {
+                                    updateGameState('level', gameState.level + 1);
+                                    dispatchEvent(new CustomEvent('levelUp', {
+                                        detail: { level: gameState.level }
+                                    }));
+                                }
+
+                                function checkLevelProgress() {
+                                    if (gameState.score >= gameState.level * 1000) {
+                                        levelUp();
+                                    }
+                                }
+                                setInterval(checkLevelProgress, 1000);
+                            </script>
+                        `;
+                        $.querySelector(".game-container")?.appendChild(
+                            parse(levelScript)
+                        );
+                    }
+                    break;
+
+                case "add_game_element":
+                    const elements = [
+                        '<div class="player" onkeydown="handleMovement()"></div>',
+                        '<div class="enemy" data-speed="2"></div>',
+                        '<div class="collectible" data-points="10"></div>',
+                    ];
+                    const element =
+                        elements[Math.floor(Math.random() * elements.length)];
+                    $.querySelector(".game-container")?.appendChild(
+                        parse(element)
+                    );
+                    break;
+
+                case "change_layout":
+                    const layoutStyles = [
+                        "display: flex; flex-direction: column; gap: 1rem;",
+                        "display: flex; justify-content: space-between; align-items: center;",
+                        "display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 15px;",
+                        'display: grid; grid-template-areas: "header header" "nav main" "footer footer"; gap: 10px;',
+                    ];
+                    const selectedLayout =
+                        layoutStyles[
+                            Math.floor(Math.random() * layoutStyles.length)
+                        ];
+                    const targetElement = $.querySelector(".game-container");
+                    if (targetElement) {
+                        const currentStyle =
+                            targetElement.getAttribute("style") || "";
+                        targetElement.setAttribute(
+                            "style",
+                            `${currentStyle}; ${selectedLayout}`
+                        );
+                    }
+                    break;
+
+                case "add_interaction":
+                    if (!html.includes("handleMovement")) {
+                        const movementScript = `
+                            <script>
+                                function handleMovement(event) {
+                                    const player = document.querySelector('.player');
+                                    const speed = 5;
+                                    switch(event.key) {
+                                        case 'ArrowLeft': player.style.left = (player.offsetLeft - speed) + 'px'; break;
+                                        case 'ArrowRight': player.style.left = (player.offsetLeft + speed) + 'px'; break;
+                                        case 'ArrowUp': player.style.top = (player.offsetTop - speed) + 'px'; break;
+                                        case 'ArrowDown': player.style.top = (player.offsetTop + speed) + 'px'; break;
+                                    }
+                                }
+                                document.addEventListener('keydown', handleMovement);
+                            </script>
+                        `;
+                        $.querySelector("body")?.appendChild(
+                            parse(movementScript)
+                        );
+                    }
+                    break;
+
+                case "add_animation":
+                    const animations = [
+                        "@keyframes float { 0% { transform: translateY(0); } 50% { transform: translateY(-10px); } 100% { transform: translateY(0); } }",
+                        "@keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }",
+                        "@keyframes rotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }",
+                    ];
+                    const animation =
+                        animations[
+                            Math.floor(Math.random() * animations.length)
+                        ];
+                    const styleElement =
+                        $.querySelector("style") || parse("<style></style>");
+                    styleElement.textContent += animation;
+                    if (!$.querySelector("style")) {
+                        $.querySelector("head")?.appendChild(styleElement);
+                    }
+                    break;
+
+                case "modify_style":
+                    const styles = [
+                        "border: 2px solid #333; box-shadow: 2px 2px 5px rgba(0,0,0,0.2); margin: 10px;",
+                        "background-color: #f0f0f0; border-radius: 4px; padding: 10px;",
+                        "position: relative; overflow: hidden; min-height: 200px;",
+                    ];
+                    const style =
+                        styles[Math.floor(Math.random() * styles.length)];
+                    const element = $.querySelector(".game-container");
+                    if (element) {
+                        const currentStyle =
+                            element.getAttribute("style") || "";
+                        element.setAttribute(
+                            "style",
+                            `${currentStyle}; ${style}`
+                        );
+                    }
+                    break;
             }
-
-            const mutatedPattern: GamePattern = {
-                ...pattern,
-                id: uuidv4(),
-                pattern_name: `${pattern.pattern_name}_mutated`,
-                content: {
-                    ...pattern.content,
-                    html: dom.serialize(),
-                },
-            };
-
-            console.log("Mutation complete:", {
-                originalId: pattern.id,
-                mutatedId: mutatedPattern.id,
-            });
-
-            return mutatedPattern;
-        } catch (error) {
-            console.error("Error during mutation:", {
-                patternId: pattern.id,
-                error: error.message,
-            });
-            return pattern;
         }
+
+        return {
+            ...pattern,
+            content: {
+                ...pattern.content,
+                html: $.toString(),
+            },
+        };
     }
 
     private async crossover(
@@ -615,9 +642,11 @@ export class PatternEvolution extends Service {
     }
 
     private async mutateColors(document: Document): Promise<void> {
+        console.log("Applying color mutation");
         const styles = document.querySelectorAll("style");
         styles.forEach((style) => {
             if (style.textContent) {
+                // Replace colors with new random colors
                 style.textContent = style.textContent.replace(
                     /#[0-9a-f]{6}/gi,
                     () =>
@@ -625,15 +654,71 @@ export class PatternEvolution extends Service {
                             .toString(16)
                             .padStart(6, "0")}`
                 );
+                // Add new color properties
+                const elements = document.querySelectorAll(".game-element");
+                elements.forEach((element) => {
+                    const color = `#${Math.floor(Math.random() * 16777215)
+                        .toString(16)
+                        .padStart(6, "0")}`;
+                    style.textContent += `\n.${element.className.split(" ")[0]} { color: ${color}; border-color: ${color}; }`;
+                });
             }
         });
     }
 
     private async mutateAnimations(document: Document): Promise<void> {
+        console.log("Applying animation mutation");
         const styles = document.querySelectorAll("style");
+        const animations = [
+            {
+                name: "bounce",
+                keyframes:
+                    "@keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-20px); } }",
+                style: "animation: bounce VAR_DURs infinite;",
+            },
+            {
+                name: "rotate",
+                keyframes:
+                    "@keyframes rotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }",
+                style: "animation: rotate VAR_DURs infinite linear;",
+            },
+            {
+                name: "pulse",
+                keyframes:
+                    "@keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }",
+                style: "animation: pulse VAR_DURs infinite;",
+            },
+            {
+                name: "shake",
+                keyframes:
+                    "@keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-10px); } 75% { transform: translateX(10px); } }",
+                style: "animation: shake VAR_DURs infinite;",
+            },
+        ];
+
         styles.forEach((style) => {
             if (style.textContent) {
-                // Modify animation duration
+                // Add new animation
+                const animation =
+                    animations[Math.floor(Math.random() * animations.length)];
+                if (
+                    !style.textContent.includes(`@keyframes ${animation.name}`)
+                ) {
+                    style.textContent += `\n${animation.keyframes}`;
+                }
+
+                // Apply animation to elements
+                const elements = document.querySelectorAll(".game-element");
+                elements.forEach((element) => {
+                    const duration = (Math.random() * 2 + 0.5).toFixed(1);
+                    const animationStyle = animation.style.replace(
+                        "VAR_DUR",
+                        duration
+                    );
+                    style.textContent += `\n.${element.className.split(" ")[0]} { ${animationStyle} }`;
+                });
+
+                // Modify existing animation durations
                 style.textContent = style.textContent.replace(
                     /animation:.*?(\d+)s/g,
                     (match, duration) =>
@@ -647,19 +732,113 @@ export class PatternEvolution extends Service {
     }
 
     private async mutateLayout(document: Document): Promise<void> {
+        console.log("Applying layout mutation");
         const elements = document.querySelectorAll(".game-element");
+        const styles = document.querySelectorAll("style");
+        const layouts = [
+            "position: absolute; top: VAR_POSpx; left: VAR_POSpx;",
+            "position: absolute; bottom: VAR_POSpx; right: VAR_POSpx;",
+            "position: absolute; transform: translate(VAR_POSpx, VAR_POSpx);",
+            "position: absolute; transform: rotate(VAR_ROTdeg) translate(VAR_POSpx, VAR_POSpx);",
+        ];
+
         elements.forEach((element) => {
-            const style = element.getAttribute("style") || "";
-            const newStyle = style
-                .replace(
-                    /width:.*?;/,
-                    `width: ${Math.floor(30 + Math.random() * 40)}px;`
+            const layout = layouts[Math.floor(Math.random() * layouts.length)]
+                .replace(/VAR_POS/g, () =>
+                    Math.floor(Math.random() * 100).toString()
                 )
-                .replace(
-                    /height:.*?;/,
-                    `height: ${Math.floor(30 + Math.random() * 40)}px;`
+                .replace(/VAR_ROT/g, () =>
+                    Math.floor(Math.random() * 360).toString()
                 );
+
+            const style = element.getAttribute("style") || "";
+            const newStyle =
+                style
+                    .replace(
+                        /width:.*?;/,
+                        `width: ${Math.floor(30 + Math.random() * 40)}px;`
+                    )
+                    .replace(
+                        /height:.*?;/,
+                        `height: ${Math.floor(30 + Math.random() * 40)}px;`
+                    )
+                    .replace(
+                        /position:.*?;|top:.*?;|left:.*?;|bottom:.*?;|right:.*?;|transform:.*?;/g,
+                        ""
+                    ) + layout;
             element.setAttribute("style", newStyle);
+        });
+
+        // Add responsive layout styles
+        styles.forEach((style) => {
+            if (style.textContent && !style.textContent.includes("@media")) {
+                style.textContent += `
+                    @media (max-width: 768px) {
+                        .game-element {
+                            transform: scale(0.8);
+                        }
+                    }
+                    @media (max-width: 480px) {
+                        .game-element {
+                            transform: scale(0.6);
+                        }
+                    }
+                `;
+            }
+        });
+    }
+
+    private async mutateInteractivity(document: Document): Promise<void> {
+        console.log("Applying interactivity mutation");
+        const elements = document.querySelectorAll(".game-element");
+        const interactionTypes = [
+            {
+                class: "interactive",
+                attributes: {
+                    onclick: "this.classList.toggle('active')",
+                    "data-interactive": "true",
+                },
+                style: ".interactive:hover { cursor: pointer; transform: scale(1.1); transition: transform 0.2s; }",
+            },
+            {
+                class: "draggable",
+                attributes: {
+                    draggable: "true",
+                    ondragstart:
+                        "event.dataTransfer.setData('text', event.target.id)",
+                    "data-interactive": "true",
+                },
+                style: ".draggable:hover { cursor: move; }",
+            },
+            {
+                class: "clickable",
+                attributes: {
+                    onclick: "this.style.animation = 'pulse 0.5s'",
+                    "data-interactive": "true",
+                },
+                style: ".clickable:hover { cursor: pointer; filter: brightness(1.2); }",
+            },
+        ];
+
+        elements.forEach((element) => {
+            if (Math.random() < 0.5) {
+                const interaction =
+                    interactionTypes[
+                        Math.floor(Math.random() * interactionTypes.length)
+                    ];
+                element.classList.add(interaction.class);
+                Object.entries(interaction.attributes).forEach(
+                    ([key, value]) => {
+                        element.setAttribute(key, value);
+                    }
+                );
+
+                // Add interaction styles
+                const style = document.querySelector("style");
+                if (style && !style.textContent?.includes(interaction.style)) {
+                    style.textContent += `\n${interaction.style}`;
+                }
+            }
         });
     }
 }
