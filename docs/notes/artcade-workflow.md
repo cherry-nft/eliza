@@ -4,7 +4,13 @@
 
 ## This document outlines the exact workflow for adding, testing, and utilizing HTML patterns in the Artcade plugin, with specific references to our existing implementation.
 
-## Current State
+---
+
+**CLIENT AND SERVER TESTS NOW COMPLETE IN PLAYGROUND DIRECTORY IN ARTCADE PLUGIN**
+
+---
+
+## Previous State
 
 We can use:
 
