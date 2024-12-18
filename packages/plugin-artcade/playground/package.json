@@ -20,7 +20,8 @@
         "test:integration": "tsx src/server/test-server-integration.ts",
         "test:generations": "tsx src/server/test-generations.ts",
         "test:endpoints": "tsx src/server/test-endpoints.ts",
-        "test:tokenization": "tsx src/server/test-tokenization.ts"
+        "test:tokenization": "tsx src/server/test-tokenization.ts",
+        "view:patterns": "tsx src/server/test-patterns.ts"
     },
     "dependencies": {
         "@ai16z/plugin-artcade": "workspace:*",

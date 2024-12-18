@@ -131,6 +131,66 @@ export class ClientPatternService {
             );
         }
     }
+
+    async evolvePattern(
+        pattern: GamePattern,
+        config: { type: string }
+    ): Promise<GeneratedPattern> {
+        this.logger("info", "Requesting pattern evolution", {
+            patternId: pattern.id,
+            type: config.type,
+        });
+
+        try {
+            const response = await this.fetchWithLogging<
+                ServiceResponse<GeneratedPattern>
+            >("/evolve", {
+                method: "POST",
+                body: JSON.stringify({
+                    html: pattern.content.html,
+                    prompt: pattern.pattern_name,
+                    type: config.type,
+                }),
+            });
+
+            if (!response.success || !response.data) {
+                throw new Error(response.error?.message || "Evolution failed");
+            }
+
+            return response.data;
+        } catch (error) {
+            this.logger("error", "Evolution failed:", error);
+            throw error;
+        }
+    }
+
+    async searchSimilarPatterns(params: {
+        html?: string;
+        type?: string;
+    }): Promise<GamePattern[]> {
+        this.logger("info", "Searching for similar patterns", params);
+
+        try {
+            const response = await this.fetchWithLogging<GamePattern[]>(
+                "/search/similar",
+                {
+                    method: "POST",
+                    body: JSON.stringify(params),
+                }
+            );
+
+            if (!response.success || !response.data) {
+                throw new Error(
+                    response.error?.message || "Failed to find similar patterns"
+                );
+            }
+
+            return response.data;
+        } catch (error) {
+            this.logger("error", "Similar pattern search failed:", error);
+            throw error;
+        }
+    }
 }
 
 // Create and export singleton instance

@@ -13,6 +13,7 @@ import {
     elizaLogger,
 } from "@ai16z/eliza";
 import { TokenizationService } from "./services/TokenizationService";
+import { PatternLoader } from "./services/PatternLoader";
 
 // Add shutdown function
 async function shutdownGracefully() {
@@ -273,6 +274,18 @@ try {
 console.log("[Server] Initializing ClaudeService...");
 const claudeService = new ClaudeService(vectorDb);
 console.log("[Server] ClaudeService initialized successfully");
+
+const patternLoader = new PatternLoader(vectorDb);
+
+// Load patterns into VectorDB
+patternLoader
+    .loadPatternsFromJson()
+    .then(() => {
+        console.log("[Server] Successfully loaded patterns into VectorDB");
+    })
+    .catch((error) => {
+        console.error("[Server] Failed to load patterns:", error);
+    });
 
 const app = express();
 const port = SERVER_CONFIG.PORT;

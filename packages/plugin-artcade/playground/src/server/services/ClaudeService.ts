@@ -403,4 +403,61 @@ export class ClaudeService implements PatternServiceInterface {
             throw error;
         }
     }
+
+    async evolvePattern(
+        currentHtml: string,
+        userPrompt: string,
+        patternType?: string
+    ): Promise<GeneratedPattern> {
+        console.log("[ClaudeService] Starting pattern evolution", {
+            prompt: userPrompt,
+            type: patternType,
+        });
+
+        try {
+            // Find patterns similar to the current type
+            const relevantPatterns =
+                await this.findRelevantPatterns(userPrompt);
+
+            // Filter by pattern type if specified
+            const typePatterns = patternType
+                ? relevantPatterns.filter((p) => p.type === patternType)
+                : relevantPatterns;
+
+            console.log(
+                "[ClaudeService] Found relevant patterns:",
+                typePatterns.map((p) => ({ id: p.id, type: p.type }))
+            );
+
+            // Generate evolution prompt
+            const evolutionPrompt = `
+                Original request: ${userPrompt}
+
+                Current implementation:
+                \`\`\`html
+                ${currentHtml}
+                \`\`\`
+
+                Reference patterns for improvement:
+                ${this.formatPatternExamples(
+                    typePatterns.map((p) => ({
+                        code: p.content.html,
+                        score: p.effectiveness_score,
+                        type: p.type,
+                    }))
+                )}
+
+                Generate an improved version that maintains the core functionality but incorporates techniques from the reference patterns.
+            `;
+
+            // Use existing generation pipeline with new prompt
+            return this.generatePattern(evolutionPrompt);
+        } catch (error) {
+            console.error("[ClaudeService] Evolution failed:", error);
+            throw new PatternGenerationError(
+                "Failed to evolve pattern",
+                error instanceof Error ? error.message : "Unknown error"
+            );
+        }
+    }
 }

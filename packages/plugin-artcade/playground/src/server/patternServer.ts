@@ -338,4 +338,43 @@ router.post("/:id/track-usage", async (req, res) => {
     }
 });
 
+// Pattern Evolution
+router.post("/evolve", async (req, res) => {
+    console.log("[PatternServer] Received evolution request");
+    try {
+        const { html, prompt, type } = req.body;
+        if (!html || !prompt) {
+            console.error(
+                "[PatternServer] Missing required evolution parameters"
+            );
+            return res.status(400).json({
+                success: false,
+                error: { message: "Missing required parameters" },
+            });
+        }
+
+        console.log("[PatternServer] Evolving pattern with type:", type);
+        const evolvedPattern = await req.app.locals.claudeService.evolvePattern(
+            html,
+            prompt,
+            type
+        );
+        console.log("[PatternServer] Successfully evolved pattern");
+
+        res.json({
+            success: true,
+            data: evolvedPattern,
+        });
+    } catch (error) {
+        console.error("[PatternServer] Error evolving pattern:", error);
+        res.status(500).json({
+            success: false,
+            error: {
+                message:
+                    error instanceof Error ? error.message : "Unknown error",
+            },
+        });
+    }
+});
+
 export default router;

@@ -151,21 +151,24 @@ const App: React.FC = () => {
       };
       console.log('Current pattern for evolution:', currentPattern);
 
-      console.log('Evolving pattern');
-      const evolvedPattern = await clientPatternService.evolvePattern(currentPattern, {
-        mutationRate: 0.3,
-        populationSize: 10
-      });
+      console.log('Evolving pattern with type:', currentPattern.type);
+      const evolvedPattern = await clientPatternService.evolvePattern(
+        currentPattern,
+        { type: currentPattern.type }
+      );
       console.log('Evolved pattern:', evolvedPattern);
 
       console.log('Updating Claude output with evolved pattern');
       setClaudeOutput({
         ...claudeOutput,
-        html: evolvedPattern.content.html
+        html: evolvedPattern.html
       });
 
       console.log('Searching for similar patterns to evolved pattern');
-      const similarPatterns = await clientPatternService.searchSimilarPatterns(evolvedPattern);
+      const similarPatterns = await clientPatternService.searchSimilarPatterns({
+        html: evolvedPattern.html,
+        type: currentPattern.type
+      });
       console.log('Found similar patterns:', similarPatterns);
 
       if (similarPatterns.length > 0) {
@@ -173,7 +176,10 @@ const App: React.FC = () => {
         setSelectedPattern(similarPatterns[0]);
 
         console.log('Comparing evolved pattern');
-        const metrics = await clientPatternService.comparePatterns(evolvedPattern.content.html, similarPatterns[0]);
+        const metrics = await clientPatternService.comparePatterns(
+          evolvedPattern.html,
+          similarPatterns[0]
+        );
         console.log('Evolution comparison metrics:', metrics);
         setMetrics(metrics);
       }
