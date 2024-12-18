@@ -159,30 +159,30 @@ async function testPatternEvolution() {
                     <div class="game-container">
                         <div class="game-element character">
                             <div class="sprite"></div>
-                            <style>
-                                .game-container {
-                                    width: 100%;
-                                    height: 100%;
-                                    position: relative;
-                                    background: #f0f0f0;
-                                }
-                                .game-element {
-                                    position: absolute;
-                                    width: 50px;
-                                    height: 50px;
-                                    background: #00ff00;
-                                    animation: bounce 1s infinite;
-                                }
-                                .sprite {
-                                    width: 100%;
-                                    height: 100%;
-                                }
-                                @keyframes bounce {
-                                    0%, 100% { transform: translateY(0); }
-                                    50% { transform: translateY(-20px); }
-                                }
-                            </style>
                         </div>
+                        <style>
+                            .game-container {
+                                width: 100%;
+                                height: 100%;
+                                position: relative;
+                                background: #f0f0f0;
+                            }
+                            .game-element {
+                                position: absolute;
+                                width: 50px;
+                                height: 50px;
+                                background: #00ff00;
+                                animation: bounce 1s infinite;
+                            }
+                            .sprite {
+                                width: 100%;
+                                height: 100%;
+                            }
+                            @keyframes bounce {
+                                0%, 100% { transform: translateY(0); }
+                                50% { transform: translateY(-20px); }
+                            }
+                        </style>
                     </div>
                 </body>
                 </html>
@@ -321,7 +321,7 @@ async function testPatternEvolution() {
 
         console.log("\nTest completed successfully");
     } catch (error) {
-        console.error("Error during testing:", {
+        console.error("Test failed:", {
             name: error.name,
             message: error.message,
             stack: error.stack,
