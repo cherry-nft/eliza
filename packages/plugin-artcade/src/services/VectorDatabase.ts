@@ -49,7 +49,7 @@ export class VectorDatabase extends Service {
     private runtime!: IAgentRuntime & { logger: typeof elizaLogger };
     private embeddingCache!: any;
     private vectorOps!: any;
-    private memoryManager!: MemoryManager;
+    private memoryManager!: IMemoryManager;
     private cache: Map<
         string,
         {
@@ -59,7 +59,7 @@ export class VectorDatabase extends Service {
     > = new Map();
     private readonly CACHE_TTL = 300000; // 5 minutes
     private readonly EMBEDDING_DIMENSION = 1536;
-    private readonly TABLE_NAME = "game_patterns";
+    private readonly TABLE_NAME = "vector_patterns";
 
     constructor() {
         super();
@@ -75,8 +75,8 @@ export class VectorDatabase extends Service {
         this.embeddingCache = runtime.embeddingCache;
         this.vectorOps = runtime.vectorOperations;
 
-        // Get memory manager with proper type checking
-        const memoryManager = runtime.getMemoryManager?.();
+        // Get memory manager with proper type checking and table name
+        const memoryManager = runtime.getMemoryManager(this.TABLE_NAME);
         if (!memoryManager) {
             throw new Error("Memory manager is required but not available");
         }

@@ -6,13 +6,13 @@ import { VectorDatabase } from "../../../src/services/VectorDatabase";
 import { ClaudeService } from "./services/ClaudeService";
 import patternRouter from "./patternServer";
 import { SERVER_CONFIG } from "./config/serverConfig";
-import {
-    DatabaseAdapter,
-    MemoryManager,
-    IAgentRuntime,
-    elizaLogger,
-} from "@ai16z/eliza";
 import { TokenizationService } from "./services/TokenizationService";
+import { ArtcadeRuntime } from "../../../src/types/runtime";
+import { IMemoryManager } from "@ai16z/eliza";
+import { Memory } from "@ai16z/eliza";
+
+// Add constant for memory table name
+const VECTOR_DB_TABLE = "vector_patterns";
 
 // Add shutdown function
 async function shutdownGracefully() {
@@ -52,7 +52,7 @@ const __dirname = dirname(__filename);
 console.log("[Server] Configuration loaded successfully");
 
 // Initialize runtime dependencies with in-memory storage
-const memoryStore = new Map<string, any>();
+const memoryStore = new Map<string, Memory>();
 
 const databaseAdapter = {
     async query(sql: string, params?: any[]) {
@@ -64,31 +64,47 @@ const databaseAdapter = {
     },
 };
 
-const memoryManager = {
+const memoryManager: IMemoryManager = {
     runtime: null as any,
-    tableName: "game_patterns",
-    initialize: async () => {},
-    createMemory: async (memory: any) => {
+    initialize: async () => {
+        console.log("[MemoryManager] Initializing");
+    },
+    createMemory: async (memory: Memory) => {
         console.log("[MemoryManager] Creating memory:", memory.id);
         memoryStore.set(memory.id, memory);
     },
-    getMemory: async (id: string, tableName?: string) => {
+    getMemory: async (id: string) => {
         console.log("[MemoryManager] Getting memory:", id);
         return memoryStore.get(id) || null;
     },
-    updateMemory: async (memory: any) => {
+    updateMemory: async (memory: Memory) => {
         console.log("[MemoryManager] Updating memory:", memory.id);
         memoryStore.set(memory.id, memory);
     },
-    deleteMemory: async (id: string, tableName?: string) => {
+    deleteMemory: async (id: string) => {
         console.log("[MemoryManager] Deleting memory:", id);
         memoryStore.delete(id);
     },
-    getMemories: async ({ tableName, filter, count = 10, unique = true }) => {
-        console.log("[MemoryManager] Getting memories with filter:", filter);
-        return Array.from(memoryStore.values()).slice(0, count);
+    getMemories: async (opts: {
+        roomId: `${string}-${string}-${string}-${string}-${string}`;
+        count?: number;
+        unique?: boolean;
+        start?: number;
+        end?: number;
+    }) => {
+        console.log("[MemoryManager] Getting memories with options:", opts);
+        const memories = Array.from(memoryStore.values())
+            .filter((memory) => memory.roomId === opts.roomId)
+            .slice(opts.start || 0, opts.end || opts.count || undefined);
+        return memories;
     },
-    searchMemoriesByEmbedding: async (embedding: number[], opts?: any) => {
+    searchMemoriesByEmbedding: async (
+        embedding: number[],
+        opts?: {
+            match_threshold?: number;
+            max_results?: number;
+        }
+    ) => {
         console.log(
             "[MemoryManager] Searching by embedding, threshold:",
             opts?.match_threshold
@@ -98,8 +114,13 @@ const memoryManager = {
             similarity: 0.9,
         }));
     },
-    countMemories: async (roomId: string, unique?: boolean) => memoryStore.size,
-    addEmbeddingToMemory: async (memory: any) => memory,
+    countMemories: async (roomId: string, unique?: boolean) => {
+        const count = Array.from(memoryStore.values()).filter(
+            (memory) => memory.roomId === roomId
+        ).length;
+        return count;
+    },
+    addEmbeddingToMemory: async (memory: Memory) => memory,
     getCachedEmbeddings: async (content: string) => [],
     getMemoryById: async (id: string) => memoryStore.get(id) || null,
     getMemoriesByRoomIds: async ({ roomIds }: { roomIds: string[] }) => {
@@ -195,16 +216,19 @@ const vectorOperations = {
 };
 
 // Create runtime object with proper implementations
-const runtime: IAgentRuntime & { logger: typeof elizaLogger } = {
-    databaseAdapter: databaseAdapter as any,
+const runtime: ArtcadeRuntime = {
+    databaseAdapter,
     embeddingCache,
     vectorOperations,
-    getMemoryManager: () => memoryManager,
+    getMemoryManager: (name: string): IMemoryManager => {
+        console.log("[Runtime] Getting memory manager for table:", name);
+        return memoryManager;
+    },
     logger: {
-        info: (...args) => console.log("[Info]", ...args),
-        error: (...args) => console.error("[Error]", ...args),
-        debug: (...args) => console.debug("[Debug]", ...args),
-        warn: (...args) => console.warn("[Warning]", ...args),
+        info: (...args: any[]) => console.log("[Info]", ...args),
+        error: (...args: any[]) => console.error("[Error]", ...args),
+        debug: (...args: any[]) => console.debug("[Debug]", ...args),
+        warn: (...args: any[]) => console.warn("[Warning]", ...args),
     },
 };
 
@@ -230,7 +254,7 @@ console.log("[Server] Starting VectorDatabase initialization...");
 console.log("[Server] Runtime configuration:", {
     hasEmbeddingCache: !!runtime.embeddingCache,
     hasVectorOps: !!runtime.vectorOperations,
-    hasMemoryManager: !!runtime.getMemoryManager(),
+    hasMemoryManager: !!runtime.getMemoryManager(VECTOR_DB_TABLE),
     databaseAdapter: !!runtime.databaseAdapter,
 });
 
