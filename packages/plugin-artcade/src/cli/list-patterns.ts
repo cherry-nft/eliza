@@ -16,7 +16,7 @@ async function listPatterns() {
         console.log("\nStored Game Patterns:");
         console.log("====================\n");
 
-        patterns.forEach((pattern, index) => {
+        patterns.forEach((pattern: any, index: number) => {
             console.log(`${index + 1}. ${pattern.pattern_name}`);
             console.log(`   Type: ${pattern.type}`);
             console.log(
@@ -32,7 +32,7 @@ async function listPatterns() {
             }
             console.log("\n");
         });
-    } catch (error) {
+    } catch (error: any) {
         if (error.code === "ENOENT") {
             console.log("No patterns found. The patterns database is empty.");
         } else {

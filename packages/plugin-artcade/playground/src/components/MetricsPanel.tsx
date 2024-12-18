@@ -52,7 +52,7 @@ const MetricsPanel: React.FC<MetricsPanelProps> = ({
       </Typography>
       <Box sx={{ height: 300 }}>
         <Plot
-          data={radarData}
+          data={radarData as any}
           layout={{
             polar: {
               radialaxis: {

@@ -12,6 +12,23 @@ import {
 import { v4 as uuidv4 } from "uuid";
 import { JSDOM } from "jsdom";
 
+interface Memory {
+    userId: string;
+    agentId: string;
+    roomId: `${string}-${string}-${string}-${string}-${string}`;
+    type: "evolution_generation";
+    content: {
+        text: string; // Required for embedding
+        generation: number;
+        population: HTMLOrganism[];
+        timestamp: string;
+    };
+    metadata: {
+        generation: number;
+        bestFitness: number;
+    };
+}
+
 const DEFAULT_CONFIG: EvolutionConfig = {
     populationSize: 50,
     maxGenerations: 20,
@@ -22,6 +39,7 @@ const DEFAULT_CONFIG: EvolutionConfig = {
 };
 
 export class EvolutionEngine {
+    private readonly MEMORY_TABLE = "evolution_memories";
     private runtime: IAgentRuntime;
     private config: EvolutionConfig;
     private mutationOperators: MutationOperator[];
@@ -252,10 +270,23 @@ export class EvolutionEngine {
     private createEmptyFitnessScores(): FitnessScores {
         return {
             interactivity: 0,
-            complexity: 0,
+            responsiveness: 0,
+            aesthetics: 0,
             performance: 0,
-            entertainment: 0,
             novelty: 0,
+            userInput: 0,
+            stateManagement: 0,
+            feedback: 0,
+            progression: 0,
+            gameElements: 0,
+            socialElements: 0,
+            mediaElements: 0,
+            nostalgia: 0,
+            playerControl: 0,
+            collectibles: 0,
+            scoring: 0,
+            obstacles: 0,
+            gameLoop: 0,
             total: 0,
         };
     }
@@ -380,10 +411,26 @@ export class EvolutionEngine {
         population: HTMLOrganism[],
         generation: number
     ): Promise<void> {
-        const memoryManager = this.runtime.getMemoryManager();
-        await memoryManager.createMemory({
+        const memoryManager = this.runtime.getMemoryManager(this.MEMORY_TABLE);
+        if (!memoryManager) {
+            throw new Error("Memory manager not available in runtime");
+        }
+
+        // Create a text representation of the generation for embedding
+        const generationSummary = {
+            generation,
+            bestFitness: Math.max(...population.map((o) => o.fitness.total)),
+            populationSize: population.length,
+            timestamp: new Date().toISOString(),
+        };
+
+        const memory: Memory = {
+            userId: "system", // Since this is system-generated
+            agentId: "evolution-engine", // Identifier for our evolution engine
+            roomId: uuidv4() as `${string}-${string}-${string}-${string}-${string}`, // Generate a unique room ID
             type: "evolution_generation",
             content: {
+                text: JSON.stringify(generationSummary),
                 generation,
                 population,
                 timestamp: new Date().toISOString(),
@@ -394,6 +441,8 @@ export class EvolutionEngine {
                     ...population.map((o) => o.fitness.total)
                 ),
             },
-        });
+        };
+
+        await memoryManager.createMemory(memory as any);
     }
 }

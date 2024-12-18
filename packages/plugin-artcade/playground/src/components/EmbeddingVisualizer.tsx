@@ -32,7 +32,7 @@ const EmbeddingVisualizer: React.FC<EmbeddingVisualizerProps> = ({ embeddings = 
       </Typography>
       <Box sx={{ flexGrow: 1 }}>
         <Plot
-          data={data}
+          data={data as any}
           layout={{
             autosize: true,
             showlegend: true,
