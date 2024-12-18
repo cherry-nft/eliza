@@ -2,16 +2,33 @@
 
 # Claude Proposes...
 
-1. Setup a simple dev server
-2. Create a visual pattern playground:
-    - Pattern preview area
-    - Controls for pattern parameters
-    - Real-time embedding visualization
-    - Pattern effectiveness metrics display
-3. Add basic monitoring:
-    - Console logging for pattern operations
-    - Visual feedback for pattern mutations
-    - Performance metrics display
+We must adapt the playground to include:
+
+- A prompt input area
+- Side-by-side comparison of Claude's output vs. similar patterns
+- Direct feedback loop to Claude's system prompt
+- Pattern matching and suggestion system
+
++------------------+------------------+
+| Prompt Input | Pattern Space |
+| & Controls | (as existing) |
++------------------+------------------+
+| Claude Output | Similar Pattern |
+| Preview | Preview |
++------------------+------------------+
+| Comparison & Feedback Panel |
++-----------------------------------+
+
+New Components Needed
+
+- PromptInput: Text area for user prompts with "Generate" button
+- ClaudeOutputPreview: Live preview of generated HTML
+- PatternComparison: Side-by-side diff/comparison tools
+- FeedbackPanel: Quality metrics and suggestion interface
+
+First modify the layout to accommodate new components
+Then add the prompt input and Claude integration
+Finally add comparison and feedback features
 
 ## Pattern Evolution
 
