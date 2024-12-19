@@ -516,7 +516,7 @@ export class ClientPatternService {
             semantic_boost?: boolean;
         } = {}
     ): Promise<GamePattern[]> {
-        const { threshold = 0.5, limit = 5, semantic_boost = true } = options;
+        const { threshold = 0.3, limit = 5, semantic_boost = true } = options;
 
         // Extract semantic tags if boost is enabled
         let queryText = "";
