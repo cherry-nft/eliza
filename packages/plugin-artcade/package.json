@@ -35,6 +35,7 @@
         "test:integration": "tsx playground/src/server/test-integration.ts",
         "test:generations": "tsx playground/src/server/test-generations.ts",
         "list-patterns": "tsx src/cli/list-patterns.ts",
-        "test:insert": "tsx src/test-insert.ts"
+        "test:insert": "tsx src/test-insert.ts",
+        "test:search": "tsx src/test-search.ts"
     }
 }
