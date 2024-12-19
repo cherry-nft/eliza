@@ -17,13 +17,13 @@ async function testPromptEmbeddings() {
     const sessionId = uuidv4();
     const testPrompts = [
         {
-            prompt: "Create a racing game with neon graphics",
+            prompt: "Create a music visualizer with pulsing neon bars that react to the beat",
             userId: "test-user-1",
             sessionId,
-            projectContext: "game-development",
+            projectContext: "audio-visualization",
         },
         {
-            prompt: "Build a space shooter with power-ups",
+            prompt: "Build a top-down racing game with drifting mechanics and speed trails",
             userId: "test-user-1",
             sessionId,
             projectContext: "game-development",
@@ -34,31 +34,40 @@ async function testPromptEmbeddings() {
         // Test storing prompt embeddings
         console.log("Testing prompt embedding storage...");
         for (const testData of testPrompts) {
-            await vectorDb.storePromptEmbedding(testData);
+            const startTime = Date.now();
+            await vectorDb.storePromptEmbedding({
+                ...testData,
+                responseTime: Date.now() - startTime,
+            });
             console.log(
                 `Successfully stored embedding for prompt: "${testData.prompt}"`
             );
         }
 
-        // Test retrieving similar prompts
-        console.log("\nTesting prompt similarity search...");
-        const searchEmbedding = await vectorDb.generatePromptEmbedding(
-            "Make a racing game with glowing effects"
+        // Test retrieving similar patterns
+        console.log("\nTesting pattern similarity search...");
+        const searchQuery =
+            "Create a racing game with neon effects and drifting";
+        const similarPatterns = await vectorDb.findSimilarPatterns(
+            searchQuery,
+            0.5, // threshold
+            5 // limit
         );
 
-        const { data: similarPrompts, error } = await vectorDb.supabase.rpc(
-            "match_prompts_with_patterns",
-            {
-                query_embedding: searchEmbedding,
-                match_threshold: 0.5,
-                match_count: 5,
-            }
-        );
+        console.log("\nSimilar patterns found:");
+        console.log(similarPatterns);
 
-        if (error) throw error;
-
-        console.log("\nSimilar prompts found:");
-        console.log(similarPrompts);
+        // Test updating prompt match results
+        if (similarPatterns.length > 0) {
+            const testPromptId = uuidv4(); // In real usage, this would be the ID from storePromptEmbedding
+            await vectorDb.updatePromptMatchResults(testPromptId, {
+                matchedPatternIds: similarPatterns.map((pattern) => pattern.id),
+                selectedPatternId: similarPatterns[0].id,
+                successScore: 0.85,
+                userFeedback: "Great match!",
+            });
+            console.log("\nSuccessfully updated prompt match results");
+        }
 
         console.log("\nPrompt embeddings test completed successfully!");
     } catch (error) {
