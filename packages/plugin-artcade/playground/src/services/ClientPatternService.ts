@@ -227,20 +227,24 @@ export class ClientPatternService {
         );
     }
 
-    async evolvePattern(
-        pattern: GamePattern,
-        options: EvolutionOptions & {
-            patternType:
-                | "animation"
-                | "layout"
-                | "interaction"
-                | "style"
-                | "game_mechanic";
-        }
-    ): Promise<GamePattern> {
+    async evolvePattern(options: {
+        pattern: GamePattern;
+        type: string;
+        mutationRate: number;
+        populationSize: number;
+        patternType?:
+            | "animation"
+            | "layout"
+            | "interaction"
+            | "style"
+            | "game_mechanic";
+    }): Promise<GamePattern> {
         this.logger("info", "Evolving pattern with options:", options);
 
         try {
+            // Extract semantic tags from parent pattern
+            const parentTags = extractSemanticTags(options.pattern);
+
             // Configure evolution based on pattern type
             const evolutionConfig = {
                 populationSize: options.populationSize,
@@ -253,7 +257,7 @@ export class ClientPatternService {
 
             // Create targeted mutation operators based on pattern type
             const mutationOperators = this.createTargetedMutationOperators(
-                options.patternType
+                options.patternType || "game_mechanic"
             );
 
             const response = await this.fetchWithLogging<{
@@ -267,8 +271,8 @@ export class ClientPatternService {
                 method: "POST",
                 body: JSON.stringify({
                     pattern: {
-                        html: pattern.content.html,
-                        type: options.patternType,
+                        html: options.pattern.content.html,
+                        type: options.type,
                         mutation_operators: mutationOperators,
                     },
                     config: evolutionConfig,
@@ -280,22 +284,68 @@ export class ClientPatternService {
             }
 
             // Create evolved pattern with the same structure as original
-            return {
-                ...pattern,
+            const evolvedPattern = {
+                ...options.pattern,
                 content: {
-                    ...pattern.content,
+                    ...options.pattern.content,
                     html: response.data.evolved_html,
                     metadata: {
-                        ...pattern.content.metadata,
+                        ...options.pattern.content.metadata,
                         evolution: {
-                            parent_pattern_id: pattern.id,
+                            parent_pattern_id: options.pattern.id,
                             applied_patterns: response.data.applied_patterns,
-                            mutation_type: options.patternType,
+                            mutation_type: options.type,
                             fitness_scores: response.data.fitness_scores,
                         },
                     },
                 },
             };
+
+            // Preserve relevant semantic tags from parent
+            const evolvedTags = extractSemanticTags(evolvedPattern);
+
+            // Merge parent and evolved tags
+            const mergedTags: SemanticTags = {
+                use_cases: [
+                    ...new Set([
+                        ...parentTags.use_cases,
+                        ...evolvedTags.use_cases,
+                    ]),
+                ],
+                mechanics: [
+                    ...new Set([
+                        ...parentTags.mechanics,
+                        ...evolvedTags.mechanics,
+                    ]),
+                ],
+                interactions: [
+                    ...new Set([
+                        ...parentTags.interactions,
+                        ...evolvedTags.interactions,
+                    ]),
+                ],
+                visual_style: [
+                    ...new Set([
+                        ...parentTags.visual_style,
+                        ...evolvedTags.visual_style,
+                    ]),
+                ],
+            };
+
+            // Update the evolved pattern with merged semantic information
+            const updatedPattern = {
+                ...evolvedPattern,
+                room_id: encodeSemanticRoomId(mergedTags),
+                content: {
+                    ...evolvedPattern.content,
+                    metadata: {
+                        ...evolvedPattern.content.metadata,
+                        semantic_tags: mergedTags,
+                    },
+                },
+            };
+
+            return updatedPattern;
         } catch (error) {
             this.logger("error", "Evolution failed:", error);
             throw error;
@@ -463,76 +513,6 @@ export class ClientPatternService {
         const { data, error } = await query.limit(limit);
         if (error) throw error;
         return data;
-    }
-
-    async evolvePattern(options: {
-        pattern: Pattern;
-        type: string;
-        mutationRate: number;
-        populationSize: number;
-    }): Promise<Pattern> {
-        const { pattern, type, mutationRate, populationSize } = options;
-
-        // Extract semantic tags from parent pattern
-        const parentTags = extractSemanticTags(pattern as any);
-
-        // Generate new pattern
-        const evolved = await this.supabase.rpc("evolve_pattern", {
-            parent_id: pattern.id,
-            pattern_type: type,
-            mutation_rate: mutationRate,
-            population_size: populationSize,
-        });
-
-        if (evolved.error) throw evolved.error;
-
-        // Preserve relevant semantic tags from parent
-        const evolvedPattern = evolved.data;
-        const evolvedTags = extractSemanticTags(evolvedPattern as any);
-
-        // Merge parent and evolved tags
-        const mergedTags: SemanticTags = {
-            use_cases: [
-                ...new Set([...parentTags.use_cases, ...evolvedTags.use_cases]),
-            ],
-            mechanics: [
-                ...new Set([...parentTags.mechanics, ...evolvedTags.mechanics]),
-            ],
-            interactions: [
-                ...new Set([
-                    ...parentTags.interactions,
-                    ...evolvedTags.interactions,
-                ]),
-            ],
-            visual_style: [
-                ...new Set([
-                    ...parentTags.visual_style,
-                    ...evolvedTags.visual_style,
-                ]),
-            ],
-        };
-
-        // Update the evolved pattern with merged semantic information
-        const updatedPattern = {
-            ...evolvedPattern,
-            room_id: encodeSemanticRoomId(mergedTags),
-            content: {
-                ...evolvedPattern.content,
-                metadata: {
-                    ...evolvedPattern.content.metadata,
-                    semantic_tags: mergedTags,
-                },
-            },
-        };
-
-        // Store the updated pattern
-        const { error: updateError } = await this.supabase
-            .from("vector_patterns")
-            .update(updatedPattern)
-            .eq("id", evolvedPattern.id);
-
-        if (updateError) throw updateError;
-        return updatedPattern;
     }
 
     async getSimilarPatterns(
