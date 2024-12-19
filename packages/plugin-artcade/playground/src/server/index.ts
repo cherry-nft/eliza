@@ -28,6 +28,7 @@ if (!process.env.SUPABASE_PROJECT_URL) {
 const vectorDb = new VectorSupabase(process.env.SUPABASE_PROJECT_URL);
 const claudeService = new ClaudeService({
     OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY || "",
+    vectorDb: vectorDb,
 });
 
 // Attach services to app.locals

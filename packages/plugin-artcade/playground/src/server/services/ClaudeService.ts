@@ -8,6 +8,7 @@ import { VectorDatabase } from "../../../../src/services/VectorDatabase";
 
 interface ClaudeConfig {
     OPENROUTER_API_KEY: string;
+    vectorDb: VectorDatabase;
 }
 
 export class ClaudeService implements PatternServiceInterface {
@@ -15,16 +16,105 @@ export class ClaudeService implements PatternServiceInterface {
     private readonly API_URL = "https://openrouter.ai/api/v1/chat/completions";
     private vectorDb: VectorDatabase;
     private lastUsedPatterns: any[] = []; // Track patterns used in generation
+    private readonly PROMPT_TEMPLATE = `# System Prompt: Artcade [In Production]
+
+You are an expert web developer tasked with creating an interactive HTML experience. First, analyze this prompt and break it down into components:
+
+"{{user_prompt}}"
+
+Here are some similar patterns for reference:
+{{pattern_examples}}
+
+Your response must be a single JSON object with this exact structure. ALL fields are REQUIRED:
+
+{
+"plan": {
+    "coreMechanics": string[],
+    "visualElements": string[],
+    "interactivity": string[],
+    "interactionFlow": [
+        {
+            "trigger": string,
+            "action": string,
+            "description": string
+        }
+    ],
+    "stateManagement": {
+        "variables": [
+            {
+                "name": string,
+                "type": string,
+                "description": string
+            }
+        ],
+        "updates": string[]
+    },
+    "assetRequirements": {
+        "scripts": string[],
+        "styles": string[],
+        "fonts": string[],
+        "images": string[],
+        "animations": [
+            {
+                "type": string,
+                "property": string,
+                "element": string
+            }
+        ]
+    }
+},
+"title": string,
+"description": string,
+"html": string,
+"thumbnail": {
+    "alt": string,
+    "backgroundColor": string,
+    "elements": [
+        {
+            "type": string,
+            "attributes": Record<string, string | number>
+        }
+    ]
+}
+}
+
+Requirements for the HTML:
+
+- Must be a single, self-contained file
+- All CSS in <style> tag in head
+- All JavaScript in <script> tag at end of body
+- Must use semantic HTML5 elements
+- Must include proper meta tags
+- Must be responsive (work down to 320px)
+- Must include ARIA labels
+- Must not use external resources
+
+IMPORTANT VALIDATION REQUIREMENTS:
+
+1. Response MUST be a single JSON object
+2. ALL fields marked as REQUIRED must be present
+3. The 'plan' object MUST include ALL specified fields
+4. Do not include any explanation, markdown formatting, or additional text
+5. The response must be valid JSON that can be parsed directly
+
+Before returning, verify that your response includes ALL required fields and follows the exact structure specified above.`;
 
     constructor(config: ClaudeConfig) {
         console.log("[ClaudeService] Initializing service...");
 
         try {
             this.OPENROUTER_API_KEY = config.OPENROUTER_API_KEY;
+            this.vectorDb = config.vectorDb;
 
             if (!this.OPENROUTER_API_KEY) {
                 throw new PatternGenerationError(
                     "OpenRouter API key not found in configuration"
+                );
+            }
+
+            if (!this.vectorDb) {
+                throw new PatternGenerationError(
+                    "Vector database not provided"
                 );
             }
 

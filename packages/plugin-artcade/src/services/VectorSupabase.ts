@@ -58,13 +58,23 @@ export class VectorSupabase {
             Metadata: ${JSON.stringify(pattern.content.metadata)}
         `.trim();
 
+        return this.generateEmbeddingFromText(textToEmbed);
+    }
+
+    public async generateEmbeddingFromText(text: string): Promise<number[]> {
         const response = await this.openai.embeddings.create({
             model: "text-embedding-3-small",
-            input: textToEmbed,
+            input: text,
             encoding_format: "float",
         });
 
         return response.data[0].embedding;
+    }
+
+    private async generateEmbeddingFromPattern(
+        pattern: GamePattern
+    ): Promise<number[]> {
+        return this.generateEmbedding(pattern);
     }
 
     private async generatePromptEmbedding(prompt: string): Promise<number[]> {

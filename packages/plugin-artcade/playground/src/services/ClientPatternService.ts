@@ -195,16 +195,13 @@ export class ClientPatternService {
     }
 
     async searchSimilarPatterns(pattern: GamePattern): Promise<GamePattern[]> {
-        return this.fetchWithLogging<GamePattern[]>(
-            "/patterns/search/similar",
-            {
-                method: "POST",
-                body: JSON.stringify({
-                    html: pattern.content.html,
-                    type: pattern.type,
-                }),
-            }
-        );
+        return this.fetchWithLogging<GamePattern[]>("/search/similar", {
+            method: "POST",
+            body: JSON.stringify({
+                html: pattern.content.html,
+                type: pattern.type,
+            }),
+        });
     }
 
     async comparePatterns(
