@@ -37,6 +37,7 @@
         "list-patterns": "tsx src/cli/list-patterns.ts",
         "test:insert": "tsx src/test-insert.ts",
         "test:insert-2": "tsx src/test-insert-2.ts",
-        "test:search": "tsx src/test-search.ts"
+        "test:search": "tsx src/test-search.ts",
+        "test:prompt-embeddings": "tsx src/tests/test-prompt-embeddings.ts"
     }
 }
