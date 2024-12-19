@@ -49,13 +49,13 @@ export class VectorSupabase {
 
     private async generateEmbedding(pattern: GamePattern): Promise<number[]> {
         const textToEmbed = `
-            Pattern: ${pattern.pattern_name}
-            Type: ${pattern.type}
-            Description: ${pattern.content.context}
-            HTML: ${pattern.content.html}
-            ${pattern.content.css ? `CSS: ${pattern.content.css}` : ""}
-            ${pattern.content.js ? `JS: ${pattern.content.js}` : ""}
-            Metadata: ${JSON.stringify(pattern.content.metadata)}
+            Pattern: ${pattern.pattern_name || "Untitled"}
+            Type: ${pattern.type || "unknown"}
+            Description: ${pattern.content?.context || pattern.content?.metadata?.description || "No description"}
+            HTML: ${pattern.content?.html || ""}
+            ${pattern.content?.css ? `CSS: ${pattern.content.css}` : ""}
+            ${pattern.content?.js ? `JS: ${pattern.content.js}` : ""}
+            Metadata: ${JSON.stringify(pattern.content?.metadata || {})}
         `.trim();
 
         return this.generateEmbeddingFromText(textToEmbed);
@@ -64,7 +64,7 @@ export class VectorSupabase {
     public async generateEmbeddingFromText(text: string): Promise<number[]> {
         const response = await this.openai.embeddings.create({
             model: "text-embedding-3-small",
-            input: text,
+            input: [text],
             encoding_format: "float",
         });
 
@@ -86,7 +86,7 @@ export class VectorSupabase {
 
         const response = await this.openai.embeddings.create({
             model: "text-embedding-3-small",
-            input: formattedPrompt,
+            input: [formattedPrompt],
             encoding_format: "float",
         });
 
@@ -182,17 +182,20 @@ export class VectorSupabase {
     }
 
     async findSimilarPatterns(
-        searchText: string,
+        input: string | GamePattern,
         threshold = 0.5,
         limit = 5
     ): Promise<GamePattern[]> {
         try {
-            const response = await this.openai.embeddings.create({
-                model: "text-embedding-3-small",
-                input: searchText,
-                encoding_format: "float",
-            });
-            const searchEmbedding = response.data[0].embedding;
+            let searchEmbedding: number[];
+
+            if (typeof input === "string") {
+                // If input is a string, use generateEmbeddingFromText
+                searchEmbedding = await this.generateEmbeddingFromText(input);
+            } else {
+                // If input is a GamePattern, use generateEmbedding
+                searchEmbedding = await this.generateEmbedding(input);
+            }
 
             const { data, error } = await this.supabase.rpc("match_patterns", {
                 query_embedding: searchEmbedding,

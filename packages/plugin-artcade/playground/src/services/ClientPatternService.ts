@@ -200,6 +200,8 @@ export class ClientPatternService {
             body: JSON.stringify({
                 html: pattern.content.html,
                 type: pattern.type,
+                threshold: 0.85,
+                limit: 5,
             }),
         });
     }

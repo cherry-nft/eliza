@@ -238,7 +238,7 @@ router.post("/search/similar", async (req, res) => {
     console.log("[PatternServer] Received similar pattern search request");
     try {
         const searchParams: SimilarPatternsRequest = req.body;
-        let embedding: number[];
+        let similarPatterns: GamePattern[];
 
         if (searchParams.patternId) {
             // Search by pattern ID
@@ -252,29 +252,24 @@ router.post("/search/similar", async (req, res) => {
             if (!pattern) {
                 throw new PatternSearchError("Reference pattern not found");
             }
-            embedding = pattern.embedding;
+            similarPatterns = await req.app.locals.vectorDb.findSimilarPatterns(
+                pattern,
+                searchParams.threshold || 0.85,
+                searchParams.limit || 5
+            );
         } else if (searchParams.html) {
             // Search by raw HTML
-            console.log(
-                "[PatternServer] Generating embedding for HTML content"
-            );
-            embedding = await req.app.locals.vectorDb.generateEmbedding(
-                searchParams.html
+            console.log("[PatternServer] Searching by HTML content");
+            similarPatterns = await req.app.locals.vectorDb.findSimilarPatterns(
+                searchParams.html,
+                searchParams.threshold || 0.85,
+                searchParams.limit || 5
             );
         } else {
             throw new PatternSearchError(
                 "Either patternId or html must be provided"
             );
         }
-
-        // Find similar patterns
-        const similarPatterns =
-            await req.app.locals.vectorDb.findSimilarPatterns(
-                embedding,
-                searchParams.type || "ui",
-                searchParams.threshold || 0.85,
-                searchParams.limit || 5
-            );
 
         console.log(
             "[PatternServer] Found similar patterns:",
