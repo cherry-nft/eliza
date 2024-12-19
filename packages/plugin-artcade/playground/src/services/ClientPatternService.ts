@@ -187,7 +187,14 @@ export class ClientPatternService {
     }
 
     async getAllPatterns(): Promise<GamePattern[]> {
-        return this.fetchWithLogging<GamePattern[]>("/patterns");
+        const response = await this.fetchWithLogging<{
+            success: boolean;
+            data: GamePattern[];
+        }>("/");
+        if (!response.success) {
+            throw new Error("Failed to fetch patterns");
+        }
+        return response.data;
     }
 
     async searchSimilarPatterns(pattern: GamePattern): Promise<GamePattern[]> {

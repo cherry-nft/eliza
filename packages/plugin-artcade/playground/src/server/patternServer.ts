@@ -167,6 +167,32 @@ router.post("/store", async (req, res) => {
     }
 });
 
+// List all patterns
+router.get("/", async (req, res) => {
+    console.log("[PatternServer] Received request to list all patterns");
+    try {
+        const patterns = await req.app.locals.vectorDb.getAllPatterns();
+        console.log("[PatternServer] Successfully retrieved patterns");
+        res.json({
+            success: true,
+            data: patterns,
+        });
+    } catch (error) {
+        console.error("[PatternServer] Error retrieving patterns:", error);
+        res.status(500).json({
+            success: false,
+            error: {
+                message:
+                    error instanceof Error ? error.message : "Unknown error",
+                details:
+                    error instanceof PatternRetrievalError
+                        ? error.details
+                        : undefined,
+            },
+        });
+    }
+});
+
 // Pattern Retrieval
 router.get("/:id", async (req, res) => {
     const { id } = req.params;
@@ -335,39 +361,6 @@ router.post("/:id/track-usage", async (req, res) => {
         res.status(error instanceof PatternRetrievalError ? 404 : 500).json(
             response
         );
-    }
-});
-
-// Pattern Retrieval
-router.get("/", async (req, res) => {
-    console.log("[PatternServer] Received request to list all patterns");
-
-    try {
-        const patterns = await req.app.locals.vectorDb.listStoredPatterns();
-        console.log(
-            "[PatternServer] Successfully retrieved patterns:",
-            patterns.length
-        );
-
-        const response: PatternRetrievalResponse = {
-            success: true,
-            data: patterns,
-        };
-        res.json(response);
-    } catch (error) {
-        console.error("[PatternServer] Error retrieving patterns:", error);
-        const response: PatternRetrievalResponse = {
-            success: false,
-            error: {
-                message:
-                    error instanceof Error ? error.message : "Unknown error",
-                details:
-                    error instanceof PatternRetrievalError
-                        ? error.details
-                        : undefined,
-            },
-        };
-        res.status(500).json(response);
     }
 });
 
