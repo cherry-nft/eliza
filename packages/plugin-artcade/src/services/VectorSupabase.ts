@@ -7,7 +7,6 @@ import {
     ClaudeUsageContext,
     PatternFeatures,
 } from "../types/effectiveness";
-import { Pool } from "pg";
 
 // Custom error class for database operations
 class DatabaseError extends Error {
@@ -28,21 +27,23 @@ export class VectorSupabase {
     private openai;
     private readonly CACHE_TTL = 300000; // 5 minutes
     private readonly EMBEDDING_DIMENSION = 1536;
-    private pool: Pool;
 
-    constructor(connectionString: string) {
+    constructor(supabaseUrl: string) {
+        if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+            throw new Error("Missing Supabase service role key");
+        }
+
         this.supabase = createClient(
-            process.env.SUPABASE_URL || "",
-            process.env.SUPABASE_SERVICE_ROLE_KEY || ""
+            supabaseUrl,
+            process.env.SUPABASE_SERVICE_ROLE_KEY
         );
+
+        if (!process.env.OPENAI_API_KEY) {
+            throw new Error("Missing OpenAI API key");
+        }
 
         this.openai = new OpenAI({
             apiKey: process.env.OPENAI_API_KEY,
-        });
-
-        this.pool = new Pool({
-            connectionString,
-            ssl: { rejectUnauthorized: false },
         });
     }
 
@@ -487,10 +488,7 @@ function updatePlayer() {
         };
 
         try {
-            await this.pool.query(
-                "INSERT INTO vector_patterns (id, pattern) VALUES ($1, $2)",
-                [movementPattern.id, movementPattern]
-            );
+            await this.storePattern(movementPattern);
         } catch (error) {
             console.error("Error storing movement pattern:", error);
             throw error;
@@ -629,10 +627,7 @@ function checkCollisions() {
         };
 
         try {
-            await this.pool.query(
-                "INSERT INTO vector_patterns (id, pattern) VALUES ($1, $2)",
-                [collisionPattern.id, collisionPattern]
-            );
+            await this.storePattern(collisionPattern);
         } catch (error) {
             console.error("Error storing collision pattern:", error);
             throw error;
@@ -853,10 +848,7 @@ function updateTrailColor(color) {
         };
 
         try {
-            await this.pool.query(
-                "INSERT INTO vector_patterns (id, pattern) VALUES ($1, $2)",
-                [uiPattern.id, uiPattern]
-            );
+            await this.storePattern(uiPattern);
         } catch (error) {
             console.error("Error storing UI pattern:", error);
             throw error;
@@ -974,10 +966,7 @@ function showCombo(multiplier) {
         };
 
         try {
-            await this.pool.query(
-                "INSERT INTO vector_patterns (id, pattern) VALUES ($1, $2)",
-                [scoringPattern.id, scoringPattern]
-            );
+            await this.storePattern(scoringPattern);
         } catch (error) {
             console.error("Error storing scoring pattern:", error);
             throw error;
@@ -1145,10 +1134,7 @@ function updateCops() {
         };
 
         try {
-            await this.pool.query(
-                "INSERT INTO vector_patterns (id, pattern) VALUES ($1, $2)",
-                [policePattern.id, policePattern]
-            );
+            await this.storePattern(policePattern);
         } catch (error) {
             console.error("Error storing police effects pattern:", error);
             throw error;
@@ -1228,10 +1214,7 @@ if (audioContext) {
         };
 
         try {
-            await this.pool.query(
-                "INSERT INTO vector_patterns (id, pattern) VALUES ($1, $2)",
-                [soundPattern.id, soundPattern]
-            );
+            await this.storePattern(soundPattern);
         } catch (error) {
             console.error("Error storing sound effects pattern:", error);
             throw error;
