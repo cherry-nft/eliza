@@ -139,10 +139,17 @@ Before returning, verify that your response includes ALL required fields and fol
             console.log("[ClaudeService] Generating embedding for prompt");
             const embedding = await this.vectorDb.generateEmbedding(prompt);
 
+            // Store the prompt and its embedding
+            await this.vectorDb.storePromptEmbedding({
+                prompt,
+                userId: "system", // You may want to pass this from the client
+                sessionId: crypto.randomUUID(),
+                projectContext: "pattern_generation",
+            });
+
             // Get patterns from VectorDatabase
             const similarPatterns = await this.vectorDb.findSimilarPatterns(
                 embedding,
-                "all", // or specific type if we can determine it
                 0.85, // similarity threshold
                 3 // number of patterns to return
             );
