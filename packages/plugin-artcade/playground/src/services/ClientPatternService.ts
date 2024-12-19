@@ -8,20 +8,43 @@ import {
 import { GamePattern } from "../../../src/types/patterns";
 import { PatternEffectivenessMetrics } from "../../../src/types/effectiveness";
 import { CLIENT_CONFIG } from "../config/clientConfig";
+import {
+    extractSemanticTags,
+    encodeSemanticRoomId,
+} from "../../../src/utils/semantic-utils";
+import type { Pattern } from "../shared/types/pattern.types";
+import type { SemanticTags } from "../../../src/types/patterns";
 
 interface EvolutionOptions {
     mutationRate: number;
     populationSize: number;
 }
 
+export interface PatternSearchOptions {
+    type?: string;
+    effectiveness_threshold?: number;
+    limit?: number;
+    semantic_match?: {
+        query_text?: string;
+        boost_categories?: {
+            use_cases?: boolean;
+            mechanics?: boolean;
+            interactions?: boolean;
+            visual_style?: boolean;
+        };
+    };
+}
+
 export class ClientPatternService {
     private readonly baseUrl: string;
     private readonly logger: (level: "info" | "error", ...args: any[]) => void;
+    private supabase: any;
 
-    constructor(baseUrl = CLIENT_CONFIG.API_BASE_URL) {
+    constructor(baseUrl = CLIENT_CONFIG.API_BASE_URL, supabase: any) {
         this.baseUrl = baseUrl;
         this.logger = this.createLogger();
         this.logger("info", "Service initialized");
+        this.supabase = supabase;
     }
 
     private createLogger() {
@@ -392,6 +415,154 @@ export class ClientPatternService {
                 },
             };
         }
+    }
+
+    async getPatterns(options: PatternSearchOptions = {}): Promise<Pattern[]> {
+        const {
+            type,
+            effectiveness_threshold = 0.5,
+            limit = 10,
+            semantic_match,
+        } = options;
+
+        let query = this.supabase.from("vector_patterns").select("*");
+
+        if (type) {
+            query = query.eq("type", type);
+        }
+
+        if (effectiveness_threshold) {
+            query = query.gte("effectiveness_score", effectiveness_threshold);
+        }
+
+        if (semantic_match?.query_text) {
+            // Use the enhanced match_patterns function
+            const { data: matches, error } = await this.supabase.rpc(
+                "match_patterns",
+                {
+                    query_embedding: await this.generateQueryEmbedding(
+                        semantic_match.query_text
+                    ),
+                    query_text: semantic_match.query_text.toLowerCase(),
+                    match_threshold: effectiveness_threshold,
+                    match_count: limit,
+                }
+            );
+
+            if (error) throw error;
+            return matches;
+        }
+
+        const { data, error } = await query.limit(limit);
+        if (error) throw error;
+        return data;
+    }
+
+    async evolvePattern(options: {
+        pattern: Pattern;
+        type: string;
+        mutationRate: number;
+        populationSize: number;
+    }): Promise<Pattern> {
+        const { pattern, type, mutationRate, populationSize } = options;
+
+        // Extract semantic tags from parent pattern
+        const parentTags = extractSemanticTags(pattern as any);
+
+        // Generate new pattern
+        const evolved = await this.supabase.rpc("evolve_pattern", {
+            parent_id: pattern.id,
+            pattern_type: type,
+            mutation_rate: mutationRate,
+            population_size: populationSize,
+        });
+
+        if (evolved.error) throw evolved.error;
+
+        // Preserve relevant semantic tags from parent
+        const evolvedPattern = evolved.data;
+        const evolvedTags = extractSemanticTags(evolvedPattern as any);
+
+        // Merge parent and evolved tags
+        const mergedTags: SemanticTags = {
+            use_cases: [
+                ...new Set([...parentTags.use_cases, ...evolvedTags.use_cases]),
+            ],
+            mechanics: [
+                ...new Set([...parentTags.mechanics, ...evolvedTags.mechanics]),
+            ],
+            interactions: [
+                ...new Set([
+                    ...parentTags.interactions,
+                    ...evolvedTags.interactions,
+                ]),
+            ],
+            visual_style: [
+                ...new Set([
+                    ...parentTags.visual_style,
+                    ...evolvedTags.visual_style,
+                ]),
+            ],
+        };
+
+        // Update the evolved pattern with merged semantic information
+        const updatedPattern = {
+            ...evolvedPattern,
+            room_id: encodeSemanticRoomId(mergedTags),
+            content: {
+                ...evolvedPattern.content,
+                metadata: {
+                    ...evolvedPattern.content.metadata,
+                    semantic_tags: mergedTags,
+                },
+            },
+        };
+
+        // Store the updated pattern
+        const { error: updateError } = await this.supabase
+            .from("vector_patterns")
+            .update(updatedPattern)
+            .eq("id", evolvedPattern.id);
+
+        if (updateError) throw updateError;
+        return updatedPattern;
+    }
+
+    async getSimilarPatterns(
+        pattern: Pattern,
+        options: {
+            threshold?: number;
+            limit?: number;
+            semantic_boost?: boolean;
+        } = {}
+    ): Promise<Pattern[]> {
+        const { threshold = 0.5, limit = 5, semantic_boost = true } = options;
+
+        // Extract semantic tags if boost is enabled
+        let queryText = "";
+        if (semantic_boost) {
+            const tags = extractSemanticTags(pattern as any);
+            queryText = Object.values(tags).flat().join(" ");
+        }
+
+        const { data: matches, error } = await this.supabase.rpc(
+            "match_patterns",
+            {
+                query_embedding: pattern.embedding,
+                query_text: queryText,
+                match_threshold: threshold,
+                match_count: limit,
+            }
+        );
+
+        if (error) throw error;
+        return matches;
+    }
+
+    private async generateQueryEmbedding(query: string): Promise<number[]> {
+        // This should be implemented based on your embedding generation strategy
+        // Typically would call your OpenAI or similar service
+        throw new Error("generateQueryEmbedding not implemented");
     }
 }
 

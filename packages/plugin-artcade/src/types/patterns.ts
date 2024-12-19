@@ -7,29 +7,42 @@ export interface GamePattern {
         css?: string;
         js?: string;
         context: string;
-        metadata: {
-            visual_type?: string;
-            interaction_type?: string;
-            color_scheme?: string[];
-            animation_duration?: string;
-            dependencies?: string[];
-            game_mechanics?: Array<{
-                type: string;
-                properties: Record<string, any>;
-            }>;
-            evolution?: {
-                parent_pattern_id: string;
-                applied_patterns: string[];
-                mutation_type: GamePattern["type"];
-                fitness_scores: Record<string, number>;
-            };
-        };
+        metadata: PatternMetadata;
     };
     embedding: number[];
     effectiveness_score: number;
     usage_count: number;
     created_at?: Date;
     last_used?: Date;
+    room_id: string;
+    user_id: string;
+    agent_id: string;
+}
+
+export interface SemanticTags {
+    use_cases: string[];
+    mechanics: string[];
+    interactions: string[];
+    visual_style: string[];
+}
+
+export interface PatternMetadata {
+    visual_type?: string;
+    interaction_type?: string;
+    color_scheme?: string[];
+    animation_duration?: string;
+    dependencies?: string[];
+    game_mechanics?: Array<{
+        type: string;
+        properties: Record<string, any>;
+    }>;
+    evolution?: {
+        parent_pattern_id: string;
+        applied_patterns: string[];
+        mutation_type: GamePattern["type"];
+        fitness_scores: Record<string, number>;
+    };
+    semantic_tags?: SemanticTags;
 }
 
 export interface StagedPattern extends GamePattern {
