@@ -36,10 +36,10 @@ export interface ClaudeUsageContext {
         features_used: string[];
     }>;
     quality_assessment: {
-        visual_score: number;
-        interactive_score: number;
-        functional_score: number;
-        performance_score: number;
+        visual: number;
+        interactive: number;
+        functional: number;
+        performance: number;
     };
 }
 
@@ -57,4 +57,22 @@ export interface EffectivenessReport {
         functional_trend: number[];
     };
     gaps_identified: string[];
+}
+
+export interface PatternFeatures {
+    visual: {
+        hasAnimations: boolean;
+        colorCount: number;
+        layoutType: "flex" | "grid" | "standard";
+    };
+    interactive: {
+        eventListeners: string[];
+        hasUserInput: boolean;
+        stateChanges: boolean;
+    };
+    functional: {
+        hasGameLogic: boolean;
+        dataManagement: boolean;
+        complexity: number;
+    };
 }

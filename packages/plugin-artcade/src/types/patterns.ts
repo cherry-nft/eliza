@@ -9,7 +9,7 @@ export interface GamePattern {
         context: string;
         metadata: PatternMetadata;
     };
-    embedding: number[];
+    embedding?: number[];
     effectiveness_score: number;
     usage_count: number;
     created_at?: Date;
@@ -17,6 +17,20 @@ export interface GamePattern {
     room_id: string;
     user_id: string;
     agent_id: string;
+    usage_stats?: {
+        total_uses: number;
+        successful_uses: number;
+        average_similarity: number;
+        last_used: Date;
+    };
+    claude_usage_metrics?: {
+        last_usage: {
+            direct_reuse: boolean;
+            structural_similarity: number;
+            feature_adoption: string[];
+            timestamp: Date;
+        };
+    };
 }
 
 export interface SemanticTags {
@@ -27,6 +41,7 @@ export interface SemanticTags {
 }
 
 export interface PatternMetadata {
+    description?: string;
     visual_type?: string;
     interaction_type?: string;
     color_scheme?: string[];
