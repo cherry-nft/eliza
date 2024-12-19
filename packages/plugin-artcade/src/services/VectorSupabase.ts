@@ -177,12 +177,18 @@ export class VectorSupabase {
         try {
             const embedding = await this.generateEmbedding(pattern);
 
+            // Generate UUIDs for required fields if not provided
+            const patternWithIds = {
+                ...pattern,
+                room_id: pattern.room_id || crypto.randomUUID(),
+                user_id: pattern.user_id || crypto.randomUUID(),
+                agent_id: pattern.agent_id || crypto.randomUUID(),
+                embedding,
+            };
+
             const { error } = await this.supabase
                 .from("vector_patterns")
-                .insert({
-                    ...pattern,
-                    embedding,
-                });
+                .insert(patternWithIds);
 
             if (error) throw error;
         } catch (error) {
@@ -198,17 +204,21 @@ export class VectorSupabase {
     ): Promise<GamePattern[]> {
         try {
             let searchEmbedding: number[];
+            let queryText: string;
 
             if (typeof input === "string") {
                 // If input is a string, use generateEmbeddingFromText
                 searchEmbedding = await this.generateEmbeddingFromText(input);
+                queryText = input.toLowerCase();
             } else {
                 // If input is a GamePattern, use generateEmbedding
                 searchEmbedding = await this.generateEmbedding(input);
+                queryText = input.pattern_name.toLowerCase();
             }
 
             const { data, error } = await this.supabase.rpc("match_patterns", {
                 query_embedding: searchEmbedding,
+                query_text: queryText,
                 match_threshold: threshold,
                 match_count: limit,
             });

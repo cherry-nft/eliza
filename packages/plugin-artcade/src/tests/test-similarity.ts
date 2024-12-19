@@ -91,6 +91,7 @@ async function testSimilarity() {
                 "match_patterns",
                 {
                     query_embedding: queryEmbedding,
+                    query_text: testQuery,
                     match_threshold: threshold,
                     match_count: 10,
                 }
