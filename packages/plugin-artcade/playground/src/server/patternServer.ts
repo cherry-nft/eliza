@@ -171,7 +171,11 @@ router.post("/store", async (req, res) => {
 router.get("/", async (req, res) => {
     console.log("[PatternServer] Received request to list all patterns");
     try {
-        const patterns = await req.app.locals.vectorDb.getAllPatterns();
+        const vectorDb = req.app.locals.vectorDb;
+        if (!vectorDb) {
+            throw new Error("VectorDatabase service not available");
+        }
+        const patterns = await vectorDb.getAllPatterns();
         console.log("[PatternServer] Successfully retrieved patterns");
         res.json({
             success: true,

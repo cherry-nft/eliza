@@ -3,6 +3,8 @@ import cors from "cors";
 import { elizaLogger } from "@ai16z/eliza";
 import { ClaudeService } from "./services/ClaudeService";
 import { testServerSupabaseConnection } from "./config/serverSupabaseConfig";
+import { VectorSupabase } from "../../../src/services/VectorSupabase";
+import patternRouter from "./patternServer";
 import dotenv from "dotenv";
 
 // Load environment variables
@@ -17,13 +19,26 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Initialize Claude service with API key from environment
+// Validate required environment variables
+if (!process.env.SUPABASE_PROJECT_URL) {
+    throw new Error("SUPABASE_PROJECT_URL is required");
+}
+
+// Initialize services
+const vectorDb = new VectorSupabase(process.env.SUPABASE_PROJECT_URL);
 const claudeService = new ClaudeService({
     OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY || "",
 });
 
+// Attach services to app.locals
+app.locals.vectorDb = vectorDb;
+app.locals.claudeService = claudeService;
+
 // Test Supabase connection
 await testServerSupabaseConnection();
+
+// Mount pattern router at /api/patterns
+app.use("/api/patterns", patternRouter);
 
 // Health check endpoint
 app.get("/health", (req, res) => {
