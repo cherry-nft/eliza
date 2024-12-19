@@ -12,8 +12,8 @@ import {
     extractSemanticTags,
     encodeSemanticRoomId,
 } from "../../../src/utils/semantic-utils";
-import type { Pattern } from "../shared/types/pattern.types";
 import type { SemanticTags } from "../../../src/types/patterns";
+import { supabaseClient } from "../config/supabaseConfig";
 
 interface EvolutionOptions {
     mutationRate: number;
@@ -229,15 +229,10 @@ export class ClientPatternService {
 
     async evolvePattern(options: {
         pattern: GamePattern;
-        type: string;
+        type: GamePattern["type"];
         mutationRate: number;
         populationSize: number;
-        patternType?:
-            | "animation"
-            | "layout"
-            | "interaction"
-            | "style"
-            | "game_mechanic";
+        patternType?: GamePattern["type"];
     }): Promise<GamePattern> {
         this.logger("info", "Evolving pattern with options:", options);
 
@@ -474,7 +469,9 @@ export class ClientPatternService {
         }
     }
 
-    async getPatterns(options: PatternSearchOptions = {}): Promise<Pattern[]> {
+    async getPatterns(
+        options: PatternSearchOptions = {}
+    ): Promise<GamePattern[]> {
         const {
             type,
             effectiveness_threshold = 0.5,
@@ -516,13 +513,13 @@ export class ClientPatternService {
     }
 
     async getSimilarPatterns(
-        pattern: Pattern,
+        pattern: GamePattern,
         options: {
             threshold?: number;
             limit?: number;
             semantic_boost?: boolean;
         } = {}
-    ): Promise<Pattern[]> {
+    ): Promise<GamePattern[]> {
         const { threshold = 0.5, limit = 5, semantic_boost = true } = options;
 
         // Extract semantic tags if boost is enabled
@@ -554,4 +551,7 @@ export class ClientPatternService {
 }
 
 // Create and export singleton instance
-export const clientPatternService = new ClientPatternService();
+export const clientPatternService = new ClientPatternService(
+    CLIENT_CONFIG.API_BASE_URL,
+    supabaseClient
+);
