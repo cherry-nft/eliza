@@ -5,7 +5,7 @@ import type {
     PatternStorageRequest,
     SimilarPatternsRequest,
     PatternUsageContext,
-} from "../shared/types/pattern.types";
+} from "../shared/pattern.types";
 
 // Load environment variables
 config();

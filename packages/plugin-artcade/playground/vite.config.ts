@@ -4,7 +4,7 @@ import Markdown from "vite-plugin-md";
 
 export default defineConfig(({ mode }) => {
     // Load env file based on mode
-    process.env = { ...process.env, ...loadEnv(mode, process.cwd(), "") };
+    const env = loadEnv(mode, process.cwd(), "");
 
     return {
         plugins: [react(), Markdown()],
@@ -45,8 +45,14 @@ export default defineConfig(({ mode }) => {
         },
         define: {
             "process.env": {
+                VITE_SUPABASE_PROJECT_URL: JSON.stringify(
+                    env.VITE_SUPABASE_PROJECT_URL
+                ),
+                VITE_SUPABASE_ANON_KEY: JSON.stringify(
+                    env.VITE_SUPABASE_ANON_KEY
+                ),
                 VITE_OPENROUTER_API_KEY: JSON.stringify(
-                    process.env.VITE_OPENROUTER_API_KEY
+                    env.VITE_OPENROUTER_API_KEY
                 ),
                 NODE_ENV: JSON.stringify(mode),
             },
@@ -62,7 +68,14 @@ export default defineConfig(({ mode }) => {
                 ],
             },
             rollupOptions: {
-                external: ["path", "url", "onnxruntime-node", /\.node$/],
+                external: [
+                    "path",
+                    "url",
+                    "fs",
+                    "crypto",
+                    "onnxruntime-node",
+                    /\.node$/,
+                ],
             },
         },
         ssr: {

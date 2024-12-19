@@ -15,7 +15,7 @@ import {
     PatternRetrievalError,
     PatternSearchError,
     PatternUsageContext,
-} from "../shared/types/pattern.types";
+} from "../shared/pattern.types";
 import { TokenizationService } from "./services/TokenizationService";
 
 const router = express.Router();

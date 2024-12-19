@@ -1,36 +1,26 @@
-import { readFileSync } from "fs";
-import { loadServerConfig } from "../config/environment";
 import {
     GeneratedPattern,
     PatternGenerationError,
     PatternServiceInterface,
     PatternValidationError,
-} from "../../shared/types/pattern.types";
+} from "../../shared/pattern.types";
 import { VectorDatabase } from "../../../../src/services/VectorDatabase";
+
+interface ClaudeConfig {
+    OPENROUTER_API_KEY: string;
+}
 
 export class ClaudeService implements PatternServiceInterface {
     private OPENROUTER_API_KEY: string;
     private readonly API_URL = "https://openrouter.ai/api/v1/chat/completions";
-    private readonly PROMPT_TEMPLATE: string;
     private vectorDb: VectorDatabase;
     private lastUsedPatterns: any[] = []; // Track patterns used in generation
 
-    constructor(vectorDb: VectorDatabase) {
+    constructor(config: ClaudeConfig) {
         console.log("[ClaudeService] Initializing service...");
-        this.vectorDb = vectorDb;
 
         try {
-            // Load configuration
-            const config = loadServerConfig();
             this.OPENROUTER_API_KEY = config.OPENROUTER_API_KEY;
-
-            // Load prompt template
-            console.log(
-                "[ClaudeService] Loading prompt template from:",
-                config.PROMPT_PATH
-            );
-            this.PROMPT_TEMPLATE = readFileSync(config.PROMPT_PATH, "utf-8");
-            console.log("[ClaudeService] Successfully loaded prompt template");
 
             if (!this.OPENROUTER_API_KEY) {
                 throw new PatternGenerationError(

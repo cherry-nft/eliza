@@ -2,7 +2,7 @@ import { clientPatternService } from "./ClientPatternService";
 import {
     PatternGenerationError,
     GeneratedPattern,
-} from "../shared/types/pattern.types";
+} from "../shared/pattern.types";
 
 interface TestCase {
     category: string;

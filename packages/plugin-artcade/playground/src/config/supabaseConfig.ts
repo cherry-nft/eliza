@@ -1,24 +1,22 @@
 import { createClient } from "@supabase/supabase-js";
-import { elizaLogger } from "@ai16z/eliza";
 
-// Environment validation
-if (
-    !process.env.SUPABASE_PROJECT_URL ||
-    !process.env.SUPABASE_SERVICE_ROLE_KEY
-) {
-    elizaLogger.error("Missing required Supabase environment variables");
-    process.exit(1);
+// Use Vite's environment variable handling
+const supabaseUrl = import.meta.env.VITE_SUPABASE_PROJECT_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+if (!supabaseUrl || !supabaseAnonKey) {
+    console.error("Missing required Supabase environment variables");
 }
 
 export const supabaseClient = createClient(
-    process.env.SUPABASE_PROJECT_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY,
+    supabaseUrl || "",
+    supabaseAnonKey || "",
     {
         auth: { persistSession: false },
     }
 );
 
-// Connection test function
+// Browser-safe connection test
 export async function testSupabaseConnection() {
     try {
         const { error } = await supabaseClient
@@ -26,10 +24,10 @@ export async function testSupabaseConnection() {
             .select("count");
 
         if (error) throw error;
-        elizaLogger.info("Supabase connection successful");
+        console.log("Supabase connection successful");
         return true;
     } catch (error) {
-        elizaLogger.error("Supabase connection failed:", error);
+        console.error("Supabase connection failed:", error);
         return false;
     }
 }

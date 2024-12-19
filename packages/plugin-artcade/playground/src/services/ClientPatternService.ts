@@ -4,7 +4,7 @@ import {
     PatternGenerationResponse,
     PatternStorageResponse,
     PatternValidationError,
-} from "../shared/types/pattern.types";
+} from "../shared/pattern.types";
 import { GamePattern } from "../../../src/types/patterns";
 import { PatternEffectivenessMetrics } from "../../../src/types/effectiveness";
 import { CLIENT_CONFIG } from "../config/clientConfig";

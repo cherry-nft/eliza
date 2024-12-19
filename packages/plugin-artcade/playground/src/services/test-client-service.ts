@@ -1,5 +1,5 @@
 import { clientPatternService } from "./ClientPatternService";
-import { PatternGenerationError } from "../shared/types/pattern.types";
+import { PatternGenerationError } from "../shared/pattern.types";
 
 async function testClientService() {
     console.log("[Test] Starting client service test...");
