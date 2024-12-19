@@ -67,6 +67,92 @@ export class VectorSupabase {
         return response.data[0].embedding;
     }
 
+    private async generatePromptEmbedding(prompt: string): Promise<number[]> {
+        const formattedPrompt = `
+            User Query: ${prompt}
+            Context: Game development pattern search
+            Intent: Find matching UI and game mechanics
+        `.trim();
+
+        const response = await this.openai.embeddings.create({
+            model: "text-embedding-3-small",
+            input: formattedPrompt,
+            encoding_format: "float",
+        });
+
+        return response.data[0].embedding;
+    }
+
+    async storePromptEmbedding(options: {
+        prompt: string;
+        userId: string;
+        sessionId?: string;
+        projectContext?: string;
+    }): Promise<void> {
+        try {
+            const startTime = Date.now();
+            const embedding = await this.generatePromptEmbedding(
+                options.prompt
+            );
+
+            const promptData = {
+                user_id: options.userId,
+                prompt: options.prompt,
+                embedding,
+                session_id: options.sessionId,
+                project_context: options.projectContext,
+                response_time_ms: Date.now() - startTime,
+            };
+
+            const { error } = await this.supabase
+                .from("prompt_embeddings")
+                .insert(promptData);
+
+            if (error) throw error;
+        } catch (error) {
+            console.error("Failed to store prompt embedding:", error);
+            throw new DatabaseError("Failed to store prompt embedding", error);
+        }
+    }
+
+    async updatePromptMatchResults(
+        promptId: string,
+        options: {
+            matchedPatternIds: string[];
+            selectedPatternId?: string;
+            successScore?: number;
+            userFeedback?: string;
+        }
+    ): Promise<void> {
+        try {
+            const updateData: Record<string, any> = {
+                matched_pattern_ids: options.matchedPatternIds,
+            };
+
+            if (options.selectedPatternId) {
+                updateData.selected_pattern_id = options.selectedPatternId;
+            }
+
+            if (options.successScore !== undefined) {
+                updateData.success_score = options.successScore;
+            }
+
+            if (options.userFeedback) {
+                updateData.user_feedback = options.userFeedback;
+            }
+
+            const { error } = await this.supabase
+                .from("prompt_embeddings")
+                .update(updateData)
+                .eq("id", promptId);
+
+            if (error) throw error;
+        } catch (error) {
+            console.error("Failed to update prompt results:", error);
+            throw new DatabaseError("Failed to update prompt results", error);
+        }
+    }
+
     async storePattern(pattern: GamePattern): Promise<void> {
         try {
             const embedding = await this.generateEmbedding(pattern);

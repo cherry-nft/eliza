@@ -1,176 +1,99 @@
-# Artcade Database Connection Update
+# Artcade Pattern Enhancement System
 
 ## Goal
 
-Switch from direct PostgreSQL connection to Supabase while maintaining existing functionality.
+To create a system that enhances Claude's HTML generation by leveraging our embedded pattern library. The system will:
 
-## Implementation Plan
+1. Accept a user prompt and generate initial HTML using Claude
+2. Use semantic search to find relevant patterns from our vector database
+3. Provide these patterns as context to Claude for HTML enhancement
+4. Return improved HTML that incorporates learned patterns while maintaining the user's original intent
 
-### 1. Environment Configuration (5 min)
+This should use Claude's in-context learning capabilities with our vector-embedded patterns as reference material. The enhancement comes from Claude's ability to understand and adapt patterns from our curated library based on semantic similarity.
 
-File: `packages/plugin-artcade/playground/.env`
+## Key Concepts
 
-```env
-# Required Supabase Configuration
-SUPABASE_URL=your_supabase_url
-SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+- Vector Embeddings: Used for semantic similarity search
+- Pattern Matching: Finding relevant examples from our library
+- Context Enhancement: Providing matched patterns to Claude
+- Semantic Room IDs: Text-based identifiers for pattern categorization
+- In-Context Learning: Claude's ability to learn from provided examples
 
-# Existing Configuration (unchanged)
-OPENAI_API_KEY=your_openai_key
-```
+## Current Flow
 
-Verification:
+1. Frontend (React)
 
-- Check if `.env` file exists
-- Add Supabase variables if missing
-- Keep existing variables unchanged
+    - User enters prompt in PromptInput component
+    - "Generate Pattern" button triggers handlePromptSubmit
+    - App.tsx manages state and coordinates pattern generation
 
-### 2. Supabase Configuration (10 min)
+2. Client Service Layer
 
-File: `packages/plugin-artcade/playground/src/config/supabaseConfig.ts`
+    - ClientPatternService.generatePattern sends POST to /generate
+    - Handles response validation and error management
+    - Coordinates pattern search and comparison
 
-```typescript
-import { createClient } from "@supabase/supabase-js";
-import { elizaLogger } from "@ai16z/eliza";
+3. Backend Generation
+    - /generate endpoint (to be implemented)
+    - Claude interaction for initial HTML generation
+    - Pattern matching using vector similarity
+    - Enhanced output generation
 
-if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    elizaLogger.error("Missing required Supabase environment variables");
-    process.exit(1);
-}
+## Implementation Strategy
 
-export const supabaseClient = createClient(
-    process.env.SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY,
-    {
-        auth: { persistSession: false },
-    },
-);
+### 1. Pattern Matching System
 
-// Add connection test function
-export async function testSupabaseConnection() {
-    try {
-        const { error } = await supabaseClient
-            .from("vector_patterns")
-            .select("count");
+- Convert user prompt to embedding vector
+- Search vector database for similar patterns
+- Use semantic room_ids for additional context
+- Rank patterns by relevance and effectiveness
 
-        if (error) throw error;
-        elizaLogger.info("Supabase connection successful");
-        return true;
-    } catch (error) {
-        elizaLogger.error("Supabase connection failed:", error);
-        return false;
-    }
-}
-```
+### 2. Claude Integration
 
-Verification:
+- Initial prompt processing
+- Pattern injection into context
+- HTML generation with pattern awareness
+- Quality validation and enhancement
 
-- Ensure imports are available
-- Verify environment variable checks
-- Test connection function works
+### 3. Enhancement Pipeline
 
-### 3. Server Update (15 min)
+a. Input Processing
 
-File: `packages/plugin-artcade/playground/src/server/index.ts`
+- Analyze user prompt for key requirements
+- Extract semantic meaning and intent
+- Identify relevant pattern categories
 
-```typescript
-import { elizaLogger } from "@ai16z/eliza";
-import {
-    supabaseClient,
-    testSupabaseConnection,
-} from "../config/supabaseConfig";
-import { VectorSupabase } from "../../../src/services/VectorSupabase";
+b. Pattern Selection
 
-// Remove PostgresDatabaseAdapter import and initialization
-// const databaseAdapter = new PostgresDatabaseAdapter(...);
+- Query vector database
+- Filter by semantic similarity
+- Sort by effectiveness score
+- Select top N most relevant patterns
 
-// Initialize VectorSupabase
-const vectorDb = new VectorSupabase(process.env.SUPABASE_URL!);
+c. Context Construction
 
-// Update server initialization
-app.listen(PORT, async () => {
-    try {
-        // Test Supabase connection first
-        const isConnected = await testSupabaseConnection();
-        if (!isConnected) {
-            throw new Error("Failed to connect to Supabase");
-        }
+- Format selected patterns for Claude
+- Include semantic tags and metadata
+- Structure examples for optimal learning
+- Maintain original prompt intent
 
-        elizaLogger.info(`Server running on port ${PORT}`);
-    } catch (error) {
-        elizaLogger.error("Server initialization failed:", error);
-        process.exit(1);
-    }
-});
+d. Output Generation
 
-// Add health check endpoint
-app.get("/health", async (req, res) => {
-    try {
-        const isConnected = await testSupabaseConnection();
-        res.json({
-            status: isConnected ? "healthy" : "error",
-            timestamp: new Date().toISOString(),
-        });
-    } catch (error) {
-        res.status(500).json({
-            status: "error",
-            error: error instanceof Error ? error.message : "Unknown error",
-        });
-    }
-});
-```
+- Generate enhanced HTML
+- Validate against requirements
+- Apply quality metrics
+- Return final result
 
-Verification:
+### 4. Quality Assurance
 
-- Server starts successfully
-- Health check endpoint responds
-- Vector operations work through Supabase
+- Validate HTML structure
+- Check semantic alignment with prompt
+- Verify pattern integration
+- Measure effectiveness metrics
 
-## Testing Steps
+### 5. Feedback Loop
 
-1. Environment Check:
-
-```bash
-cat packages/plugin-artcade/playground/.env
-# Verify Supabase variables are present
-```
-
-2. Start Server:
-
-```bash
-cd packages/plugin-artcade/playground
-pnpm dev
-```
-
-3. Test Connection:
-
-```bash
-curl http://localhost:3000/health
-# Should return {"status":"healthy","timestamp":"..."}
-```
-
-## Rollback Plan
-
-If issues occur:
-
-1. Keep a backup of the original `.env` file
-2. Add feature flag in `.env`:
-
-```env
-USE_SUPABASE=false
-```
-
-3. Add conditional initialization:
-
-```typescript
-const useSupabase = process.env.USE_SUPABASE === "true";
-const db = useSupabase
-    ? new VectorSupabase(process.env.SUPABASE_URL!)
-    : new PostgresDatabaseAdapter(/* ... */);
-```
-
-## Success Criteria
-
-- Server starts without database connection errors
-- Health check returns healthy status
-- Pattern operations (search, store, retrieve) work through Supabase
+- Track pattern usage
+- Update effectiveness scores
+- Monitor enhancement success
+- Refine pattern selection

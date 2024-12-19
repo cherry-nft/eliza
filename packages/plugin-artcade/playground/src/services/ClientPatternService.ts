@@ -14,11 +14,7 @@ import {
 } from "../../../src/utils/semantic-utils";
 import type { SemanticTags } from "../../../src/types/patterns";
 import { supabaseClient } from "../config/supabaseConfig";
-
-interface EvolutionOptions {
-    mutationRate: number;
-    populationSize: number;
-}
+import OpenAI from "openai";
 
 export interface PatternSearchOptions {
     type?: string;
@@ -39,6 +35,7 @@ export class ClientPatternService {
     private readonly baseUrl: string;
     private readonly logger: (level: "info" | "error", ...args: any[]) => void;
     private supabase: any;
+    private openai: OpenAI | null = null;
 
     constructor(baseUrl = CLIENT_CONFIG.API_BASE_URL, supabase: any) {
         this.baseUrl = baseUrl;
@@ -544,9 +541,41 @@ export class ClientPatternService {
     }
 
     private async generateQueryEmbedding(query: string): Promise<number[]> {
-        // This should be implemented based on your embedding generation strategy
-        // Typically would call your OpenAI or similar service
-        throw new Error("generateQueryEmbedding not implemented");
+        try {
+            // Initialize OpenAI client if not already done
+            if (!this.openai) {
+                if (!process.env.OPENAI_API_KEY) {
+                    throw new Error("OpenAI API key not configured");
+                }
+                this.openai = new OpenAI({
+                    apiKey: process.env.OPENAI_API_KEY,
+                });
+            }
+
+            // Format query for semantic search
+            const formattedQuery = `
+                Search Query: ${query}
+                Context: Pattern search for game development
+                Intent: Find relevant UI patterns and game mechanics
+            `.trim();
+
+            // Generate embedding using OpenAI
+            const response = await this.openai.embeddings.create({
+                model: "text-embedding-3-small",
+                input: formattedQuery,
+                encoding_format: "float",
+            });
+
+            // Return the embedding vector
+            return response.data[0].embedding;
+        } catch (error) {
+            this.logger("error", "Failed to generate query embedding:", error);
+            throw new Error(
+                error instanceof Error
+                    ? `Failed to generate embedding: ${error.message}`
+                    : "Failed to generate embedding for search query"
+            );
+        }
     }
 }
 
