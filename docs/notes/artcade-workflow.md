@@ -6,676 +6,933 @@
 
 ---
 
-**CLIENT AND SERVER TESTS NOW COMPLETE IN PLAYGROUND DIRECTORY IN ARTCADE PLUGIN**
+<!-- December 19, 2024 -->
 
-## Playground Implementation
+## Two main entry points:
 
-### Directory Structure
+a. Client Side (ClientPatternService)
 
+- Handles user interactions
+- Makes API requests to server
+- Manages pattern evolution
+
+b. Server Side (patternServer)
+
+- Processes incoming requests
+- Coordinates with ClaudeService
+- Manages database operations
+
+```mermaid
+sequenceDiagram
+    Client->>ClientPatternService: User submits prompt
+    ClientPatternService->>PatternServer: POST /generate
+    PatternServer->>ClaudeService: generatePattern(prompt)
+    ClaudeService->>VectorSupabase: findSimilarPatterns()
+    VectorSupabase->>Supabase: pgvector similarity search
+    Supabase-->>VectorSupabase: Similar patterns
+    ClaudeService->>OpenRouter: Generate with context
+    OpenRouter-->>ClaudeService: Generated pattern
+    ClaudeService->>VectorSupabase: trackClaudeUsage()
+    PatternServer-->>ClientPatternService: Pattern response
 ```
-packages/plugin-artcade/playground/
-├── src/
-│   ├── services/           # Client-side services
-│   │   ├── ClientPatternService.ts
-│   │   └── test-pattern-variations.ts
-│   ├── server/            # Server-side implementation
-│   │   ├── services/
-│   │   │   └── ClaudeService.ts
-│   │   └── patternServer.ts
-│   ├── shared/            # Shared types and interfaces
-│   │   └── types/
-│   │       └── pattern.types.ts
-│   └── components/        # React components
-```
 
-### Core Components
+// Three key pattern types:
+a. GeneratedPattern (Initial Creation) - plan: PatternPlan - title, description - html, thumbnail
 
-#### 1. Shared Types (`pattern.types.ts`)
+b. StoredPattern (Database) - id, type, pattern_name - content (html, css, javascript) - embedding: number[] (1536 dimensions) - effectiveness_score, usage_count
 
-- `GeneratedPattern`: Core interface for pattern data
-    - Contains plan, HTML, title, description, and thumbnail
-    - Used for communication between client and server
-- `PatternGenerationError`: Custom error type for generation failures
-- `PatternValidationError`: Custom error type for validation failures
+c. GamePattern (Enhanced Pattern) - Includes semantic tags - Includes room_id - Tracks evolution history
 
-#### 2. Client Implementation
+Vector Database Implementation:
 
-##### ClientPatternService
+-- Key Components:
 
-Location: `src/services/ClientPatternService.ts`
+1. vector_patterns table
 
-- Handles all client-server communication
-- Features:
+    - Uses pgvector extension
+    - HNSW index for fast similarity search
+    - Stores 1536-dimension OpenAI embeddings
+
+2. match_patterns function
+
+    - Cosine similarity search
+    - Configurable threshold
+    - Returns similar patterns with scores
+
+3. prompt_embeddings table
+    - Tracks prompt history
+    - Links to matched patterns
+    - Stores success metrics
+
+Service Responsibilities:
+
+1. ClientPatternService
+
     - Pattern generation requests
-    - Health checks
-    - Error handling with custom types
-    - Extensive logging for debugging
-- Key Methods:
-    ```typescript
-    generatePattern(prompt: string): Promise<GeneratedPattern>
-    healthCheck(): Promise<boolean>
-    ```
+    - Pattern evolution
+    - Semantic search
+    - Pattern storage/retrieval
 
-##### Pattern Variation Tests
+2. ClaudeService
 
-Location: `src/services/test-pattern-variations.ts`
+    - Pattern generation via OpenRouter
+    - Context enhancement with similar patterns
+    - Usage tracking
+    - Quality validation
 
-- Comprehensive test suite for pattern generation
-- Tests multiple pattern categories:
-    - Interactive Elements
-    - Games
-    - Visual Effects
-- Validates:
-    - Generation success
-    - Response structure
-    - Feature presence
-    - Performance metrics
+3. VectorSupabase
+    - Embedding generation
+    - Pattern similarity search
+    - Pattern storage/retrieval
+    - Usage statistics
 
-#### 3. Server Implementation
+Pattern Evolution System:
 
-##### ClaudeService
+// Evolution workflow:
 
-Location: `src/server/services/ClaudeService.ts`
+1. Extract semantic tags from parent
+2. Apply targeted mutations based on type
+3. Generate new pattern
+4. Merge semantic information
+5. Update effectiveness scores
+6. Store evolved pattern
 
-- Core service for pattern generation
-- Features:
-    - Claude API integration via OpenRouter
-    - Prompt template management
-    - Response validation
-    - Error handling
-- Configuration:
-    - Max tokens: 8192
-    - Response timeout: 60 seconds
-    - Temperature: 0.7
+// Validation at multiple levels:
 
-##### Pattern Server
+1. Input Validation
 
-Location: `src/server/patternServer.ts`
+    - Prompt requirements
+    - Pattern structure
+    - Embedding dimensions
 
-- Express server implementation
-- Endpoints:
-    - `/generate`: Pattern generation
-    - `/health`: Service health check
-- Features:
-    - Request validation
-    - Error handling
-    - CORS support
-    - Logging
+2. Output Validation
 
-### Testing Infrastructure
+    - Pattern completeness
+    - HTML validity
+    - Semantic consistency
 
-#### 1. Pattern Generation Tests
+3. Performance Tracking
+    - Effectiveness scores
+    - Usage statistics
+    - Quality metrics
 
-- Location: `src/services/test-pattern-variations.ts`
-- Tests multiple pattern types:
-    ```typescript
-    const TEST_CASES: TestCase[] = [
-      {
-        category: "Interactive Elements",
-        name: "Pulsing Button",
-        prompt: "...",
-        expectedFeatures: [...]
-      },
-      // More test cases...
-    ];
-    ```
+// Hierarchical error system:
 
-#### 2. Client Service Tests
+1. PatternGenerationError
+2. PatternValidationError
+3. PatternStorageError
+4. PatternRetrievalError
+5. PatternSearchError
 
-- Location: `src/services/test-client-service.ts`
-- Tests:
-    - Service initialization
-    - API communication
-    - Error handling
-    - Response validation
+<-------------------------------------------------------------->
 
-### Key Features
+Vector Database Issues:
 
-1. **Robust Error Handling**
+Type Mismatches:
+Several pattern types ("movement", "collision", "ui", etc.) don't match the expected GamePattern types
+Missing properties in pattern creation (room_id, user_id, agent_id)
+Missing Pattern Properties:
 
-    - Custom error types for different scenarios
-    - Detailed error messages with context
-    - Error recovery strategies
+// These properties are referenced but don't exist
+this.movementPattern
+this.collisionPattern
+this.uiPattern
+this.scoringPattern
+this.policePattern
+this.soundPattern
 
-2. **Extensive Logging**
+Potential pgvector Implementation Issues:
+The code assumes a match_patterns RPC function exists in Supabase
+No explicit vector indexing configuration is visible
+Missing vector similarity calculation method specification
 
-    - Request/response logging
-    - Performance metrics
-    - Error tracking
-    - Generation statistics
+Issue:
+// Current implementation
+const { data } = await this.supabase.rpc("match_patterns", {
+query_embedding: searchEmbedding,
+match_threshold: threshold,
+match_count: limit,
+});
 
-3. **Type Safety**
+You need to ensure the embedding format matches exactly. Add type checking:
 
-    - Shared type definitions
-    - Runtime type validation
-    - Consistent interfaces
-
-4. **Performance Optimization**
-    - Configurable timeouts
-    - Token optimization
-    - Response caching (where appropriate)
-
-### Usage Example
-
-```typescript
-// Client-side pattern generation
-const clientService = new ClientPatternService();
-try {
-    const pattern = await clientService.generatePattern(
-        "Create an interactive button with hover effects",
-    );
-    console.log(`Generated pattern: ${pattern.title}`);
-} catch (error) {
-    if (error instanceof PatternGenerationError) {
-        console.error("Generation failed:", error.message);
-    }
-}
-```
-
-### Testing Commands
-
-```bash
-# Run pattern variation tests
-pnpm test:patterns
-
-# Run client service tests
-pnpm test:client
-
-# Start development server
-pnpm dev:server
-```
-
-This implementation provides a robust foundation for pattern generation, with clear separation of concerns between client and server components, while maintaining type safety and extensive error handling throughout the system.
-
----
-
-**PREVIOUS STATES**
-
-## Previous State
-
-We can use:
-
-- PatternLibrary to extract the best aspect of the HTML code
-- PatternStaging to stage it as a preserved pattern
-- PatternLearning to evaluate new combinations
-- VectorDatabase to find similar high-quality patterns
-
-The existing system already supports:
-
-1. Pattern type categorization
-2. Quality scoring
-3. Embedding-based similarity search
-4. Evolution tracking
-5. Feedback incorporation
-
-For your basketball game example:
-
-1. Extract the gravity physics using PatternLibrary.extractGameMechanics()
-2. Store it with high effectiveness score
-3. Use PatternEvolution with your parameters to find complementary patterns
-4. Use PatternLearning to evaluate the combinations
-
-Would you like me to:
-
-1. Show how to use these existing services for your workflow
-2. Explain how to integrate the evolution parameters
-3. Demonstrate the pattern preservation process
-
-The infrastructure is more sophisticated than I initially realized - we should definitely leverage it rather than build new systems.
-
----
-
-## Previous State
-
-1. User writes a prompt
-2. Claude generates HTML output
-3. Pattern type is selected (animation, layout, interaction, style, game mechanic)
-4. Evolution parameters are currently using hardcoded mutations
-5. Similar patterns section shows related patterns but isn't using embeddings effectively
-
-## Phase 1: Moving from Hardcoded to Embedding-Based Evolution
-
-### Step 1: Pattern Analysis
-
-```typescript
-// File: packages/plugin-artcade/src/services/PatternFingerprinting.ts
-
-interface PatternFeatures {
-    // Visual features like animations, colors, layouts
-    visual: {
-        hasAnimations: boolean;
-        colorCount: number;
-        layoutType: "flex" | "grid" | "standard";
-    };
-
-    // Interactive elements like clicks, hovers, drags
-    interactive: {
-        eventListeners: string[];
-        hasUserInput: boolean;
-        stateChanges: boolean;
-    };
-
-    // Core functionality features
-    functional: {
-        hasGameLogic: boolean;
-        dataManagement: boolean;
-        complexity: number;
-    };
+interface MatchPatternsParams {
+query_embedding: number[];
+match_threshold: number;
+match_count: number;
 }
 
-// Takes HTML string, returns numerical features for embedding
-function extractFeatures(html: string): PatternFeatures {
-    // Natural language: Analyze HTML/CSS/JS to identify key characteristics
-    // that define the pattern's behavior and appearance
-}
-```
-
-### Step 2: Embedding Generation
-
-```typescript
-// File: packages/plugin-artcade/src/services/VectorDatabase.ts
-
-interface PatternVector {
-    id: string;
-    vector: number[]; // Our embedding
-    features: PatternFeatures;
-    type: string;
-}
-
-// Natural language: Convert pattern features into a numerical embedding
-// that can be used for similarity search
-function generateEmbedding(features: PatternFeatures): number[] {
-    return [
-        // Visual dimension (0-1)
-        features.visual.hasAnimations ? 0.5 : 0,
-        features.visual.colorCount / 10,
-
-        // Interactive dimension (0-1)
-        features.interactive.eventListeners.length / 5,
-        features.interactive.hasUserInput ? 0.5 : 0,
-
-        // Functional dimension (0-1)
-        features.functional.complexity,
-        features.functional.hasGameLogic ? 0.5 : 0,
-    ];
-}
-```
-
-### Step 3: Pattern Evolution Using Embeddings
-
-```typescript
-// File: packages/plugin-artcade/playground/src/services/PG-PatternService.ts
-
-// Natural language: Instead of hardcoded mutations, find similar patterns
-// in embedding space and apply their successful mutations
-async function evolvePattern(
-    pattern: GamePattern,
-    config: EvolutionConfig,
-): Promise<GamePattern> {
-    // 1. Extract features from current pattern
-    const features = extractFeatures(pattern.content.html);
-
-    // 2. Generate embedding
-    const embedding = generateEmbedding(features);
-
-    // 3. Find similar patterns
-    const similarPatterns = await findSimilarPatterns(embedding, pattern.type);
-
-    // 4. Extract successful mutations from similar patterns
-    const mutations = extractMutations(similarPatterns);
-
-    // 5. Apply mutations based on similarity and success rate
-    return applyMutations(pattern, mutations, config.mutationRate);
-}
-```
-
-### Step 4: Similarity Search
-
-```typescript
-// File: packages/plugin-artcade/src/services/PatternLibrary.ts
-
-// Natural language: Find patterns with similar embeddings that have been
-// successful in the past
-async function findSimilarPatterns(
-    embedding: number[],
-    type: string,
-    limit: number = 5,
+async findSimilarPatterns(
+input: string | GamePattern,
+threshold = 0.5,
+limit = 5
 ): Promise<GamePattern[]> {
-    const patterns = await getAllPatterns();
+try {
+let searchEmbedding: number[];
 
-    return patterns
-        .filter((p) => p.type === type)
-        .map((p) => ({
-            pattern: p,
-            similarity: cosineSimilarity(embedding, p.embedding),
-        }))
-        .sort((a, b) => b.similarity - a.similarity)
-        .slice(0, limit)
-        .map((x) => x.pattern);
+        if (typeof input === "string") {
+            searchEmbedding = await this.generateEmbeddingFromText(input);
+        } else {
+            searchEmbedding = await this.generateEmbedding(input);
+        }
+
+        // Verify embedding dimension
+        if (searchEmbedding.length !== this.EMBEDDING_DIMENSION) {
+            throw new Error(`Invalid embedding dimension: ${searchEmbedding.length}`);
+        }
+
+        const { data, error } = await this.supabase.rpc<GamePattern>("match_patterns", {
+            query_embedding: searchEmbedding,
+            match_threshold: threshold,
+            match_count: limit,
+        });
+
+        if (error) throw error;
+        return data || [];
+    } catch (error) {
+        console.error("Failed to find similar patterns:", error);
+        throw new DatabaseError("Failed to find similar patterns", error);
+    }
+
 }
-```
 
-## Implementation Plan
+Add Error Handling for Vector Operations:
 
-1. Create `PatternFingerprinting` service
+private async generateEmbedding(pattern: GamePattern): Promise<number[]> {
+try {
+const textToEmbed = this.formatPatternForEmbedding(pattern);
+const embedding = await this.generateEmbeddingFromText(textToEmbed);
 
-    - Start with basic feature extraction
-    - Focus on easily identifiable patterns
-    - Add more sophisticated analysis gradually
+        // Validate embedding
+        if (!embedding || embedding.length !== this.EMBEDDING_DIMENSION) {
+            throw new Error(`Invalid embedding generated: ${embedding?.length || 0} dimensions`);
+        }
 
-2. Update `VectorDatabase`
+        return embedding;
+    } catch (error) {
+        throw new DatabaseError("Failed to generate embedding", error);
+    }
 
-    - Add embedding generation
-    - Implement similarity search
-    - Store successful mutations
+}
 
-3. Modify `PG-PatternService`
+Add Proper Type Definitions for Supabase Responses:
 
-    - Replace hardcoded mutations with embedding-based evolution
+interface VectorSearchResult {
+id: string;
+pattern_name: string;
+type: string;
+content: any;
+effectiveness_score: number;
+similarity: number;
+}
+
+Add Index Management:
+
+async reindexVectors(): Promise<void> {
+try {
+await this.supabase.rpc('reindex_vectors');
+} catch (error) {
+throw new DatabaseError("Failed to reindex vectors", error);
+}
+}
+
+server/index.ts issues:
+
+1. // Error in ClaudeService initialization
+   const claudeService = new ClaudeService({
+   vectorDb: vectorDb, // Type mismatch here
+   });
+
+The error suggests VectorSupabase doesn't match the expected VectorDatabase interface. This is a critical issue.
+
+1. import { VectorSupabase } from "../../../src/services/VectorSupabase";
+
+This relative path import isn't listed in the tsconfig, which will cause build issues.
+
+3. app.post("/generate", async (req, res) => {
+   try {
+   const { prompt } = req.body;
+   const result = await claudeService.generatePattern(prompt);
+   res.json(result);
+   } catch (error) {
+   // Basic error handling could be improved
+   }
+   });
+
+This is missing error handling and validation.
+
+---
+
+    **CLIENT AND SERVER TESTS NOW COMPLETE IN PLAYGROUND DIRECTORY IN ARTCADE PLUGIN**
+
+    ## Playground Implementation
+
+    ### Directory Structure
+
+    ```
+    packages/plugin-artcade/playground/
+    ├── src/
+    │   ├── services/           # Client-side services
+    │   │   ├── ClientPatternService.ts
+    │   │   └── test-pattern-variations.ts
+    │   ├── server/            # Server-side implementation
+    │   │   ├── services/
+    │   │   │   └── ClaudeService.ts
+    │   │   └── patternServer.ts
+    │   ├── shared/            # Shared types and interfaces
+    │   │   └── types/
+    │   │       └── pattern.types.ts
+    │   └── components/        # React components
+    ```
+
+    ### Core Components
+
+    #### 1. Shared Types (`pattern.types.ts`)
+
+    - `GeneratedPattern`: Core interface for pattern data
+        - Contains plan, HTML, title, description, and thumbnail
+        - Used for communication between client and server
+    - `PatternGenerationError`: Custom error type for generation failures
+    - `PatternValidationError`: Custom error type for validation failures
+
+    #### 2. Client Implementation
+
+    ##### ClientPatternService
+
+    Location: `src/services/ClientPatternService.ts`
+
+    - Handles all client-server communication
+    - Features:
+        - Pattern generation requests
+        - Health checks
+        - Error handling with custom types
+        - Extensive logging for debugging
+    - Key Methods:
+        ```typescript
+        generatePattern(prompt: string): Promise<GeneratedPattern>
+        healthCheck(): Promise<boolean>
+        ```
+
+    ##### Pattern Variation Tests
+
+    Location: `src/services/test-pattern-variations.ts`
+
+    - Comprehensive test suite for pattern generation
+    - Tests multiple pattern categories:
+        - Interactive Elements
+        - Games
+        - Visual Effects
+    - Validates:
+        - Generation success
+        - Response structure
+        - Feature presence
+        - Performance metrics
+
+    #### 3. Server Implementation
+
+    ##### ClaudeService
+
+    Location: `src/server/services/ClaudeService.ts`
+
+    - Core service for pattern generation
+    - Features:
+        - Claude API integration via OpenRouter
+        - Prompt template management
+        - Response validation
+        - Error handling
+    - Configuration:
+        - Max tokens: 8192
+        - Response timeout: 60 seconds
+        - Temperature: 0.7
+
+    ##### Pattern Server
+
+    Location: `src/server/patternServer.ts`
+
+    - Express server implementation
+    - Endpoints:
+        - `/generate`: Pattern generation
+        - `/health`: Service health check
+    - Features:
+        - Request validation
+        - Error handling
+        - CORS support
+        - Logging
+
+    ### Testing Infrastructure
+
+    #### 1. Pattern Generation Tests
+
+    - Location: `src/services/test-pattern-variations.ts`
+    - Tests multiple pattern types:
+        ```typescript
+        const TEST_CASES: TestCase[] = [
+        {
+            category: "Interactive Elements",
+            name: "Pulsing Button",
+            prompt: "...",
+            expectedFeatures: [...]
+        },
+        // More test cases...
+        ];
+        ```
+
+    #### 2. Client Service Tests
+
+    - Location: `src/services/test-client-service.ts`
+    - Tests:
+        - Service initialization
+        - API communication
+        - Error handling
+        - Response validation
+
+    ### Key Features
+
+    1. **Robust Error Handling**
+
+        - Custom error types for different scenarios
+        - Detailed error messages with context
+        - Error recovery strategies
+
+    2. **Extensive Logging**
+
+        - Request/response logging
+        - Performance metrics
+        - Error tracking
+        - Generation statistics
+
+    3. **Type Safety**
+
+        - Shared type definitions
+        - Runtime type validation
+        - Consistent interfaces
+
+    4. **Performance Optimization**
+        - Configurable timeouts
+        - Token optimization
+        - Response caching (where appropriate)
+
+    ### Usage Example
+
+    ```typescript
+    // Client-side pattern generation
+    const clientService = new ClientPatternService();
+    try {
+        const pattern = await clientService.generatePattern(
+            "Create an interactive button with hover effects",
+        );
+        console.log(`Generated pattern: ${pattern.title}`);
+    } catch (error) {
+        if (error instanceof PatternGenerationError) {
+            console.error("Generation failed:", error.message);
+        }
+    }
+    ```
+
+    ### Testing Commands
+
+    ```bash
+    # Run pattern variation tests
+    pnpm test:patterns
+
+    # Run client service tests
+    pnpm test:client
+
+    # Start development server
+    pnpm dev:server
+    ```
+
+    This implementation provides a robust foundation for pattern generation, with clear separation of concerns between client and server components, while maintaining type safety and extensive error handling throughout the system.
+
+    ---
+
+    **PREVIOUS STATES**
+
+    ## Previous State
+
+    We can use:
+
+    - PatternLibrary to extract the best aspect of the HTML code
+    - PatternStaging to stage it as a preserved pattern
+    - PatternLearning to evaluate new combinations
+    - VectorDatabase to find similar high-quality patterns
+
+    The existing system already supports:
+
+    1. Pattern type categorization
+    2. Quality scoring
+    3. Embedding-based similarity search
+    4. Evolution tracking
+    5. Feedback incorporation
+
+    For your basketball game example:
+
+    6. Extract the gravity physics using PatternLibrary.extractGameMechanics()
+    7. Store it with high effectiveness score
+    8. Use PatternEvolution with your parameters to find complementary patterns
+    9. Use PatternLearning to evaluate the combinations
+
+    Would you like me to:
+
+    10. Show how to use these existing services for your workflow
+    11. Explain how to integrate the evolution parameters
+    12. Demonstrate the pattern preservation process
+
+    The infrastructure is more sophisticated than I initially realized - we should definitely leverage it rather than build new systems.
+
+    ---
+
+    ## Previous State
+
+    13. User writes a prompt
+    14. Claude generates HTML output
+    15. Pattern type is selected (animation, layout, interaction, style, game mechanic)
+    16. Evolution parameters are currently using hardcoded mutations
+    17. Similar patterns section shows related patterns but isn't using embeddings effectively
+
+    ## Phase 1: Moving from Hardcoded to Embedding-Based Evolution
+
+    ### Step 1: Pattern Analysis
+
+    ```typescript
+    // File: packages/plugin-artcade/src/services/PatternFingerprinting.ts
+
+    interface PatternFeatures {
+        // Visual features like animations, colors, layouts
+        visual: {
+            hasAnimations: boolean;
+            colorCount: number;
+            layoutType: "flex" | "grid" | "standard";
+        };
+
+        // Interactive elements like clicks, hovers, drags
+        interactive: {
+            eventListeners: string[];
+            hasUserInput: boolean;
+            stateChanges: boolean;
+        };
+
+        // Core functionality features
+        functional: {
+            hasGameLogic: boolean;
+            dataManagement: boolean;
+            complexity: number;
+        };
+    }
+
+    // Takes HTML string, returns numerical features for embedding
+    function extractFeatures(html: string): PatternFeatures {
+        // Natural language: Analyze HTML/CSS/JS to identify key characteristics
+        // that define the pattern's behavior and appearance
+    }
+    ```
+
+    ### Step 2: Embedding Generation
+
+    ```typescript
+    // File: packages/plugin-artcade/src/services/VectorDatabase.ts
+
+    interface PatternVector {
+        id: string;
+        vector: number[]; // Our embedding
+        features: PatternFeatures;
+        type: string;
+    }
+
+    // Natural language: Convert pattern features into a numerical embedding
+    // that can be used for similarity search
+    function generateEmbedding(features: PatternFeatures): number[] {
+        return [
+            // Visual dimension (0-1)
+            features.visual.hasAnimations ? 0.5 : 0,
+            features.visual.colorCount / 10,
+
+            // Interactive dimension (0-1)
+            features.interactive.eventListeners.length / 5,
+            features.interactive.hasUserInput ? 0.5 : 0,
+
+            // Functional dimension (0-1)
+            features.functional.complexity,
+            features.functional.hasGameLogic ? 0.5 : 0,
+        ];
+    }
+    ```
+
+    ### Step 3: Pattern Evolution Using Embeddings
+
+    ```typescript
+    // File: packages/plugin-artcade/playground/src/services/PG-PatternService.ts
+
+    // Natural language: Instead of hardcoded mutations, find similar patterns
+    // in embedding space and apply their successful mutations
+    async function evolvePattern(
+        pattern: GamePattern,
+        config: EvolutionConfig,
+    ): Promise<GamePattern> {
+        // 1. Extract features from current pattern
+        const features = extractFeatures(pattern.content.html);
+
+        // 2. Generate embedding
+        const embedding = generateEmbedding(features);
+
+        // 3. Find similar patterns
+        const similarPatterns = await findSimilarPatterns(embedding, pattern.type);
+
+        // 4. Extract successful mutations from similar patterns
+        const mutations = extractMutations(similarPatterns);
+
+        // 5. Apply mutations based on similarity and success rate
+        return applyMutations(pattern, mutations, config.mutationRate);
+    }
+    ```
+
+    ### Step 4: Similarity Search
+
+    ```typescript
+    // File: packages/plugin-artcade/src/services/PatternLibrary.ts
+
+    // Natural language: Find patterns with similar embeddings that have been
+    // successful in the past
+    async function findSimilarPatterns(
+        embedding: number[],
+        type: string,
+        limit: number = 5,
+    ): Promise<GamePattern[]> {
+        const patterns = await getAllPatterns();
+
+        return patterns
+            .filter((p) => p.type === type)
+            .map((p) => ({
+                pattern: p,
+                similarity: cosineSimilarity(embedding, p.embedding),
+            }))
+            .sort((a, b) => b.similarity - a.similarity)
+            .slice(0, limit)
+            .map((x) => x.pattern);
+    }
+    ```
+
+    ## Implementation Plan
+
+    18. Create `PatternFingerprinting` service
+
+        - Start with basic feature extraction
+        - Focus on easily identifiable patterns
+        - Add more sophisticated analysis gradually
+
+    19. Update `VectorDatabase`
+
+        - Add embedding generation
+        - Implement similarity search
+        - Store successful mutations
+
+    20. Modify `PG-PatternService`
+
+        - Replace hardcoded mutations with embedding-based evolution
+        - Keep hardcoded mutations as fallback
+        - Add logging for evolution success
+
+    21. Success Metrics
+        - Pattern diversity
+        - User satisfaction
+        - Evolution speed
+        - Code quality
+
+    ## Notes
+
+    - Start simple with basic feature extraction
+    - Add complexity only when needed
     - Keep hardcoded mutations as fallback
-    - Add logging for evolution success
+    - Focus on user feedback loop
 
-4. Success Metrics
-    - Pattern diversity
-    - User satisfaction
-    - Evolution speed
-    - Code quality
+    ## Transition Plan to Embeddings-Based Evolution
 
-## Notes
+    ### Phase 1: Pattern Analysis & Embedding Integration
 
-- Start simple with basic feature extraction
-- Add complexity only when needed
-- Keep hardcoded mutations as fallback
-- Focus on user feedback loop
+    #### 1. Pattern Database Analysis
 
-## Transition Plan to Embeddings-Based Evolution
+    ```typescript
+    // Reference: packages/plugin-artcade/src/data/patterns.json
+    // Current implementation: packages/plugin-artcade/playground/src/services/PG-PatternService.ts
+    ```
 
-### Phase 1: Pattern Analysis & Embedding Integration
+    ##### Pattern Structure Analysis
 
-#### 1. Pattern Database Analysis
+    - **HTML Structure**
 
-```typescript
-// Reference: packages/plugin-artcade/src/data/patterns.json
-// Current implementation: packages/plugin-artcade/playground/src/services/PG-PatternService.ts
-```
+        - Extract DOM hierarchy patterns
+        - Identify common component structures
+        - Map reusable layout patterns
+        - Document structural variations by pattern type
 
-##### Pattern Structure Analysis
+    - **CSS Analysis**
 
-- **HTML Structure**
+        - Catalog animation properties and timing functions
+        - Document interaction styles (hover, active, focus states)
+        - Map visual style patterns (gradients, shadows, transforms)
+        - Identify responsive design patterns
 
-    - Extract DOM hierarchy patterns
-    - Identify common component structures
-    - Map reusable layout patterns
-    - Document structural variations by pattern type
+    - **JavaScript Patterns**
+        - Event handling patterns
+        - State management approaches
+        - Animation control patterns
+        - Game mechanic implementations
 
-- **CSS Analysis**
+    ##### Embedding Space Mapping
 
-    - Catalog animation properties and timing functions
-    - Document interaction styles (hover, active, focus states)
-    - Map visual style patterns (gradients, shadows, transforms)
-    - Identify responsive design patterns
+    ```typescript
+    // Reference: packages/plugin-artcade/src/services/VectorDatabase.ts
+    // Current implementation: packages/plugin-artcade/src/types/patterns.ts
+    ```
 
-- **JavaScript Patterns**
-    - Event handling patterns
-    - State management approaches
-    - Animation control patterns
-    - Game mechanic implementations
+    - **Core Dimensions**
 
-##### Embedding Space Mapping
+        1. Visual Complexity (0-1)
 
-```typescript
-// Reference: packages/plugin-artcade/src/services/VectorDatabase.ts
-// Current implementation: packages/plugin-artcade/src/types/patterns.ts
-```
+            - Number of styled elements
+            - CSS property diversity
+            - Animation complexity
 
-- **Core Dimensions**
+        2. Interaction Depth (0-1)
 
-    1. Visual Complexity (0-1)
+            - Event listener count
+            - State changes
+            - User input handling
 
-        - Number of styled elements
-        - CSS property diversity
-        - Animation complexity
+        3. Functional Complexity (0-1)
 
-    2. Interaction Depth (0-1)
+            - Logic complexity
+            - Data management
+            - Algorithm sophistication
 
-        - Event listener count
-        - State changes
-        - User input handling
+        4. Performance Impact (0-1)
+            - Resource usage
+            - Animation performance
+            - DOM manipulation frequency
 
-    3. Functional Complexity (0-1)
+    #### 2. Pattern Fingerprinting System
 
-        - Logic complexity
-        - Data management
-        - Algorithm sophistication
+    ```typescript
+    // Target Implementation: packages/plugin-artcade/src/services/PatternFingerprinting.ts
+    ```
 
-    4. Performance Impact (0-1)
-        - Resource usage
-        - Animation performance
-        - DOM manipulation frequency
+    ##### Feature Extraction Pipeline
 
-#### 2. Pattern Fingerprinting System
+    1. **Static Analysis**
 
-```typescript
-// Target Implementation: packages/plugin-artcade/src/services/PatternFingerprinting.ts
-```
+        - Parse HTML structure
+        - Extract CSS properties
+        - Analyze JavaScript patterns
+        - Generate structural fingerprint
 
-##### Feature Extraction Pipeline
+    2. **Dynamic Analysis**
 
-1. **Static Analysis**
+        - Interaction patterns
+        - Animation sequences
+        - State transitions
+        - Performance characteristics
 
-    - Parse HTML structure
-    - Extract CSS properties
-    - Analyze JavaScript patterns
-    - Generate structural fingerprint
+    3. **Metadata Generation**
+        - Pattern type classification
+        - Complexity metrics
+        - Dependency graph
+        - Usage context
 
-2. **Dynamic Analysis**
+    ##### Embedding Generation
 
-    - Interaction patterns
-    - Animation sequences
-    - State transitions
-    - Performance characteristics
-
-3. **Metadata Generation**
-    - Pattern type classification
-    - Complexity metrics
-    - Dependency graph
-    - Usage context
-
-##### Embedding Generation
-
-```typescript
-// Reference: packages/plugin-artcade/src/services/PatternLearning.ts
-```
-
-1. **Feature Vector Creation**
-
-    - Convert fingerprint to numerical vector
-    - Normalize dimensions
-    - Apply dimension reduction
-    - Generate embedding coordinates
-
-2. **Similarity Computation**
-    - Define distance metrics
-    - Implement nearest neighbor search
-    - Optimize search performance
-    - Cache common queries
-
-#### 3. Enhanced Pattern Storage
-
-```typescript
-// Reference: packages/plugin-artcade/src/services/PatternLibrary.ts
-```
-
-##### Metadata Schema
-
-```typescript
-interface PatternMetadata {
-    effectiveness: {
-        visual: number;
-        interactive: number;
-        functional: number;
-        performance: number;
-    };
-    mutations: {
-        successful: string[];
-        failed: string[];
-        impact: Record<string, number>;
-    };
-    usage: {
-        count: number;
-        contexts: string[];
-        feedback: FeedbackRecord[];
-    };
-}
-```
+    ```typescript
+    // Reference: packages/plugin-artcade/src/services/PatternLearning.ts
+    ```
 
-##### Feature Tracking
+    4. **Feature Vector Creation**
+
+        - Convert fingerprint to numerical vector
+        - Normalize dimensions
+        - Apply dimension reduction
+        - Generate embedding coordinates
+
+    5. **Similarity Computation**
+        - Define distance metrics
+        - Implement nearest neighbor search
+        - Optimize search performance
+        - Cache common queries
+
+    #### 3. Enhanced Pattern Storage
+
+    ```typescript
+    // Reference: packages/plugin-artcade/src/services/PatternLibrary.ts
+    ```
+
+    ##### Metadata Schema
+
+    ```typescript
+    interface PatternMetadata {
+        effectiveness: {
+            visual: number;
+            interactive: number;
+            functional: number;
+            performance: number;
+        };
+        mutations: {
+            successful: string[];
+            failed: string[];
+            impact: Record<string, number>;
+        };
+        usage: {
+            count: number;
+            contexts: string[];
+            feedback: FeedbackRecord[];
+        };
+    }
+    ```
 
-1. **Success Metrics**
+    ##### Feature Tracking
 
-    - Pattern adoption rate
-    - User satisfaction scores
-    - Performance benchmarks
-    - Error rates
+    6. **Success Metrics**
 
-2. **Evolution History**
-    - Mutation lineage
-    - Effectiveness changes
-    - Adaptation patterns
-    - Version control
+        - Pattern adoption rate
+        - User satisfaction scores
+        - Performance benchmarks
+        - Error rates
 
-##### Natural Language Integration
+    7. **Evolution History**
+        - Mutation lineage
+        - Effectiveness changes
+        - Adaptation patterns
+        - Version control
 
-1. **Pattern Descriptions**
+    ##### Natural Language Integration
 
-    - Human-readable summaries
-    - Technical specifications
-    - Usage guidelines
-    - Best practices
+    8. **Pattern Descriptions**
 
-2. **Search Enhancement**
-    - Keyword extraction
-    - Semantic tagging
-    - Context mapping
-    - Query optimization
+        - Human-readable summaries
+        - Technical specifications
+        - Usage guidelines
+        - Best practices
 
-#### Implementation Notes
+    9. **Search Enhancement**
+        - Keyword extraction
+        - Semantic tagging
+        - Context mapping
+        - Query optimization
 
-- Keep pattern fingerprints in memory for fast lookup
-- Use efficient vector storage for embeddings
-- Implement caching for common queries
-- Maintain versioning for pattern evolution
-- Document all magic numbers and thresholds
-- Add telemetry for pattern usage
-- Implement failure recovery
-- Add validation for pattern integrity
+    #### Implementation Notes
 
-### Phase 2: Evolution Engine Redesign
+    - Keep pattern fingerprints in memory for fast lookup
+    - Use efficient vector storage for embeddings
+    - Implement caching for common queries
+    - Maintain versioning for pattern evolution
+    - Document all magic numbers and thresholds
+    - Add telemetry for pattern usage
+    - Implement failure recovery
+    - Add validation for pattern integrity
 
-1. Replace Hardcoded Mutations:
+    ### Phase 2: Evolution Engine Redesign
 
-    - Move from static mutation list to dynamic feature extraction
-    - Use embeddings to identify potential mutation targets
-    - Create weighted mutation selection based on pattern type
+    1. Replace Hardcoded Mutations:
 
-2. Implement Smart Mutation Selection:
+        - Move from static mutation list to dynamic feature extraction
+        - Use embeddings to identify potential mutation targets
+        - Create weighted mutation selection based on pattern type
 
-    - Use pattern type to filter relevant embeddings
-    - Calculate similarity scores between current pattern and stored patterns
-    - Extract successful mutation patterns from similar examples
+    2. Implement Smart Mutation Selection:
 
-3. Add Evolutionary Memory:
-    - Track successful mutation chains
-    - Store effectiveness metrics for each mutation
-    - Build a feedback loop for mutation success rates
+        - Use pattern type to filter relevant embeddings
+        - Calculate similarity scores between current pattern and stored patterns
+        - Extract successful mutation patterns from similar examples
 
-### Phase 3: Integration & Testing
+    3. Add Evolutionary Memory:
+        - Track successful mutation chains
+        - Store effectiveness metrics for each mutation
+        - Build a feedback loop for mutation success rates
 
-1. Update Playground Interface:
+    ### Phase 3: Integration & Testing
 
-    - Show available mutations based on pattern analysis
-    - Display embedding space visualization
-    - Add feedback mechanisms for mutation success
+    4. Update Playground Interface:
 
-2. Implement Testing Framework:
+        - Show available mutations based on pattern analysis
+        - Display embedding space visualization
+        - Add feedback mechanisms for mutation success
 
-    - Create benchmark patterns for each type
-    - Measure evolution effectiveness
-    - Compare with hardcoded mutation results
+    5. Implement Testing Framework:
 
-3. Add Monitoring & Metrics:
-    - Track evolution success rates
-    - Measure embedding space coverage
-    - Monitor pattern diversity
+        - Create benchmark patterns for each type
+        - Measure evolution effectiveness
+        - Compare with hardcoded mutation results
 
-## New Workflow
+    6. Add Monitoring & Metrics:
+        - Track evolution success rates
+        - Measure embedding space coverage
+        - Monitor pattern diversity
 
-1. User Input:
+    ## New Workflow
 
-    - Write prompt
-    - Claude generates base HTML
-    - System analyzes output and maps to embedding space
+    7. User Input:
 
-2. Pattern Evolution:
+        - Write prompt
+        - Claude generates base HTML
+        - System analyzes output and maps to embedding space
 
-    - System identifies similar patterns using embeddings
-    - Extracts successful mutation patterns
-    - Applies weighted mutations based on pattern type
-    - Updates embedding space with results
+    8. Pattern Evolution:
 
-3. Feedback Loop:
+        - System identifies similar patterns using embeddings
+        - Extracts successful mutation patterns
+        - Applies weighted mutations based on pattern type
+        - Updates embedding space with results
 
-    - User provides feedback on mutations
-    - System updates mutation weights
-    - Stores successful patterns with embeddings
-    - Refines evolution strategies
+    9. Feedback Loop:
 
-4. Pattern Library Growth:
-    - New successful patterns enrich embedding space
-    - Evolution strategies improve over time
-    - Pattern relationships become more refined
+        - User provides feedback on mutations
+        - System updates mutation weights
+        - Stores successful patterns with embeddings
+        - Refines evolution strategies
 
-## Success Metrics
+    10. Pattern Library Growth:
+        - New successful patterns enrich embedding space
+        - Evolution strategies improve over time
+        - Pattern relationships become more refined
 
-1. Evolution Quality:
+    ## Success Metrics
 
-    - Mutation relevance to pattern type
-    - Success rate of mutations
-    - Pattern diversity
+    11. Evolution Quality:
 
-2. System Performance:
+        - Mutation relevance to pattern type
+        - Success rate of mutations
+        - Pattern diversity
 
-    - Evolution speed
-    - Embedding accuracy
-    - Pattern matching precision
+    12. System Performance:
 
-3. User Experience:
-    - Mutation predictability
-    - Evolution control
-    - Result quality
+        - Evolution speed
+        - Embedding accuracy
+        - Pattern matching precision
 
-## Implementation Priorities
+    13. User Experience:
+        - Mutation predictability
+        - Evolution control
+        - Result quality
 
-1. First Sprint:
+    ## Implementation Priorities
 
-    - Implement pattern fingerprinting
-    - Create embedding extraction pipeline
-    - Update pattern storage schema
+    14. First Sprint:
 
-2. Second Sprint:
+        - Implement pattern fingerprinting
+        - Create embedding extraction pipeline
+        - Update pattern storage schema
 
-    - Build dynamic mutation selection
-    - Integrate embedding-based similarity
-    - Create feedback collection
+    15. Second Sprint:
 
-3. Third Sprint:
-    - Implement evolutionary memory
-    - Add metrics tracking
-    - Refine mutation strategies
+        - Build dynamic mutation selection
+        - Integrate embedding-based similarity
+        - Create feedback collection
 
-## Notes
+    16. Third Sprint:
+        - Implement evolutionary memory
+        - Add metrics tracking
+        - Refine mutation strategies
 
-- Keep existing hardcoded mutations as fallback
-- Gradually phase out static mutations as embedding coverage improves
-- Focus on collecting quality feedback for embedding refinement
-- Maintain clear separation between pattern types while allowing cross-pollination
+    ## Notes
+
+    - Keep existing hardcoded mutations as fallback
+    - Gradually phase out static mutations as embedding coverage improves
+    - Focus on collecting quality feedback for embedding refinement
+    - Maintain clear separation between pattern types while allowing cross-pollination

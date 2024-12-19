@@ -39,6 +39,16 @@
         "test:insert-2": "tsx src/test-insert-2.ts",
         "test:search": "tsx src/test-search.ts",
         "test:prompt-embeddings": "tsx src/tests/test-prompt-embeddings.ts",
-        "test:similarity": "tsx src/tests/test-similarity.ts"
+        "test:similarity": "tsx src/tests/test-similarity.ts",
+        "test:check-embedding": "tsx src/tests/test-check-embedding.ts",
+        "test:check-embedding-2": "tsx src/tests/test-check-embedding-2.ts",
+        "test:vector-format": "tsx src/tests/test-vector-format.ts",
+        "test:migration-check": "tsx src/tests/test-migration-check.ts",
+        "migration:verify": "tsx src/tests/migration/phase1_verify_state.ts",
+        "migration:setup": "tsx src/tests/migration/phase1_setup.ts",
+        "migration:backup": "tsx src/tests/migration/phase1_backup.ts",
+        "migration:convert": "tsx src/tests/migration/phase2_convert.ts",
+        "migration:verify-conversion": "tsx src/tests/migration/phase2_verify.ts",
+        "migration:convert-all": "tsx src/tests/migration/phase2_convert_all.ts"
     }
 }

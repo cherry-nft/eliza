@@ -35,7 +35,17 @@ export class VectorSupabase {
 
         this.supabase = createClient(
             supabaseUrl,
-            process.env.SUPABASE_SERVICE_ROLE_KEY
+            process.env.SUPABASE_SERVICE_ROLE_KEY,
+            {
+                db: {
+                    schema: "public",
+                },
+                global: {
+                    headers: {
+                        "x-my-custom-header": "my-app-name",
+                    },
+                },
+            }
         );
 
         if (!process.env.OPENAI_API_KEY) {
