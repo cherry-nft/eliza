@@ -231,21 +231,15 @@ export class VectorSupabase {
     ): Promise<GamePattern[]> {
         try {
             let searchEmbedding: number[];
-            let queryText: string;
 
             if (typeof input === "string") {
-                // If input is a string, use generateEmbeddingFromText
                 searchEmbedding = await this.generateEmbeddingFromText(input);
-                queryText = input.toLowerCase();
             } else {
-                // If input is a GamePattern, use generateEmbedding
                 searchEmbedding = await this.generateEmbedding(input);
-                queryText = input.pattern_name.toLowerCase();
             }
 
             const { data, error } = await this.supabase.rpc("match_patterns", {
                 query_embedding: searchEmbedding,
-                query_text: queryText,
                 match_threshold: threshold,
                 match_count: limit,
             });
