@@ -235,7 +235,8 @@ router.get("/:id", async (req, res) => {
 });
 
 // Similar Pattern Search
-router.get("/similar", async (req, res) => {
+router.post("/search/similar", async (req, res) => {
+    console.log("[PatternServer] Received similar pattern search request");
     try {
         const {
             patternId,
@@ -243,11 +244,18 @@ router.get("/similar", async (req, res) => {
             type,
             threshold = 0.7,
             limit = 5,
-        } = req.query as SimilarPatternsRequest;
+        } = req.body as SimilarPatternsRequest;
 
         if (!patternId && !html) {
             throw new Error("Either patternId or html must be provided");
         }
+
+        console.log("[PatternServer] Search params:", {
+            patternId,
+            type,
+            threshold,
+            limit,
+        });
 
         let sourceEmbedding: number[];
         if (patternId) {
@@ -270,6 +278,11 @@ router.get("/similar", async (req, res) => {
                 Number(limit),
                 type as GamePattern["type"]
             );
+
+        console.log(
+            "[PatternServer] Found similar patterns:",
+            similarPatterns.length
+        );
 
         const response: SimilarPatternsResponse = {
             success: true,

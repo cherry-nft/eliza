@@ -1285,3 +1285,27 @@ export function encodeSemanticRoomId(tags: SemanticTags): string {
     - Deduplication of similar tags
     - Monitoring of tag usage patterns
     - Updates based on pattern evolution
+
+<!--
+
+Random Notes:
+
+ERRORS:
+
+[Pattern Context Enhancement]
+The current formatPatternExamples method simply shows the raw HTML/CSS/JS
+We should enhance it to include semantic information and usage patterns
+This will help Claude better understand how to adapt and combine patterns
+
+[Similarity Search Refinement]
+Current threshold (0.85) might be too strict
+We should consider using semantic tags in addition to vector similarity
+Need to track which patterns Claude successfully adapts
+
+[Pattern Usage Tracking]
+We're storing lastUsedPatterns but not fully utilizing this information
+Need to implement feedback loop for pattern effectiveness
+Should track how Claude combines and modifies patterns
+
+
+-->

@@ -227,8 +227,9 @@ export class VectorSupabase {
     async findSimilarPatterns(
         input: string | GamePattern,
         threshold = 0.5,
-        limit = 5
-    ): Promise<GamePattern[]> {
+        limit = 5,
+        type?: GamePattern["type"]
+    ): Promise<Array<{ pattern: GamePattern; similarity: number }>> {
         try {
             let searchEmbedding: number[];
 
@@ -245,7 +246,20 @@ export class VectorSupabase {
             });
 
             if (error) throw error;
-            return data;
+
+            // Filter by type in the application layer if type is specified
+            let results = data;
+            if (type) {
+                results = data.filter(
+                    (result: any) => result.pattern.type === type
+                );
+            }
+
+            // Transform the response to include both pattern and similarity
+            return results.map((result: any) => ({
+                pattern: result.pattern,
+                similarity: result.similarity,
+            }));
         } catch (error) {
             console.error("Failed to find similar patterns:", error);
             throw error;
@@ -524,5 +538,21 @@ export class VectorSupabase {
                 this.calculateDOMDepth(child as HTMLElement, depth + 1)
             )
         );
+    }
+
+    async getPattern(id: string): Promise<GamePattern | null> {
+        try {
+            const { data, error } = await this.supabase
+                .from("vector_patterns")
+                .select("*")
+                .eq("id", id)
+                .single();
+
+            if (error) throw error;
+            return data;
+        } catch (error) {
+            console.error("Failed to get pattern:", error);
+            return null;
+        }
     }
 }
