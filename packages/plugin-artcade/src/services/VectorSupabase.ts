@@ -80,10 +80,8 @@ export class VectorSupabase {
             Pattern: ${pattern.pattern_name || "Untitled"}
             Type: ${pattern.type || "unknown"}
             Description: ${pattern.content?.context || pattern.content?.metadata?.description || "No description"}
-            HTML: ${pattern.content?.html || ""}
-            ${pattern.content?.css ? `CSS: ${pattern.content.css}` : ""}
-            ${pattern.content?.js ? `JS: ${pattern.content.js}` : ""}
-            Metadata: ${JSON.stringify(pattern.content?.metadata || {})}
+            Keywords: ${pattern.room_id ? pattern.room_id.replace(/-/g, " ").replace(/_/g, " ") : ""}
+            Content: ${pattern.content?.html || ""} ${pattern.content?.css || ""} ${pattern.content?.js || ""}
         `.trim();
 
         return this.generateEmbeddingFromText(textToEmbed);
@@ -106,11 +104,19 @@ export class VectorSupabase {
     }
 
     private async generatePromptEmbedding(prompt: string): Promise<number[]> {
+        const keywords = this.extractKeywords(prompt);
         const formattedPrompt = `
-            User Query: ${prompt}
-            Context: Game development pattern search
-            Intent: Find matching UI and game mechanics
+            Pattern: ${prompt}
+            Type: search
+            Description: ${prompt}
+            Keywords: ${keywords.join(" ")}
+            Content: ${prompt}
         `.trim();
+
+        console.log(
+            "[VectorSupabase] Formatted prompt for embedding:",
+            formattedPrompt
+        );
 
         const response = await this.openai.embeddings.create({
             model: "text-embedding-3-small",
@@ -226,7 +232,7 @@ export class VectorSupabase {
 
     async findSimilarPatterns(
         input: string | GamePattern,
-        threshold = 0.6,
+        threshold = 0.3,
         limit = 5,
         type?: GamePattern["type"]
     ): Promise<Array<{ pattern: GamePattern; similarity: number }>> {
@@ -236,9 +242,10 @@ export class VectorSupabase {
 
             if (typeof input === "string") {
                 console.log(
-                    "[VectorSupabase] Generating embedding from text input"
+                    "[VectorSupabase] Generating embedding from text input:",
+                    input
                 );
-                searchEmbedding = await this.generateEmbeddingFromText(input);
+                searchEmbedding = await this.generatePromptEmbedding(input);
                 searchText = input;
             } else {
                 console.log(
@@ -250,19 +257,20 @@ export class VectorSupabase {
                     `${input.pattern_name} ${input.type} ${input.content?.context || ""} ${input.content?.metadata?.description || ""}`.trim();
             }
 
-            console.log("[VectorSupabase] Searching with parameters:", {
+            console.log("[VectorSupabase] Search parameters:", {
                 threshold,
                 limit,
                 type,
                 embeddingSize: searchEmbedding.length,
                 searchText,
+                keywords: this.extractKeywords(searchText),
             });
 
             const { data, error } = await this.supabase.rpc("match_patterns", {
                 query_embedding: searchEmbedding,
                 query_text: searchText,
                 match_threshold: threshold,
-                match_count: limit,
+                match_count: type ? limit * 2 : limit,
             });
 
             if (error) {
@@ -271,55 +279,54 @@ export class VectorSupabase {
             }
 
             // Log all similarity scores for analysis
-            console.log(
-                "\n[VectorSupabase] Similarity scores for pattern search:"
-            );
+            console.log("\n[VectorSupabase] Pattern search results:");
             if (data && data.length > 0) {
-                data.forEach((result: any) => {
-                    if (result && result.pattern) {
+                for (const result of data) {
+                    console.log(
+                        `\nPattern: "${result.pattern_name}" (${result.type})`
+                    );
+                    console.log(
+                        `Total Score: ${result.similarity.toFixed(4)} ${
+                            result.similarity >= threshold ? "✓" : "✗"
+                        }`
+                    );
+                    // Include room_id from the result directly since it's in the SQL response
+                    if (result.room_id) {
+                        const tags = result.room_id.split("-");
+                        console.log("Semantic Tags:");
                         console.log(
-                            `- Pattern: "${result.pattern.pattern_name || "Unnamed"}" (type: ${result.pattern.type || "unknown"})`
+                            "- Use Cases:",
+                            tags[0]?.replace(/_/g, " ")
                         );
                         console.log(
-                            `  Score: ${result.similarity?.toFixed(3) || 0} ${
-                                result.similarity >= threshold ? "✓" : "✗"
-                            } (${result.similarity >= threshold ? "above" : "below"} threshold ${threshold})`
+                            "- Mechanics:",
+                            tags[1]?.replace(/_/g, " ")
+                        );
+                        console.log(
+                            "- Interactions:",
+                            tags[2]?.replace(/_/g, " ")
+                        );
+                        console.log(
+                            "- Visual Style:",
+                            tags[3]?.replace(/_/g, " ")
                         );
                     }
-                });
-            } else {
-                console.log("No patterns found in initial search");
-            }
-
-            // Filter by type in the application layer if type is specified
-            let results =
-                data?.filter((result: any) => result && result.pattern) || [];
-            if (type) {
-                const beforeCount = results.length;
-                results = results.filter(
-                    (result: any) => result.pattern.type === type
-                );
-                const afterCount = results.length;
-
-                if (beforeCount !== afterCount) {
-                    console.log(
-                        `\n[VectorSupabase] Type filtering: ${beforeCount - afterCount} patterns filtered out by type "${type}"`
-                    );
-                    // Log the filtered out patterns
-                    data.forEach((result: any) => {
-                        if (result?.pattern && result.pattern.type !== type) {
-                            console.log(
-                                `- Filtered out: "${result.pattern.pattern_name || "Unnamed"}" (type: ${result.pattern.type || "unknown"}, score: ${result.similarity?.toFixed(3) || 0})`
-                            );
-                        }
-                    });
                 }
+            } else {
+                console.log("No patterns found in search");
             }
 
             // Return the filtered results
-            return results.map((result: any) => ({
-                pattern: result.pattern,
-                similarity: result.similarity || 0,
+            return data.map((result: any) => ({
+                pattern: {
+                    id: result.id,
+                    pattern_name: result.pattern_name,
+                    type: result.type,
+                    content: result.content,
+                    effectiveness_score: result.effectiveness_score,
+                    room_id: result.room_id,
+                },
+                similarity: result.similarity,
             }));
         } catch (error) {
             console.error(

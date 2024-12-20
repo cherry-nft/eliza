@@ -22,6 +22,14 @@ async function testSemanticPatternMatching() {
     console.log(`Found ${allPatterns.length} patterns in database:`);
     allPatterns.forEach((pattern) => {
         console.log(`- ${pattern.pattern_name} (${pattern.type})`);
+        if (pattern.room_id) {
+            const tags = pattern.room_id.split("-");
+            console.log("  Tags:");
+            console.log("  • Use Cases:", tags[0]?.replace(/_/g, " "));
+            console.log("  • Mechanics:", tags[1]?.replace(/_/g, " "));
+            console.log("  • Interactions:", tags[2]?.replace(/_/g, " "));
+            console.log("  • Visual Style:", tags[3]?.replace(/_/g, " "));
+        }
     });
     console.log("=================================\n");
 
@@ -52,45 +60,67 @@ async function testSemanticPatternMatching() {
         console.log("\nGenerating embeddings and searching for patterns...");
 
         try {
-            // First, let's get ALL patterns and their similarity scores
-            const allPatterns = await vectorDb.findSimilarPatterns(
+            // Use the prompt directly for semantic search
+            const matchedPatterns = await vectorDb.findSimilarPatterns(
                 testCase.prompt,
-                0.0, // Set threshold to 0 to get ALL patterns
-                100 // Increase limit to see more patterns
+                0.3,
+                100
             );
 
-            console.log(
-                "\n📊 All Pattern Similarity Scores (sorted by similarity):"
-            );
-            console.log("------------------------------------------------");
-            allPatterns
-                .sort((a, b) => b.similarity - a.similarity)
-                .forEach(({ pattern, similarity }) => {
-                    const isExpected = testCase.expectedPatterns.includes(
-                        pattern.pattern_name
-                    );
-                    console.log(
-                        `${isExpected ? "✅" : "  "} ${similarity.toFixed(4)} - ${pattern.pattern_name}`
-                    );
-                    if (isExpected) {
-                        console.log(`   Pattern Type: ${pattern.type}`);
-                        console.log(`   Description: ${pattern.description}`);
-                    }
-                });
+            if (matchedPatterns.length > 0) {
+                console.log("\n📊 Pattern Matches (sorted by similarity):");
+                console.log("------------------------------------------------");
+                matchedPatterns
+                    .sort((a, b) => b.similarity - a.similarity)
+                    .forEach(({ pattern, similarity }) => {
+                        const isExpected = testCase.expectedPatterns.includes(
+                            pattern.pattern_name
+                        );
+                        console.log(
+                            `\n${isExpected ? "✅" : "  "} ${pattern.pattern_name} (${pattern.type})`
+                        );
+                        console.log(`   Score: ${similarity.toFixed(4)}`);
 
-            // Now let's check which expected patterns were missed
-            const foundPatterns = allPatterns.map(
-                (p) => p.pattern.pattern_name
-            );
-            const missingPatterns = testCase.expectedPatterns.filter(
-                (expected) => !foundPatterns.includes(expected)
-            );
+                        if (pattern.room_id) {
+                            const tags = pattern.room_id.split("-");
+                            console.log("   Semantic Tags:");
+                            console.log(
+                                "   • Use Cases:",
+                                tags[0]?.replace(/_/g, " ")
+                            );
+                            console.log(
+                                "   • Mechanics:",
+                                tags[1]?.replace(/_/g, " ")
+                            );
+                            console.log(
+                                "   • Interactions:",
+                                tags[2]?.replace(/_/g, " ")
+                            );
+                            console.log(
+                                "   • Visual Style:",
+                                tags[3]?.replace(/_/g, " ")
+                            );
+                        }
+                    });
 
-            if (missingPatterns.length > 0) {
-                console.log("\n❌ Missing Expected Patterns:");
-                missingPatterns.forEach((pattern) =>
-                    console.log(`- ${pattern}`)
+                // Check for missing expected patterns
+                const foundPatterns = matchedPatterns.map(
+                    (p) => p.pattern.pattern_name
                 );
+                const missingPatterns = testCase.expectedPatterns.filter(
+                    (expected) => !foundPatterns.includes(expected)
+                );
+
+                if (missingPatterns.length > 0) {
+                    console.log("\n❌ Missing Expected Patterns:");
+                    missingPatterns.forEach((pattern) =>
+                        console.log(`- ${pattern}`)
+                    );
+                } else {
+                    console.log("\n✅ All expected patterns found!");
+                }
+            } else {
+                console.log("\n❌ No patterns found matching the criteria");
             }
 
             console.log("\n------------------------------------------------");

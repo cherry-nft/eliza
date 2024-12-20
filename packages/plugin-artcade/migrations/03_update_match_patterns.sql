@@ -61,19 +61,27 @@ LANGUAGE plpgsql
 AS $$
 BEGIN
     RETURN QUERY
+    WITH similarity_scores AS (
+        SELECT
+            p.id,
+            p.pattern_name,
+            p.type,
+            p.content,
+            p.effectiveness_score,
+            (1 - (p.embedding <=> query_embedding)) as vector_similarity,
+            calculate_semantic_boost(p.room_id, query_text) as semantic_boost
+        FROM vector_patterns p
+    )
     SELECT
-        p.id,
-        p.pattern_name,
-        p.type,
-        p.content,
-        p.effectiveness_score,
-        (
-            (1 - (p.embedding <=> query_embedding)) +
-            calculate_semantic_boost(p.room_id, query_text)
-        ) AS similarity
-    FROM vector_patterns p
-    WHERE 1 - (p.embedding <=> query_embedding) > match_threshold
-    ORDER BY similarity DESC
+        s.id,
+        s.pattern_name,
+        s.type,
+        s.content,
+        s.effectiveness_score,
+        (s.vector_similarity + s.semantic_boost) as similarity
+    FROM similarity_scores s
+    WHERE (s.vector_similarity + s.semantic_boost) > match_threshold
+    ORDER BY (s.vector_similarity + s.semantic_boost) DESC
     LIMIT match_count;
 END;
 $$;
