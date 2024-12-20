@@ -1,7 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import OpenAI from "openai";
 import { GamePattern } from "../types/patterns";
-import { parse } from "node-html-parser";
+import { parse, HTMLElement as ParsedHTMLElement } from "node-html-parser";
 import {
     PatternEffectivenessMetrics,
     ClaudeUsageContext,
@@ -602,11 +602,14 @@ export class VectorSupabase {
         return Math.min(depth * 0.2 + elements * 0.01 + scripts * 0.1, 1);
     }
 
-    private calculateDOMDepth(node: HTMLElement, depth: number = 0): number {
+    private calculateDOMDepth(
+        node: ParsedHTMLElement,
+        depth: number = 0
+    ): number {
         if (!node.childNodes || node.childNodes.length === 0) return depth;
         return Math.max(
-            ...Array.from(node.childNodes).map((child: Node) =>
-                this.calculateDOMDepth(child as HTMLElement, depth + 1)
+            ...Array.from(node.childNodes).map((child) =>
+                this.calculateDOMDepth(child as ParsedHTMLElement, depth + 1)
             )
         );
     }

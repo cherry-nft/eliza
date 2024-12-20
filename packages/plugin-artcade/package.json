@@ -53,6 +53,7 @@
         "insert:webdaw": "tsx src/tests/test-webdaw-insert-patterns.ts",
         "delete:webdaw": "tsx src/tests/test-webdaw-delete.ts",
         "update:effectiveness": "tsx src/tests/update-effectiveness.ts",
-        "test:semantic-matching": "tsx src/tests/test-semantic-pattern-matching.ts"
+        "test:semantic-matching": "tsx src/tests/test-semantic-pattern-matching.ts",
+        "test:semantic-matching-v2": "tsx src/tests/test-semantic-pattern-matching-v2.ts"
     }
 }
