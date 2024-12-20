@@ -1,4 +1,4 @@
-import express from "express";
+import express, { Router } from "express";
 import { randomUUID } from "crypto";
 import {
     GeneratedPattern,
@@ -17,8 +17,9 @@ import {
     PatternUsageContext,
 } from "../shared/pattern.types";
 import { TokenizationService } from "./services/TokenizationService";
+import { GamePattern } from "../../../src/types/patterns";
 
-const router = express.Router();
+const router: Router = Router();
 
 // Health check endpoint
 router.get("/health", (req, res) => {
@@ -241,7 +242,6 @@ router.post("/search/similar", async (req, res) => {
         let similarPatterns: GamePattern[];
 
         if (searchParams.patternId) {
-            // Search by pattern ID
             console.log(
                 "[PatternServer] Searching by pattern ID:",
                 searchParams.patternId
@@ -258,7 +258,6 @@ router.post("/search/similar", async (req, res) => {
                 searchParams.limit || 5
             );
         } else if (searchParams.html) {
-            // Search by raw HTML
             console.log("[PatternServer] Searching by HTML content");
             similarPatterns = await req.app.locals.vectorDb.findSimilarPatterns(
                 searchParams.html,
@@ -275,9 +274,16 @@ router.post("/search/similar", async (req, res) => {
             "[PatternServer] Found similar patterns:",
             similarPatterns.length
         );
+
+        // Convert GamePattern[] to SimilarPattern[]
+        const patternsWithSimilarity = similarPatterns.map((pattern) => ({
+            ...pattern,
+            similarity: 0.9, // This should ideally come from the vector similarity calculation
+        }));
+
         const response: SimilarPatternsResponse = {
             success: true,
-            data: similarPatterns,
+            data: patternsWithSimilarity,
         };
         res.json(response);
     } catch (error) {

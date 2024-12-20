@@ -7,6 +7,10 @@ import {
     ClaudeUsageContext,
     PatternFeatures,
 } from "../types/effectiveness";
+import {
+    assertValidPattern,
+    PatternValidationError,
+} from "../utils/pattern-validation";
 
 // Pattern type validation
 const validPatternTypes = [
@@ -20,14 +24,6 @@ type ValidPatternType = (typeof validPatternTypes)[number];
 
 function isValidPatternType(type: string): type is ValidPatternType {
     return validPatternTypes.includes(type as ValidPatternType);
-}
-
-// Custom error class for pattern validation
-class PatternValidationError extends Error {
-    constructor(message: string) {
-        super(message);
-        this.name = "PatternValidationError";
-    }
 }
 
 // Custom error class for database operations
@@ -197,19 +193,8 @@ export class VectorSupabase {
 
     async storePattern(pattern: GamePattern): Promise<void> {
         try {
-            // Validate pattern type
-            if (!isValidPatternType(pattern.type)) {
-                throw new PatternValidationError(
-                    `Invalid pattern type: ${pattern.type}. Must be one of: ${validPatternTypes.join(", ")}`
-                );
-            }
-
-            // Validate required fields
-            if (!pattern.room_id || !pattern.user_id || !pattern.agent_id) {
-                throw new PatternValidationError(
-                    "Missing required fields: room_id, user_id, and agent_id are required"
-                );
-            }
+            // Validate the pattern using our utility
+            assertValidPattern(pattern);
 
             const embedding = await this.generateEmbedding(pattern);
 

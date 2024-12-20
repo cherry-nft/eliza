@@ -41,24 +41,25 @@ await testServerSupabaseConnection();
 // Mount pattern router at /api/patterns
 app.use("/api/patterns", patternRouter);
 
-// Health check endpoint
+// Health check endpoint with proper error handling
 app.get("/health", (req, res) => {
-    res.json({ status: "healthy" });
-});
-
-// Pattern generation endpoint
-app.post("/generate", async (req, res) => {
     try {
-        const { prompt } = req.body;
-        const result = await claudeService.generatePattern(prompt);
-        res.json(result);
-    } catch (error) {
-        elizaLogger.error("Error generating pattern:", error);
-        res.status(500).json({
-            error: {
-                message:
-                    error instanceof Error ? error.message : "Unknown error",
+        const healthStatus = {
+            status: "healthy",
+            timestamp: new Date().toISOString(),
+            services: {
+                vectorDb: vectorDb ? "connected" : "not connected",
+                claudeService: claudeService
+                    ? "initialized"
+                    : "not initialized",
             },
+        };
+        res.json(healthStatus);
+    } catch (error) {
+        elizaLogger.error("Health check failed:", error);
+        res.status(500).json({
+            status: "unhealthy",
+            error: error instanceof Error ? error.message : "Unknown error",
         });
     }
 });

@@ -1,3 +1,18 @@
+/**
+ * @description The source of truth for pattern types in the system. This interface defines the structure
+ * that is used for database storage and retrieval. All pattern-related operations should use this type.
+ *
+ * Required fields for database ingestion:
+ * - id: UUID string
+ * - type: Must be one of the valid pattern types
+ * - pattern_name: Unique identifier name
+ * - content: Must contain at least html and context
+ * - room_id: UUID string
+ * - user_id: UUID string
+ * - agent_id: UUID string
+ *
+ * The embedding field is automatically generated during storage operations.
+ */
 export interface GamePattern {
     id: string;
     type: "animation" | "layout" | "interaction" | "style" | "game_mechanic";
