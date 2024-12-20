@@ -13,6 +13,18 @@ interface ClaudeConfig {
     vectorDb: VectorSupabase;
 }
 
+interface PatternUsageCheck {
+    patternId: string;
+    patternName: string;
+    snippetsFound: {
+        snippet: string;
+        type: "html" | "css" | "js";
+        context: string;
+    }[];
+    totalSnippets: number;
+    usagePercentage: number;
+}
+
 export class ClaudeService implements PatternServiceInterface {
     private OPENROUTER_API_KEY: string;
     private readonly API_URL = "https://openrouter.ai/api/v1/chat/completions";
@@ -388,13 +400,154 @@ Before returning, verify that your response includes ALL required fields and fol
         );
     }
 
-    async generatePattern(userPrompt: string): Promise<GeneratedPattern> {
-        console.log(
-            "[ClaudeService] Starting pattern generation for prompt:",
-            userPrompt
-        );
+    private getDistinctiveSnippets(
+        pattern: GamePattern
+    ): { snippet: string; type: "html" | "css" | "js"; context: string }[] {
+        const snippets: {
+            snippet: string;
+            type: "html" | "css" | "js";
+            context: string;
+        }[] = [];
 
+        if (pattern.content.js) {
+            // Look for function declarations
+            const funcMatches = pattern.content.js.match(
+                /function\s+([a-zA-Z_$][0-9a-zA-Z_$]*)\s*\(/g
+            );
+            if (funcMatches) {
+                funcMatches.forEach((func) => {
+                    snippets.push({
+                        type: "js",
+                        snippet: func.trim(),
+                        context: "Function declaration",
+                    });
+                });
+            }
+
+            // Look for event listeners
+            const listenerMatches = pattern.content.js.match(
+                /addEventListener\(['"]([^'"]+)['"]/g
+            );
+            if (listenerMatches) {
+                listenerMatches.forEach((listener) => {
+                    snippets.push({
+                        type: "js",
+                        snippet: listener.trim(),
+                        context: "Event listener",
+                    });
+                });
+            }
+        }
+
+        if (pattern.content.css) {
+            // Look for custom animations
+            const animationMatches = pattern.content.css.match(
+                /@keyframes\s+([a-zA-Z-_0-9]+)\s*{/g
+            );
+            if (animationMatches) {
+                animationMatches.forEach((anim) => {
+                    snippets.push({
+                        type: "css",
+                        snippet: anim.trim(),
+                        context: "Keyframe animation",
+                    });
+                });
+            }
+
+            // Look for complex selectors
+            const selectorMatches = pattern.content.css.match(
+                /\.[a-zA-Z-_0-9]+\s*[+~>]\s*\.[a-zA-Z-_0-9]+/g
+            );
+            if (selectorMatches) {
+                selectorMatches.forEach((selector) => {
+                    snippets.push({
+                        type: "css",
+                        snippet: selector.trim(),
+                        context: "Complex selector",
+                    });
+                });
+            }
+        }
+
+        if (pattern.content.html) {
+            // Look for custom data attributes
+            const dataAttrMatches = pattern.content.html.match(
+                /data-[a-zA-Z-_0-9]+="[^"]+"/g
+            );
+            if (dataAttrMatches) {
+                dataAttrMatches.forEach((attr) => {
+                    snippets.push({
+                        type: "html",
+                        snippet: attr.trim(),
+                        context: "Data attribute",
+                    });
+                });
+            }
+
+            // Look for specific class combinations
+            const classMatches = pattern.content.html.match(/class="([^"]+)"/g);
+            if (classMatches) {
+                classMatches.forEach((classes) => {
+                    if (classes.split(/\s+/).length > 2) {
+                        snippets.push({
+                            type: "html",
+                            snippet: classes.trim(),
+                            context: "Class combination",
+                        });
+                    }
+                });
+            }
+        }
+
+        return snippets;
+    }
+
+    private checkPatternUsage(response: GeneratedPattern): PatternUsageCheck[] {
+        const checks = this.lastUsedPatterns.map((pattern) => {
+            const snippets = this.getDistinctiveSnippets(pattern);
+            const foundSnippets = snippets.filter((s) =>
+                response.html.includes(s.snippet)
+            );
+
+            return {
+                patternId: pattern.id,
+                patternName: pattern.pattern_name,
+                snippetsFound: foundSnippets,
+                totalSnippets: snippets.length,
+                usagePercentage:
+                    snippets.length > 0
+                        ? (foundSnippets.length / snippets.length) * 100
+                        : 0,
+            };
+        });
+
+        // Log detailed usage information
+        console.log("\n[ClaudeService] Pattern Usage Analysis:");
+        checks.forEach((check) => {
+            console.log(`\nPattern: ${check.patternName} (${check.patternId})`);
+            console.log(
+                `Usage: ${check.usagePercentage.toFixed(1)}% (${check.snippetsFound.length}/${check.totalSnippets} snippets)`
+            );
+            if (check.snippetsFound.length > 0) {
+                console.log("Found snippets:");
+                check.snippetsFound.forEach((s) => {
+                    console.log(
+                        `- ${s.type.toUpperCase()}: ${s.context}\n  "${s.snippet}"`
+                    );
+                });
+            }
+        });
+
+        return checks;
+    }
+
+    async generatePattern(userPrompt: string): Promise<GeneratedPattern> {
         try {
+            console.log(
+                "[ClaudeService] Starting pattern generation for prompt:",
+                userPrompt
+            );
+
             const requestBody = {
                 model: "anthropic/claude-3.5-sonnet:beta",
                 messages: [
@@ -451,52 +604,51 @@ Before returning, verify that your response includes ALL required fields and fol
 
             let pattern: GeneratedPattern;
             try {
-                // First try parsing the raw response
                 pattern = JSON.parse(content);
                 console.log(
                     "[ClaudeService] Successfully parsed JSON response"
                 );
-            } catch (initialError) {
-                console.log(
-                    "[ClaudeService] Initial parse failed, attempting to sanitize"
+            } catch (error) {
+                console.error(
+                    "[ClaudeService] Failed to parse response:",
+                    error
                 );
-
-                try {
-                    // If raw parsing fails, try sanitizing the response
-                    const sanitizedContent = this.sanitizeJsonString(content);
-                    console.log(
-                        "[ClaudeService] Sanitized content:",
-                        sanitizedContent
-                    );
-
-                    pattern = JSON.parse(sanitizedContent);
-                    console.log(
-                        "[ClaudeService] Successfully parsed sanitized JSON response"
-                    );
-                } catch (error) {
-                    console.error(
-                        "[ClaudeService] Failed to parse sanitized response:",
-                        error
-                    );
-                    throw new PatternValidationError(
-                        "Invalid response format from Claude",
-                        [error instanceof Error ? error.message : String(error)]
-                    );
-                }
+                throw new PatternValidationError(
+                    "Invalid response format from Claude",
+                    [error instanceof Error ? error.message : String(error)]
+                );
             }
 
-            // Track pattern usage if we used any patterns for generation
+            // Check pattern usage
+            const usageChecks = this.checkPatternUsage(pattern);
+
+            // If no patterns were used significantly, log a warning
+            const significantUsage = usageChecks.some(
+                (check) => check.usagePercentage >= 30
+            );
+            if (!significantUsage) {
+                console.warn(
+                    "[ClaudeService] WARNING: Generated pattern shows low reuse of existing patterns"
+                );
+                console.warn(
+                    "Consider adjusting the prompt to encourage more pattern reuse"
+                );
+            }
+
+            // Track pattern usage if we used any patterns
             if (this.lastUsedPatterns.length > 0) {
                 console.log("[ClaudeService] Tracking pattern usage");
                 try {
                     await this.vectorDb.trackClaudeUsage({
                         prompt: userPrompt,
                         generated_html: pattern.html,
-                        similarity_score: 0.9,
-                        matched_patterns: this.lastUsedPatterns.map((p) => ({
-                            pattern_id: p.id,
-                            similarity: 0.9,
-                            features_used: [],
+                        similarity_score: significantUsage ? 0.9 : 0.5,
+                        matched_patterns: usageChecks.map((check) => ({
+                            pattern_id: check.patternId,
+                            similarity: check.usagePercentage / 100,
+                            features_used: check.snippetsFound.map(
+                                (s) => s.snippet
+                            ),
                         })),
                         quality_assessment: {
                             visual: 0.9,
@@ -513,7 +665,6 @@ Before returning, verify that your response includes ALL required fields and fol
                         "[ClaudeService] Failed to track pattern usage:",
                         error
                     );
-                    // Don't fail the generation if tracking fails
                 }
             }
 
