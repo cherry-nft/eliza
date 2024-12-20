@@ -1,6 +1,19 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { PatternService } from "../services/PatternService";
 import { SHADER_TEMPLATE } from "../templates/shader-template";
+import { VectorSupabase } from "../services/VectorSupabase";
+
+// Mock VectorSupabase
+vi.mock("../services/VectorSupabase", () => {
+    return {
+        VectorSupabase: vi.fn().mockImplementation(() => ({
+            findSimilarPatterns: vi.fn(),
+            storePattern: vi.fn(),
+            trackClaudeUsage: vi.fn(),
+            healthCheck: vi.fn().mockResolvedValue(true),
+        })),
+    };
+});
 
 describe("PatternService", () => {
     const mockRuntime = {

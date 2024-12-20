@@ -9,10 +9,18 @@
         "target": "ESNext",
         "lib": [
             "ESNext"
-        ]
+        ],
+        "baseUrl": ".",
+        "paths": {
+            "../../shared/*": [
+                "src/shared/*"
+            ]
+        }
     },
     "include": [
         "vite.config.ts",
-        "src/server/**/*"
+        "src/server/**/*",
+        "src/shared/**/*",
+        "../src/**/*"
     ]
 }

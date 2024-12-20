@@ -3,19 +3,21 @@ import {
     PatternGenerationError,
     PatternServiceInterface,
     PatternValidationError,
-} from "../../shared/pattern.types";
-import { VectorDatabase } from "../../../../src/services/VectorDatabase";
+} from "../shared/pattern.types";
+import { VectorSupabase } from "../../../../src/services/VectorSupabase";
+import { GamePattern } from "../../../../src/types/patterns";
+import { ClaudeUsageContext } from "../../../../src/types/effectiveness";
 
 interface ClaudeConfig {
     OPENROUTER_API_KEY: string;
-    vectorDb: VectorDatabase;
+    vectorDb: VectorSupabase;
 }
 
 export class ClaudeService implements PatternServiceInterface {
     private OPENROUTER_API_KEY: string;
     private readonly API_URL = "https://openrouter.ai/api/v1/chat/completions";
-    private vectorDb: VectorDatabase;
-    private lastUsedPatterns: any[] = []; // Track patterns used in generation
+    private vectorDb: VectorSupabase;
+    private lastUsedPatterns: GamePattern[] = []; // Properly typed array
     private readonly PROMPT_TEMPLATE = `# System Prompt: Artcade [In Production]
 
 You are an expert web developer tasked with creating an interactive HTML experience. First, analyze this prompt and break it down into components:
@@ -128,41 +130,37 @@ Before returning, verify that your response includes ALL required fields and fol
         }
     }
 
-    private async findRelevantPatterns(prompt: string): Promise<any[]> {
+    private async findRelevantPatterns(prompt: string): Promise<GamePattern[]> {
         console.log(
             "[ClaudeService] Finding relevant patterns for prompt:",
             prompt
         );
 
         try {
-            // Generate embedding using vectorOperations
-            console.log("[ClaudeService] Generating embedding for prompt");
-            const embedding = await this.vectorDb.generateEmbedding(prompt);
-
-            // Store the prompt and its embedding
+            // Store the prompt embedding first
             await this.vectorDb.storePromptEmbedding({
                 prompt,
-                userId: "system", // You may want to pass this from the client
+                userId: "system",
                 sessionId: crypto.randomUUID(),
                 projectContext: "pattern_generation",
             });
 
-            // Get patterns from VectorDatabase
+            // Find similar patterns using the prompt directly
             const similarPatterns = await this.vectorDb.findSimilarPatterns(
-                embedding,
+                prompt, // Pass prompt directly, VectorSupabase will handle embedding
                 0.85, // similarity threshold
                 3 // number of patterns to return
             );
 
             console.log(
                 "[ClaudeService] Found similar patterns:",
-                similarPatterns.map((p) => p.pattern.id)
+                similarPatterns.map((p) => p.id)
             );
 
             // Store for later usage tracking
-            this.lastUsedPatterns = similarPatterns.map((p) => p.pattern);
+            this.lastUsedPatterns = similarPatterns;
 
-            return similarPatterns.map((p) => p.pattern);
+            return similarPatterns;
         } catch (error) {
             console.error(
                 "[ClaudeService] Error finding relevant patterns:",
@@ -183,18 +181,18 @@ Before returning, verify that your response includes ALL required fields and fol
             const relevantPatterns =
                 await this.findRelevantPatterns(userPrompt);
 
-            // Extract the most effective parts based on pattern effectiveness
-            const patternExamples = relevantPatterns
-                .sort((a, b) => b.effectiveness_score - a.effectiveness_score)
-                .map((pattern) => ({
-                    code: pattern.content.html,
-                    score: pattern.effectiveness_score,
-                    type: pattern.type,
-                }));
+            // Sort patterns by effectiveness score
+            const sortedPatterns = relevantPatterns.sort(
+                (a, b) => b.effectiveness_score - a.effectiveness_score
+            );
 
             console.log(
-                "[ClaudeService] Using pattern examples:",
-                patternExamples.map((p) => ({ type: p.type, score: p.score }))
+                "[ClaudeService] Using patterns:",
+                sortedPatterns.map((p) => ({
+                    type: p.type,
+                    score: p.effectiveness_score,
+                    name: p.pattern_name,
+                }))
             );
 
             // Include patterns in prompt
@@ -203,7 +201,7 @@ Before returning, verify that your response includes ALL required fields and fol
                 userPrompt
             ).replace(
                 "{{pattern_examples}}",
-                this.formatPatternExamples(patternExamples)
+                this.formatPatternExamples(sortedPatterns)
             );
 
             console.log(
@@ -213,20 +211,23 @@ Before returning, verify that your response includes ALL required fields and fol
         } catch (error) {
             console.error("[ClaudeService] Error generating prompt:", error);
             // Fallback to basic prompt if pattern enhancement fails
-            return this.PROMPT_TEMPLATE.replace("{{user_prompt}}", userPrompt);
+            return this.PROMPT_TEMPLATE.replace(
+                "{{user_prompt}}",
+                userPrompt
+            ).replace("{{pattern_examples}}", "No relevant patterns found.");
         }
     }
 
-    private formatPatternExamples(
-        examples: Array<{ code: string; score: number; type: string }>
-    ): string {
-        return examples
+    private formatPatternExamples(patterns: GamePattern[]): string {
+        return patterns
             .map(
-                (ex) => `
-            Here's a highly effective ${ex.type} pattern (score: ${ex.score}):
+                (pattern) => `
+            Here's a highly effective ${pattern.type} pattern (score: ${pattern.effectiveness_score}):
             \`\`\`html
-            ${ex.code}
+            ${pattern.content.html}
             \`\`\`
+            ${pattern.content.css ? `\`\`\`css\n${pattern.content.css}\n\`\`\`` : ""}
+            ${pattern.content.js ? `\`\`\`javascript\n${pattern.content.js}\n\`\`\`` : ""}
         `
             )
             .join("\n\n");
@@ -456,10 +457,10 @@ Before returning, verify that your response includes ALL required fields and fol
                                 })
                             ),
                             quality_assessment: {
-                                visual_score: 0.9,
-                                interactive_score: 0.9,
-                                functional_score: 0.9,
-                                performance_score: 0.9,
+                                visual: 0.9,
+                                interactive: 0.9,
+                                functional: 0.9,
+                                performance: 0.9,
                             },
                         });
                         console.log(

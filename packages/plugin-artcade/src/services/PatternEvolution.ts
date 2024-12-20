@@ -1,5 +1,5 @@
 import { Service, IAgentRuntime, elizaLogger } from "@ai16z/eliza";
-import { VectorDatabase, VectorSearchResult } from "./VectorDatabase";
+import { VectorSupabase } from "./VectorSupabase";
 import {
     PatternStagingService as PatternStaging,
     GamePattern,
@@ -27,7 +27,7 @@ export interface EvolutionResult {
 
 export class PatternEvolution extends Service {
     private runtime!: IAgentRuntime & { logger: typeof elizaLogger };
-    private vectorDb!: VectorDatabase;
+    private vectorDb!: VectorSupabase;
     private staging!: PatternStaging;
 
     private readonly defaultConfig: Required<EvolutionConfig> = {
@@ -40,8 +40,9 @@ export class PatternEvolution extends Service {
         fitnessThreshold: 0.7,
     };
 
-    constructor() {
+    constructor(supabaseUrl: string) {
         super();
+        this.vectorDb = new VectorSupabase(supabaseUrl);
     }
 
     override async initialize(
@@ -51,7 +52,7 @@ export class PatternEvolution extends Service {
         this.runtime = runtime;
 
         // Create and initialize dependencies
-        this.vectorDb = new VectorDatabase();
+        this.vectorDb = new VectorSupabase(this.vectorDb.supabaseUrl);
         await this.vectorDb.initialize(runtime);
 
         this.staging = new PatternStaging();

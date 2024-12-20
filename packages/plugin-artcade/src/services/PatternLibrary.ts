@@ -1,6 +1,7 @@
 import { Service } from "@ai16z/eliza";
 import { v4 as uuidv4 } from "uuid";
 import { glitchInvasionPattern } from "../patterns/cursor-mechanics";
+import { VectorSupabase } from "./VectorSupabase";
 
 interface GamePattern {
     id: string;
@@ -36,20 +37,18 @@ interface PatternSearchResult {
 }
 
 export class PatternLibrary {
-    private vectorDb: any;
+    private vectorDb: VectorSupabase;
     private staging: any;
     private runtime: any;
 
-    constructor() {
-        this.vectorDb = null;
+    constructor(supabaseUrl: string) {
+        this.vectorDb = new VectorSupabase(supabaseUrl);
         this.staging = null;
         this.runtime = null;
     }
 
     async initialize(runtime: any) {
         this.runtime = runtime;
-        this.vectorDb = runtime.getService("VectorDatabase");
-        this.staging = runtime.getService("PatternStaging");
         this.runtime.logger.info("PatternLibrary service initialized");
 
         // Register the glitch invasion pattern
