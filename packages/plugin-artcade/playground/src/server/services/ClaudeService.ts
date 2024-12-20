@@ -154,13 +154,13 @@ Before returning, verify that your response includes ALL required fields and fol
 
             console.log(
                 "[ClaudeService] Found similar patterns:",
-                similarPatterns.map((p) => p.id)
+                similarPatterns.map((p) => p.pattern.id)
             );
 
             // Store for later usage tracking
-            this.lastUsedPatterns = similarPatterns;
+            this.lastUsedPatterns = similarPatterns.map((p) => p.pattern);
 
-            return similarPatterns;
+            return similarPatterns.map((p) => p.pattern);
         } catch (error) {
             console.error(
                 "[ClaudeService] Error finding relevant patterns:",

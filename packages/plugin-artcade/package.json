@@ -52,6 +52,7 @@
         "migration:convert-all": "tsx src/tests/migration/phase2_convert_all.ts",
         "insert:webdaw": "tsx src/tests/test-webdaw-insert-patterns.ts",
         "delete:webdaw": "tsx src/tests/test-webdaw-delete.ts",
-        "update:effectiveness": "tsx src/tests/update-effectiveness.ts"
+        "update:effectiveness": "tsx src/tests/update-effectiveness.ts",
+        "test:semantic-matching": "tsx src/tests/test-semantic-pattern-matching.ts"
     }
 }
