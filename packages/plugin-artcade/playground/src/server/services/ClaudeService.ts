@@ -148,7 +148,7 @@ Before returning, verify that your response includes ALL required fields and fol
             // Find similar patterns using the prompt directly
             const similarPatterns = await this.vectorDb.findSimilarPatterns(
                 prompt, // Pass prompt directly, VectorSupabase will handle embedding
-                0.85, // similarity threshold
+                0.6, // similarity threshold
                 3 // number of patterns to return
             );
 
@@ -374,6 +374,20 @@ Before returning, verify that your response includes ALL required fields and fol
         return elements;
     }
 
+    private sanitizeJsonString(str: string): string {
+        // Remove any invalid escape sequences
+        return (
+            str
+                .replace(/\\([^"\\\/bfnrtu])/g, "$1")
+                // Ensure all backslashes are properly escaped
+                .replace(/\\/g, "\\\\")
+                // Fix any unescaped quotes
+                .replace(/(?<!\\)"/g, '\\"')
+                // Remove any control characters
+                .replace(/[\x00-\x1F\x7F-\x9F]/g, "")
+        );
+    }
+
     async generatePattern(userPrompt: string): Promise<GeneratedPattern> {
         console.log(
             "[ClaudeService] Starting pattern generation for prompt:",
@@ -433,59 +447,77 @@ Before returning, verify that your response includes ALL required fields and fol
 
             const content = data.choices[0].message.content;
             console.log("[ClaudeService] Processing Claude's response");
+            console.log("[ClaudeService] Raw response:", content);
 
+            let pattern: GeneratedPattern;
             try {
-                // Parse the JSON response
-                const pattern = JSON.parse(content);
+                // First try parsing the raw response
+                pattern = JSON.parse(content);
                 console.log(
                     "[ClaudeService] Successfully parsed JSON response"
                 );
+            } catch (initialError) {
+                console.log(
+                    "[ClaudeService] Initial parse failed, attempting to sanitize"
+                );
 
-                // Track pattern usage if we used any patterns for generation
-                if (this.lastUsedPatterns.length > 0) {
-                    console.log("[ClaudeService] Tracking pattern usage");
-                    try {
-                        await this.vectorDb.trackClaudeUsage({
-                            prompt: userPrompt,
-                            generated_html: pattern.html,
-                            similarity_score: 0.9,
-                            matched_patterns: this.lastUsedPatterns.map(
-                                (p) => ({
-                                    pattern_id: p.id,
-                                    similarity: 0.9,
-                                    features_used: [],
-                                })
-                            ),
-                            quality_assessment: {
-                                visual: 0.9,
-                                interactive: 0.9,
-                                functional: 0.9,
-                                performance: 0.9,
-                            },
-                        });
-                        console.log(
-                            "[ClaudeService] Successfully tracked pattern usage"
-                        );
-                    } catch (error) {
-                        console.error(
-                            "[ClaudeService] Failed to track pattern usage:",
-                            error
-                        );
-                        // Don't fail the generation if tracking fails
-                    }
+                try {
+                    // If raw parsing fails, try sanitizing the response
+                    const sanitizedContent = this.sanitizeJsonString(content);
+                    console.log(
+                        "[ClaudeService] Sanitized content:",
+                        sanitizedContent
+                    );
+
+                    pattern = JSON.parse(sanitizedContent);
+                    console.log(
+                        "[ClaudeService] Successfully parsed sanitized JSON response"
+                    );
+                } catch (error) {
+                    console.error(
+                        "[ClaudeService] Failed to parse sanitized response:",
+                        error
+                    );
+                    throw new PatternValidationError(
+                        "Invalid response format from Claude",
+                        [error instanceof Error ? error.message : String(error)]
+                    );
                 }
-
-                return pattern;
-            } catch (error) {
-                console.error(
-                    "[ClaudeService] Failed to parse response:",
-                    error
-                );
-                throw new PatternValidationError(
-                    "Invalid response format from Claude",
-                    [error instanceof Error ? error.message : String(error)]
-                );
             }
+
+            // Track pattern usage if we used any patterns for generation
+            if (this.lastUsedPatterns.length > 0) {
+                console.log("[ClaudeService] Tracking pattern usage");
+                try {
+                    await this.vectorDb.trackClaudeUsage({
+                        prompt: userPrompt,
+                        generated_html: pattern.html,
+                        similarity_score: 0.9,
+                        matched_patterns: this.lastUsedPatterns.map((p) => ({
+                            pattern_id: p.id,
+                            similarity: 0.9,
+                            features_used: [],
+                        })),
+                        quality_assessment: {
+                            visual: 0.9,
+                            interactive: 0.9,
+                            functional: 0.9,
+                            performance: 0.9,
+                        },
+                    });
+                    console.log(
+                        "[ClaudeService] Successfully tracked pattern usage"
+                    );
+                } catch (error) {
+                    console.error(
+                        "[ClaudeService] Failed to track pattern usage:",
+                        error
+                    );
+                    // Don't fail the generation if tracking fails
+                }
+            }
+
+            return pattern;
         } catch (error) {
             console.error("[ClaudeService] Pattern generation failed:", error);
             throw error;

@@ -242,7 +242,7 @@ router.post("/search/similar", async (req, res) => {
             patternId,
             html,
             type,
-            threshold = 0.7,
+            threshold = 0.6,
             limit = 5,
         } = req.body as SimilarPatternsRequest;
 
@@ -255,44 +255,73 @@ router.post("/search/similar", async (req, res) => {
             type,
             threshold,
             limit,
+            hasHtml: !!html,
         });
 
-        let sourceEmbedding: number[];
+        let searchPattern: GamePattern;
         if (patternId) {
             const pattern = await req.app.locals.vectorDb.getPattern(patternId);
             if (!pattern) {
                 throw new Error(`Pattern ${patternId} not found`);
             }
-            sourceEmbedding = pattern.embedding;
+            searchPattern = pattern;
         } else if (html) {
-            sourceEmbedding =
-                await req.app.locals.vectorDb.generateEmbedding(html);
+            // Create a temporary pattern for search
+            searchPattern = {
+                id: "temp-search",
+                type: type || "game_mechanic",
+                pattern_name: "Temporary Search Pattern",
+                content: {
+                    html,
+                    context: "search",
+                    metadata: {},
+                },
+                effectiveness_score: 0,
+                usage_count: 0,
+                created_at: new Date(),
+                last_used: new Date(),
+                embedding: [],
+            };
         } else {
             throw new Error("Invalid request: missing both patternId and html");
         }
 
-        const similarPatterns =
-            await req.app.locals.vectorDb.findSimilarPatterns(
-                sourceEmbedding,
-                Number(threshold),
-                Number(limit),
-                type as GamePattern["type"]
+        try {
+            const similarPatterns =
+                await req.app.locals.vectorDb.findSimilarPatterns(
+                    searchPattern,
+                    Number(threshold),
+                    Number(limit),
+                    type as GamePattern["type"]
+                );
+
+            console.log(
+                "[PatternServer] Found similar patterns:",
+                similarPatterns.length
             );
 
-        console.log(
-            "[PatternServer] Found similar patterns:",
-            similarPatterns.length
-        );
+            // Transform the response to match the expected format
+            const response: SimilarPatternsResponse = {
+                success: true,
+                data: similarPatterns.map(({ pattern, similarity }) => ({
+                    ...pattern,
+                    similarity,
+                })),
+            };
 
-        const response: SimilarPatternsResponse = {
-            success: true,
-            data: similarPatterns.map(({ pattern, similarity }) => ({
-                ...pattern,
-                similarity,
-            })),
-        };
-
-        res.json(response);
+            res.json(response);
+        } catch (searchError) {
+            console.error(
+                "[PatternServer] Error in pattern search:",
+                searchError
+            );
+            throw new PatternSearchError(
+                "Failed to search for similar patterns",
+                searchError instanceof Error
+                    ? searchError.message
+                    : String(searchError)
+            );
+        }
     } catch (error) {
         console.error("[PatternServer] Error finding similar patterns:", error);
         const response: SimilarPatternsResponse = {
@@ -300,7 +329,10 @@ router.post("/search/similar", async (req, res) => {
             error: {
                 message:
                     error instanceof Error ? error.message : "Unknown error",
-                details: error instanceof Error ? error.stack : undefined,
+                details:
+                    error instanceof PatternSearchError
+                        ? error.details
+                        : undefined,
             },
         };
         res.status(500).json(response);

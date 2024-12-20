@@ -226,42 +226,106 @@ export class VectorSupabase {
 
     async findSimilarPatterns(
         input: string | GamePattern,
-        threshold = 0.5,
+        threshold = 0.6,
         limit = 5,
         type?: GamePattern["type"]
     ): Promise<Array<{ pattern: GamePattern; similarity: number }>> {
         try {
             let searchEmbedding: number[];
+            let searchText: string;
 
             if (typeof input === "string") {
+                console.log(
+                    "[VectorSupabase] Generating embedding from text input"
+                );
                 searchEmbedding = await this.generateEmbeddingFromText(input);
+                searchText = input;
             } else {
+                console.log(
+                    "[VectorSupabase] Generating embedding from pattern:",
+                    input.pattern_name
+                );
                 searchEmbedding = await this.generateEmbedding(input);
+                searchText =
+                    `${input.pattern_name} ${input.type} ${input.content?.context || ""} ${input.content?.metadata?.description || ""}`.trim();
             }
+
+            console.log("[VectorSupabase] Searching with parameters:", {
+                threshold,
+                limit,
+                type,
+                embeddingSize: searchEmbedding.length,
+                searchText,
+            });
 
             const { data, error } = await this.supabase.rpc("match_patterns", {
                 query_embedding: searchEmbedding,
+                query_text: searchText,
                 match_threshold: threshold,
                 match_count: limit,
             });
 
-            if (error) throw error;
-
-            // Filter by type in the application layer if type is specified
-            let results = data;
-            if (type) {
-                results = data.filter(
-                    (result: any) => result.pattern.type === type
-                );
+            if (error) {
+                console.error("[VectorSupabase] Database search error:", error);
+                throw error;
             }
 
-            // Transform the response to include both pattern and similarity
+            // Log all similarity scores for analysis
+            console.log(
+                "\n[VectorSupabase] Similarity scores for pattern search:"
+            );
+            if (data && data.length > 0) {
+                data.forEach((result: any) => {
+                    if (result && result.pattern) {
+                        console.log(
+                            `- Pattern: "${result.pattern.pattern_name || "Unnamed"}" (type: ${result.pattern.type || "unknown"})`
+                        );
+                        console.log(
+                            `  Score: ${result.similarity?.toFixed(3) || 0} ${
+                                result.similarity >= threshold ? "✓" : "✗"
+                            } (${result.similarity >= threshold ? "above" : "below"} threshold ${threshold})`
+                        );
+                    }
+                });
+            } else {
+                console.log("No patterns found in initial search");
+            }
+
+            // Filter by type in the application layer if type is specified
+            let results =
+                data?.filter((result: any) => result && result.pattern) || [];
+            if (type) {
+                const beforeCount = results.length;
+                results = results.filter(
+                    (result: any) => result.pattern.type === type
+                );
+                const afterCount = results.length;
+
+                if (beforeCount !== afterCount) {
+                    console.log(
+                        `\n[VectorSupabase] Type filtering: ${beforeCount - afterCount} patterns filtered out by type "${type}"`
+                    );
+                    // Log the filtered out patterns
+                    data.forEach((result: any) => {
+                        if (result?.pattern && result.pattern.type !== type) {
+                            console.log(
+                                `- Filtered out: "${result.pattern.pattern_name || "Unnamed"}" (type: ${result.pattern.type || "unknown"}, score: ${result.similarity?.toFixed(3) || 0})`
+                            );
+                        }
+                    });
+                }
+            }
+
+            // Return the filtered results
             return results.map((result: any) => ({
                 pattern: result.pattern,
-                similarity: result.similarity,
+                similarity: result.similarity || 0,
             }));
         } catch (error) {
-            console.error("Failed to find similar patterns:", error);
+            console.error(
+                "[VectorSupabase] Error in findSimilarPatterns:",
+                error
+            );
             throw error;
         }
     }
