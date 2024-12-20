@@ -2,34 +2,8 @@ import { Service } from "@ai16z/eliza";
 import { v4 as uuidv4 } from "uuid";
 import { glitchInvasionPattern } from "../patterns/cursor-mechanics";
 import { VectorSupabase } from "./VectorSupabase";
-
-interface GamePattern {
-    id: string;
-    type: "animation" | "layout" | "interaction" | "style" | "game_mechanic";
-    pattern_name: string;
-    content: {
-        html: string;
-        css?: string;
-        js?: string;
-        context: string;
-        metadata: {
-            visual_type?: string;
-            interaction_type?: string;
-            color_scheme?: string[];
-            animation_duration?: string;
-            dependencies?: string[];
-            game_mechanics?: {
-                type: string;
-                properties: Record<string, any>;
-            }[];
-        };
-    };
-    embedding: number[];
-    effectiveness_score: number;
-    usage_count: number;
-    created_at?: Date;
-    last_used?: Date;
-}
+import { GamePattern, PatternMetadata, SemanticTags } from "../types/patterns";
+import { validateGamePattern } from "../utils/pattern-validation";
 
 interface PatternSearchResult {
     pattern: GamePattern;
@@ -74,6 +48,12 @@ export class PatternLibrary {
                     ...pattern.content?.metadata,
                     game_mechanics:
                         pattern.content?.metadata?.game_mechanics || [],
+                    semantic_tags: pattern.content?.metadata?.semantic_tags || {
+                        use_cases: [],
+                        mechanics: [],
+                        interactions: [],
+                        visual_style: [],
+                    },
                 },
             },
             embedding: pattern.embedding || [],
@@ -81,7 +61,30 @@ export class PatternLibrary {
             usage_count: 0,
             created_at: new Date(),
             last_used: new Date(),
+            room_id: pattern.room_id || "",
+            user_id: pattern.user_id || "",
+            agent_id: pattern.agent_id || "",
+            usage_stats: {
+                total_uses: 0,
+                successful_uses: 0,
+                average_similarity: 0,
+                last_used: new Date(),
+            },
+            claude_usage_metrics: {
+                last_usage: {
+                    direct_reuse: false,
+                    structural_similarity: 0,
+                    feature_adoption: [],
+                    timestamp: new Date(),
+                },
+            },
         };
+
+        // Validate the pattern
+        const errors = validateGamePattern(completePattern);
+        if (errors.length > 0) {
+            throw new Error(`Invalid pattern: ${errors.join(", ")}`);
+        }
 
         // Stage the pattern first
         const stagingId = await this.staging.stagePattern(completePattern, {
@@ -112,12 +115,26 @@ export class PatternLibrary {
             );
         }
 
+        if (!pattern.type) {
+            throw new Error("Pattern type is required for similarity search");
+        }
+
         const results = await this.vectorDb.findSimilarPatterns(
             pattern.embedding,
-            pattern.type || "game_mechanic",
+            pattern.type,
             threshold,
             limit
         );
+
+        // Validate each result
+        results.forEach((result) => {
+            const errors = validateGamePattern(result.pattern);
+            if (errors.length > 0) {
+                this.runtime.logger.warn(
+                    `Invalid pattern in search results: ${errors.join(", ")}`
+                );
+            }
+        });
 
         return results;
     }
@@ -199,11 +216,36 @@ export class PatternLibrary {
                     metadata: {
                         visual_type: "animation",
                         animation_duration: this.extractAnimationDuration(html),
+                        semantic_tags: {
+                            use_cases: ["animation", "visual_feedback"],
+                            mechanics: [],
+                            interactions: [],
+                            visual_style: ["animated", "keyframe_animation"],
+                        },
                     },
                 },
                 embedding: [],
                 effectiveness_score: 1.0,
                 usage_count: 0,
+                created_at: new Date(),
+                last_used: new Date(),
+                room_id: "",
+                user_id: "",
+                agent_id: "",
+                usage_stats: {
+                    total_uses: 0,
+                    successful_uses: 0,
+                    average_similarity: 0,
+                    last_used: new Date(),
+                },
+                claude_usage_metrics: {
+                    last_usage: {
+                        direct_reuse: false,
+                        structural_similarity: 0,
+                        feature_adoption: [],
+                        timestamp: new Date(),
+                    },
+                },
             });
         }
 
@@ -225,11 +267,36 @@ export class PatternLibrary {
                     context: "layout",
                     metadata: {
                         visual_type: "layout",
+                        semantic_tags: {
+                            use_cases: ["layout", "structure"],
+                            mechanics: [],
+                            interactions: [],
+                            visual_style: ["grid", "flex", "responsive"],
+                        },
                     },
                 },
                 embedding: [],
                 effectiveness_score: 1.0,
                 usage_count: 0,
+                created_at: new Date(),
+                last_used: new Date(),
+                room_id: "",
+                user_id: "",
+                agent_id: "",
+                usage_stats: {
+                    total_uses: 0,
+                    successful_uses: 0,
+                    average_similarity: 0,
+                    last_used: new Date(),
+                },
+                claude_usage_metrics: {
+                    last_usage: {
+                        direct_reuse: false,
+                        structural_similarity: 0,
+                        feature_adoption: [],
+                        timestamp: new Date(),
+                    },
+                },
             });
         }
 
@@ -253,11 +320,36 @@ export class PatternLibrary {
                     context: "interaction",
                     metadata: {
                         interaction_type: "user_input",
+                        semantic_tags: {
+                            use_cases: ["user_interaction", "event_handling"],
+                            mechanics: ["click", "hover", "drag"],
+                            interactions: ["mouse", "touch"],
+                            visual_style: ["interactive"],
+                        },
                     },
                 },
                 embedding: [],
                 effectiveness_score: 1.0,
                 usage_count: 0,
+                created_at: new Date(),
+                last_used: new Date(),
+                room_id: "",
+                user_id: "",
+                agent_id: "",
+                usage_stats: {
+                    total_uses: 0,
+                    successful_uses: 0,
+                    average_similarity: 0,
+                    last_used: new Date(),
+                },
+                claude_usage_metrics: {
+                    last_usage: {
+                        direct_reuse: false,
+                        structural_similarity: 0,
+                        feature_adoption: [],
+                        timestamp: new Date(),
+                    },
+                },
             });
         }
 
@@ -280,11 +372,36 @@ export class PatternLibrary {
                     metadata: {
                         visual_type: "style",
                         color_scheme: colorScheme,
+                        semantic_tags: {
+                            use_cases: ["styling", "theming"],
+                            mechanics: [],
+                            interactions: [],
+                            visual_style: ["color_scheme", "inline_styles"],
+                        },
                     },
                 },
                 embedding: [],
                 effectiveness_score: 1.0,
                 usage_count: 0,
+                created_at: new Date(),
+                last_used: new Date(),
+                room_id: "",
+                user_id: "",
+                agent_id: "",
+                usage_stats: {
+                    total_uses: 0,
+                    successful_uses: 0,
+                    average_similarity: 0,
+                    last_used: new Date(),
+                },
+                claude_usage_metrics: {
+                    last_usage: {
+                        direct_reuse: false,
+                        structural_similarity: 0,
+                        feature_adoption: [],
+                        timestamp: new Date(),
+                    },
+                },
             });
         }
 
@@ -333,11 +450,36 @@ export class PatternLibrary {
                                 },
                             },
                         ],
+                        semantic_tags: {
+                            use_cases: ["collision_detection", "game_physics"],
+                            mechanics: ["collision", "physics"],
+                            interactions: ["automatic"],
+                            visual_style: ["game_mechanic"],
+                        },
                     },
                 },
-                embedding: [], // Will be generated by VectorDatabase
+                embedding: [],
                 effectiveness_score: 1.0,
                 usage_count: 0,
+                created_at: new Date(),
+                last_used: new Date(),
+                room_id: "",
+                user_id: "",
+                agent_id: "",
+                usage_stats: {
+                    total_uses: 0,
+                    successful_uses: 0,
+                    average_similarity: 0,
+                    last_used: new Date(),
+                },
+                claude_usage_metrics: {
+                    last_usage: {
+                        direct_reuse: false,
+                        structural_similarity: 0,
+                        feature_adoption: [],
+                        timestamp: new Date(),
+                    },
+                },
             });
         }
 
@@ -363,11 +505,36 @@ export class PatternLibrary {
                                 },
                             },
                         ],
+                        semantic_tags: {
+                            use_cases: ["movement", "controls"],
+                            mechanics: ["keyboard_input", "touch_input"],
+                            interactions: ["keyboard", "touch"],
+                            visual_style: ["game_mechanic"],
+                        },
                     },
                 },
                 embedding: [],
                 effectiveness_score: 1.0,
                 usage_count: 0,
+                created_at: new Date(),
+                last_used: new Date(),
+                room_id: "",
+                user_id: "",
+                agent_id: "",
+                usage_stats: {
+                    total_uses: 0,
+                    successful_uses: 0,
+                    average_similarity: 0,
+                    last_used: new Date(),
+                },
+                claude_usage_metrics: {
+                    last_usage: {
+                        direct_reuse: false,
+                        structural_similarity: 0,
+                        feature_adoption: [],
+                        timestamp: new Date(),
+                    },
+                },
             });
         }
 
@@ -392,11 +559,36 @@ export class PatternLibrary {
                                 },
                             },
                         ],
+                        semantic_tags: {
+                            use_cases: ["power_ups", "game_mechanics"],
+                            mechanics: ["temporary_effects", "buffs"],
+                            interactions: ["collision", "timed"],
+                            visual_style: ["game_mechanic"],
+                        },
                     },
                 },
                 embedding: [],
                 effectiveness_score: 1.0,
                 usage_count: 0,
+                created_at: new Date(),
+                last_used: new Date(),
+                room_id: "",
+                user_id: "",
+                agent_id: "",
+                usage_stats: {
+                    total_uses: 0,
+                    successful_uses: 0,
+                    average_similarity: 0,
+                    last_used: new Date(),
+                },
+                claude_usage_metrics: {
+                    last_usage: {
+                        direct_reuse: false,
+                        structural_similarity: 0,
+                        feature_adoption: [],
+                        timestamp: new Date(),
+                    },
+                },
             });
         }
 

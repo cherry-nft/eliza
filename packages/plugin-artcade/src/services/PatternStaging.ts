@@ -1,5 +1,12 @@
 import { Service, IAgentRuntime, elizaLogger } from "@ai16z/eliza";
 import { randomUUID } from "crypto";
+import {
+    GamePattern,
+    StagedPattern,
+    ApprovalMetadata,
+    PatternHistory,
+} from "../types/patterns";
+import { validateGamePattern } from "../utils/pattern-validation";
 
 // Add service type definition
 declare module "@ai16z/eliza" {
@@ -11,60 +18,6 @@ declare module "@ai16z/eliza" {
 // Define expected service interface
 export interface PatternService extends Service {
     storeApprovedPattern(pattern: GamePattern): Promise<void>;
-}
-
-export interface GamePattern {
-    id?: string;
-    type: "animation" | "layout" | "interaction" | "style";
-    pattern_name: string;
-    content: {
-        html: string;
-        css?: string;
-        js?: string;
-        context: string;
-        metadata: {
-            visual_type?: string;
-            interaction_type?: string;
-            color_scheme?: string[];
-            animation_duration?: string;
-            dependencies?: string[];
-        };
-    };
-    embedding?: number[];
-    effectiveness_score: number;
-    usage_count: number;
-}
-
-export interface StagedPattern extends GamePattern {
-    staged_at: Date;
-    evolution_source: string;
-    location: {
-        file: string;
-        start_line: number;
-        end_line: number;
-    };
-    pending_approval: boolean;
-}
-
-export interface ApprovalMetadata {
-    reason: string;
-    quality_notes?: string;
-    inspiration_source?: string;
-    approved_at: Date;
-}
-
-export interface PatternHistory {
-    id: string;
-    pattern_id: string;
-    action: "created" | "approved" | "rejected" | "modified";
-    timestamp: Date;
-    metadata: {
-        source_file?: string;
-        line_range?: { start: number; end: number };
-        approver?: string;
-        reason?: string;
-        changes?: string[];
-    };
 }
 
 export class PatternStagingService extends Service {
@@ -90,14 +43,57 @@ export class PatternStagingService extends Service {
         const stagingId = randomUUID();
 
         const stagedPattern: StagedPattern = {
-            ...(pattern as GamePattern),
+            id: pattern.id || stagingId,
+            type: pattern.type || "game_mechanic",
+            pattern_name: pattern.pattern_name || `pattern_${Date.now()}`,
+            content: {
+                html: pattern.content?.html || "",
+                css: pattern.content?.css,
+                js: pattern.content?.js,
+                context: pattern.content?.context || "game",
+                metadata: {
+                    ...pattern.content?.metadata,
+                    semantic_tags: pattern.content?.metadata?.semantic_tags || {
+                        use_cases: [],
+                        mechanics: [],
+                        interactions: [],
+                        visual_style: [],
+                    },
+                },
+            },
+            embedding: pattern.embedding || [],
+            effectiveness_score: 0,
+            usage_count: 0,
+            created_at: new Date(),
+            last_used: new Date(),
+            room_id: pattern.room_id || "",
+            user_id: pattern.user_id || "",
+            agent_id: pattern.agent_id || "",
+            usage_stats: {
+                total_uses: 0,
+                successful_uses: 0,
+                average_similarity: 0,
+                last_used: new Date(),
+            },
+            claude_usage_metrics: {
+                last_usage: {
+                    direct_reuse: false,
+                    structural_similarity: 0,
+                    feature_adoption: [],
+                    timestamp: new Date(),
+                },
+            },
             staged_at: new Date(),
             evolution_source: source,
             location,
             pending_approval: true,
-            effectiveness_score: 0,
-            usage_count: 0,
         };
+
+        // Validate the pattern
+        const errors = validateGamePattern(stagedPattern);
+        if (errors.length > 0) {
+            throw new Error(`Invalid pattern: ${errors.join(", ")}`);
+        }
 
         this.stagedPatterns.set(stagingId, stagedPattern);
 
@@ -135,10 +131,15 @@ export class PatternStagingService extends Service {
             throw new Error(`Pattern ${stagingId} not found in staging`);
         }
 
-        const approvedPattern = {
-            ...pattern,
+        const approvedPattern: GamePattern = {
+            id: pattern.id,
+            type: pattern.type,
+            pattern_name: pattern.pattern_name,
             content: {
-                ...pattern.content,
+                html: pattern.content.html,
+                css: pattern.content.css,
+                js: pattern.content.js,
+                context: pattern.content.context,
                 metadata: {
                     ...pattern.content.metadata,
                     approval: {
@@ -147,8 +148,23 @@ export class PatternStagingService extends Service {
                     },
                 },
             },
-            pending_approval: false,
+            embedding: pattern.embedding,
+            effectiveness_score: pattern.effectiveness_score,
+            usage_count: pattern.usage_count,
+            created_at: pattern.created_at,
+            last_used: pattern.last_used,
+            room_id: pattern.room_id,
+            user_id: pattern.user_id,
+            agent_id: pattern.agent_id,
+            usage_stats: pattern.usage_stats,
+            claude_usage_metrics: pattern.claude_usage_metrics,
         };
+
+        // Validate the approved pattern
+        const errors = validateGamePattern(approvedPattern);
+        if (errors.length > 0) {
+            throw new Error(`Invalid approved pattern: ${errors.join(", ")}`);
+        }
 
         try {
             // Store in vector database through pattern service
