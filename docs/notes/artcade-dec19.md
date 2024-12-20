@@ -1154,3 +1154,134 @@ interface PatternEffectivenessMetrics {
     - Handle validation failures gracefully
 
 [Continue with next section...]
+
+### Semantic Term Management
+
+The semantic term management system is implemented through a combination of explicit tagging and inference logic, with a focus on maintaining semantic consistency across patterns.
+
+#### Tag Categories and Structure
+
+```typescript
+export interface SemanticTags {
+    use_cases: string[]; // Pattern application contexts
+    mechanics: string[]; // Game mechanics implemented
+    interactions: string[]; // User interaction patterns
+    visual_style: string[]; // Visual design elements
+}
+```
+
+#### Tag Extraction Process
+
+1. **Primary Source**: Explicitly defined tags in pattern metadata
+
+    ```typescript
+    if (pattern.content.metadata.semantic_tags) {
+        const explicitTags = pattern.content.metadata.semantic_tags;
+        tags.use_cases.push(...explicitTags.use_cases);
+        tags.mechanics.push(...explicitTags.mechanics);
+        tags.interactions.push(...explicitTags.interactions);
+        tags.visual_style.push(...explicitTags.visual_style);
+    }
+    ```
+
+2. **Fallback Inference Logic**:
+
+    - Pattern Name Analysis
+    - Type-based Inference
+    - Content Context Analysis
+    - Code Analysis (HTML/CSS/JS)
+
+3. **Inference Rules**:
+    - Game Mechanics:
+        ```typescript
+        if (type === "game_mechanic") {
+            if (name.includes("movement")) tags.mechanics.push("movement");
+            if (name.includes("physics")) tags.mechanics.push("physics");
+            if (name.includes("collision")) tags.mechanics.push("collision");
+        }
+        ```
+    - Use Cases:
+        ```typescript
+        if (context.includes("racing")) tags.use_cases.push("racing_game");
+        if (context.includes("driving"))
+            tags.use_cases.push("driving_simulation");
+        ```
+    - Interactions:
+        ```typescript
+        if (js.includes("keydown") || js.includes("keyup")) {
+            tags.interactions.push("keyboard_control");
+        }
+        if (js.includes("mousemove") || js.includes("click")) {
+            tags.interactions.push("mouse_control");
+        }
+        ```
+
+#### Semantic Similarity Calculation
+
+Weighted similarity scoring based on tag matches:
+
+```typescript
+const weights = {
+    use_cases: 0.4, // Highest priority
+    mechanics: 0.3, // Core gameplay elements
+    interactions: 0.2, // User interface patterns
+    visual_style: 0.1, // Visual elements
+};
+
+// Calculate intersection sizes and weighted boost
+Object.entries(weights).forEach(([key, weight]) => {
+    const matchCount = intersections[key as keyof typeof intersections];
+    if (matchCount > 0) {
+        boost +=
+            weight *
+            (matchCount / patternTags[key as keyof SemanticTags].length);
+    }
+});
+```
+
+#### Room ID Encoding
+
+Semantic tags are encoded into room IDs for efficient storage and retrieval:
+
+```typescript
+export function encodeSemanticRoomId(tags: SemanticTags): string {
+    // Create segments that fit UUID format (8-4-4-4-12)
+    const segments = [
+        (tags.use_cases.join("_") || "00000000").slice(0, 8),
+        (tags.mechanics.join("_") || "0000").slice(0, 4),
+        (tags.interactions.join("_") || "0000").slice(0, 4),
+        (tags.visual_style.join("_") || "0000").slice(0, 4),
+        "000000000000", // Padding to maintain UUID length
+    ];
+    return segments.join("-");
+}
+```
+
+#### Best Practices
+
+1. **Tag Extraction**:
+
+    - Always prefer explicit tags when available
+    - Use inference only when categories are empty
+    - Maintain tag uniqueness through Set operations
+    - Consider context when inferring tags
+
+2. **Similarity Calculations**:
+
+    - Use weighted scoring based on tag category importance
+    - Consider tag frequency and relevance
+    - Normalize scores for consistent comparison
+    - Cache similarity calculations when possible
+
+3. **Room ID Management**:
+
+    - Use standardized encoding format
+    - Handle missing tags gracefully with padding
+    - Maintain UUID format compatibility
+    - Implement robust parsing for encoded IDs
+
+4. **Tag Maintenance**:
+    - Regular validation of tag categories
+    - Deduplication of similar tags
+    - Monitoring of tag usage patterns
+    - Updates based on pattern evolution
