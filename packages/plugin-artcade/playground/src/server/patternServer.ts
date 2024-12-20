@@ -235,76 +235,62 @@ router.get("/:id", async (req, res) => {
 });
 
 // Similar Pattern Search
-router.post("/search/similar", async (req, res) => {
-    console.log("[PatternServer] Received similar pattern search request");
+router.get("/similar", async (req, res) => {
     try {
-        const searchParams: SimilarPatternsRequest = req.body;
-        let similarPatterns: GamePattern[];
+        const {
+            patternId,
+            html,
+            type,
+            threshold = 0.7,
+            limit = 5,
+        } = req.query as SimilarPatternsRequest;
 
-        if (searchParams.patternId) {
-            console.log(
-                "[PatternServer] Searching by pattern ID:",
-                searchParams.patternId
-            );
-            const pattern = await req.app.locals.vectorDb.getPatternById(
-                searchParams.patternId
-            );
-            if (!pattern) {
-                throw new PatternSearchError("Reference pattern not found");
-            }
-            similarPatterns = await req.app.locals.vectorDb.findSimilarPatterns(
-                pattern,
-                searchParams.threshold || 0.85,
-                searchParams.limit || 5
-            );
-        } else if (searchParams.html) {
-            console.log("[PatternServer] Searching by HTML content");
-            similarPatterns = await req.app.locals.vectorDb.findSimilarPatterns(
-                searchParams.html,
-                searchParams.threshold || 0.85,
-                searchParams.limit || 5
-            );
-        } else {
-            throw new PatternSearchError(
-                "Either patternId or html must be provided"
-            );
+        if (!patternId && !html) {
+            throw new Error("Either patternId or html must be provided");
         }
 
-        console.log(
-            "[PatternServer] Found similar patterns:",
-            similarPatterns.length
-        );
+        let sourceEmbedding: number[];
+        if (patternId) {
+            const pattern = await req.app.locals.vectorDb.getPattern(patternId);
+            if (!pattern) {
+                throw new Error(`Pattern ${patternId} not found`);
+            }
+            sourceEmbedding = pattern.embedding;
+        } else if (html) {
+            sourceEmbedding =
+                await req.app.locals.vectorDb.generateEmbedding(html);
+        } else {
+            throw new Error("Invalid request: missing both patternId and html");
+        }
 
-        // Convert GamePattern[] to SimilarPattern[]
-        const patternsWithSimilarity = similarPatterns.map((pattern) => ({
-            ...pattern,
-            similarity: 0.9, // This should ideally come from the vector similarity calculation
-        }));
+        const similarPatterns =
+            await req.app.locals.vectorDb.findSimilarPatterns(
+                sourceEmbedding,
+                Number(threshold),
+                Number(limit),
+                type as GamePattern["type"]
+            );
 
         const response: SimilarPatternsResponse = {
             success: true,
-            data: patternsWithSimilarity,
+            data: similarPatterns.map(({ pattern, similarity }) => ({
+                ...pattern,
+                similarity,
+            })),
         };
+
         res.json(response);
     } catch (error) {
-        console.error(
-            "[PatternServer] Error searching similar patterns:",
-            error
-        );
+        console.error("[PatternServer] Error finding similar patterns:", error);
         const response: SimilarPatternsResponse = {
             success: false,
             error: {
                 message:
                     error instanceof Error ? error.message : "Unknown error",
-                details:
-                    error instanceof PatternSearchError
-                        ? error.details
-                        : undefined,
+                details: error instanceof Error ? error.stack : undefined,
             },
         };
-        res.status(error instanceof PatternSearchError ? 400 : 500).json(
-            response
-        );
+        res.status(500).json(response);
     }
 });
 

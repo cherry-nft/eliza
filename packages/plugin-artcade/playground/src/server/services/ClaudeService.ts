@@ -3,7 +3,7 @@ import {
     PatternGenerationError,
     PatternServiceInterface,
     PatternValidationError,
-} from "../shared/pattern.types";
+} from "../../shared/pattern.types";
 import { VectorSupabase } from "../../../../src/services/VectorSupabase";
 import { GamePattern } from "../../../../src/types/patterns";
 import { ClaudeUsageContext } from "../../../../src/types/effectiveness";
