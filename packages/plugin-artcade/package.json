@@ -58,6 +58,7 @@
         "insert:air-hockey": "tsx src/tests/test-air-hockey-insert-patterns.ts",
         "insert:catnip-crusaders": "tsx src/tests/test-catnip-crusaders-insert-patterns.ts",
         "insert:gigger-openland": "tsx src/tests/test-gigger-openland-insert-patterns.ts",
-        "insert:gravity-simulator": "tsx src/tests/test-gravity-simulator-insert-patterns.ts"
+        "insert:gravity-simulator": "tsx src/tests/test-gravity-simulator-insert-patterns.ts",
+        "insert:glitter-4card-grid": "tsx src/tests/test-glitter-4card-grid-insert-patterns.ts"
     }
 }

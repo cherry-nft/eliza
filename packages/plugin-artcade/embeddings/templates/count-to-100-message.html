@@ -1,0 +1,779 @@
+<html lang="fr"></html>
+
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <base href=".">
+  <title>Journey to 100 Followers</title>
+  <link href="https://cdn.jsdelivr.net/npm/@fontsource/press-start-2p@4.5.0/index.min.css" rel="stylesheet">
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: #000;
+      perspective: 1000px;
+    }
+
+    canvas {
+      width: 100vw;
+      height: 100vh;
+      display: block;
+      image-rendering: optimizeSpeed;
+      image-rendering: -moz-crisp-edges;
+      image-rendering: -webkit-optimize-contrast;
+      image-rendering: optimize-contrast;
+      image-rendering: pixelated;
+      -ms-interpolation-mode: nearest-neighbor;
+    }
+
+    #counter,
+    #thanks {
+      position: fixed;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: white;
+      font-family: 'Press Start 2P', cursive;
+      text-align: center;
+      pointer-events: none;
+      text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+    }
+
+    #counter {
+      top: 50%;
+      font-size: 6em;
+      font-weight: bold;
+      background: linear-gradient(45deg, #ff3366, #00ffff, #ff8800, #00ff99);
+      background-size: 400% 400%;
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      opacity: 0;
+      transition: opacity 1s ease-in-out;
+      letter-spacing: 4px;
+      filter: drop-shadow(0 0 25px rgba(255, 255, 255, 0.7));
+      animation: gradient 5s ease infinite, pulse 1.5s ease-in-out infinite;
+      transform-origin: center center;
+    }
+
+    #thanks {
+      top: 65%;
+      font-size: 1.5em;
+      opacity: 0;
+      transition: opacity 1s;
+      line-height: 1.5;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      animation: glow 2s ease-in-out infinite alternate;
+      white-space: pre;
+    }
+
+    .ascii-particle {
+      position: absolute;
+      color: #ff8800;
+      font-family: monospace;
+      pointer-events: none;
+      font-size: 20px;
+      text-shadow: 0 0 5px #ff3300, 0 0 10px #ff6600;
+      opacity: 0.8;
+      transform-style: preserve-3d;
+      filter: blur(0.5px);
+      animation: particleGlow 2s infinite alternate;
+    }
+
+    .cursor {
+      display: inline-block;
+      width: 0.5em;
+      height: 1em;
+      background: white;
+      margin-left: 2px;
+      animation: blink 0.7s infinite;
+    }
+
+    @keyframes glow {
+      from {
+        text-shadow: 0 0 5px rgba(255, 255, 255, 0.7), 0 0 10px rgba(255, 255, 255, 0.7), 0 0 15px #ff3366, 0 0 20px #ff3366;
+      }
+
+      to {
+        text-shadow: 0 0 10px rgba(255, 255, 255, 0.7), 0 0 20px rgba(255, 255, 255, 0.7), 0 0 30px #00ffff, 0 0 40px #00ffff;
+      }
+    }
+
+    @keyframes pulse {
+      0% {
+        transform: translate(-50%, -50%) scale(1);
+      }
+
+      50% {
+        transform: translate(-50%, -50%) scale(1.2);
+      }
+
+      100% {
+        transform: translate(-50%, -50%) scale(1);
+      }
+    }
+
+    @keyframes blink {
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0;
+      }
+    }
+
+    @keyframes gradient {
+      0% {
+        background-size: 400% 400%;
+      }
+
+      50% {
+        background-size: 400% 400%;
+      }
+
+      100% {
+        background-size: 400% 400%;
+      }
+    }
+
+    @keyframes particleGlow {
+      from {
+        filter: blur(0.5px) brightness(1);
+      }
+
+      to {
+        filter: blur(1px) brightness(1.5);
+      }
+    }
+
+    .show {
+      opacity: 1 !important;
+      animation: appear 1s ease-out forwards;
+    }
+
+    @keyframes appear {
+      from {
+        transform: translate(-50%, -50%) scale(0);
+      }
+
+      to {
+        transform: translate(-50%, -50%) scale(1);
+      }
+    }
+
+    .scanlines {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: repeating-linear-gradient(transparent 0px,
+          rgba(0, 0, 0, 0.8) 1px,
+          transparent 2px,
+          transparent 4px);
+      pointer-events: none;
+      z-index: 9999;
+      animation: flicker 0.08s infinite, colorShift 10s infinite;
+      mix-blend-mode: overlay;
+      opacity: 0.9;
+    }
+
+    @keyframes flicker {
+      0% {
+        opacity: 0.85;
+      }
+
+      50% {
+        opacity: 0.95;
+      }
+
+      100% {
+        opacity: 0.85;
+      }
+    }
+
+    @keyframes colorShift {
+      0% {
+        mix-blend-mode: overlay;
+      }
+
+      50% {
+        mix-blend-mode: color-dodge;
+      }
+
+      100% {
+        mix-blend-mode: overlay;
+      }
+    }
+
+    #credits {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      color: white;
+      font-family: 'Press Start 2P', cursive;
+      font-size: 0.8em;
+      opacity: 0;
+      transition: opacity 1s ease-in-out;
+      text-shadow: 0 0 5px #fff, 0 0 10px #fff, 0 0 15px #ff3366;
+    }
+
+    .firework-particle {
+      transition: opacity 0.5s ease-out;
+      font-size: 30px;
+      text-shadow: 0 0 10px currentColor, 0 0 20px currentColor;
+    }
+  </style>
+</head>
+
+<body>
+  <canvas id="glCanvas"></canvas>
+  <div class="scanlines"></div>
+  <div id="counter">0</div>
+  <div id="thanks"></div>
+
+  <script type="text/javascript">
+    class ASCIIParticleSystem {
+      constructor() {
+        this.particles = [];
+        this.chars = ['*', '+', '×', '·', '°', '☆', '✧', '✦', '⚡', '✺'];
+        this.colors = ['#ff3300', '#ff6600', '#ff8800', '#ffaa00', '#ffcc00', '#ff5500'];
+        this.init();
+        this.fireworkParticles = [];
+        this.fireworkActive = false;
+        this.fireworkLaunches = 0;
+      }
+      init() {
+        for (let i = 0; i < 50; i++) {
+          this.createParticle();
+        }
+      }
+      createParticle() {
+        const particle = document.createElement('div');
+        particle.className = 'ascii-particle';
+        particle.textContent = this.chars[Math.floor(Math.random() * this.chars.length)];
+        particle.style.color = this.colors[Math.floor(Math.random() * this.colors.length)];
+        const x = Math.random() * window.innerWidth;
+        const y = Math.random() * window.innerHeight;
+        const z = Math.random() * 1000 - 500;
+        particle.style.left = x + 'px';
+        particle.style.top = y + 'px';
+        particle.style.transform = `translateZ(${z}px)`;
+        const data = {
+          element: particle,
+          x: x,
+          y: y,
+          z: z,
+          vx: (Math.random() - 0.5) * 2,
+          vy: (Math.random() - 0.5) * 2,
+          vz: (Math.random() - 0.5) * 2,
+          color: particle.style.color
+        };
+        this.particles.push(data);
+        document.body.appendChild(particle);
+      }
+      createFireworkParticle(centerX, centerY, colors = null) {
+        const particle = document.createElement('div');
+        particle.className = 'ascii-particle firework-particle';
+        const explosionChars = ['*', '✦', '✧', '☆', '◆', '◇', '♦', '✴', '✳', '✸'];
+        particle.textContent = explosionChars[Math.floor(Math.random() * explosionChars.length)];
+        const fireworkColors = colors || ['#ff3366', '#00ffff', '#ff8800', '#00ff99', '#ff00ff', '#ffff00', '#00ffd5', '#ff4500'];
+        particle.style.color = fireworkColors[Math.floor(Math.random() * fireworkColors.length)];
+        const angle = Math.random() * Math.PI * 2;
+        const speed = Math.random() * 10 + 5;
+        const data = {
+          element: particle,
+          x: centerX,
+          y: centerY,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          life: 100,
+          gravity: 0.2
+        };
+        this.fireworkParticles.push(data);
+        document.body.appendChild(particle);
+      }
+      triggerFireworks(launchNumber = 0) {
+        if (launchNumber >= 3) {
+          this.fireworkActive = false;
+          this.fireworkLaunches = 0;
+          this.fireworkParticles.forEach(p => p.element.remove());
+          this.fireworkParticles = [];
+          return;
+        }
+        this.fireworkActive = true;
+        this.fireworkLaunches++;
+        const centerX = window.innerWidth / 2;
+        const centerY = window.innerHeight / 2;
+        const colorSets = [
+          ['#ff3366', '#00ffff', '#ff8800', '#00ff99'],
+          ['#ff00ff', '#ffff00', '#00ffd5', '#ff4500'],
+          ['#ff6666', '#66ff66', '#6666ff', '#ff66ff']
+        ];
+        for (let i = 0; i < 200; i++) {
+          this.createFireworkParticle(centerX, centerY, colorSets[launchNumber]);
+        }
+        if (launchNumber < 2) {
+          setTimeout(() => {
+            this.triggerFireworks(launchNumber + 1);
+          }, 5000);
+        }
+      }
+      updateFireworks() {
+        if (!this.fireworkActive) return;
+        this.fireworkParticles = this.fireworkParticles.filter(p => {
+          p.x += p.vx;
+          p.y += p.vy;
+          p.vy += p.gravity;
+          p.life--;
+          p.element.style.left = p.x + 'px';
+          p.element.style.top = p.y + 'px';
+          p.element.style.opacity = p.life / 100;
+          if (p.life <= 0 || p.x < 0 || p.x > window.innerWidth || p.y < 0 || p.y > window.innerHeight) {
+            p.element.remove();
+            return false;
+          }
+          return true;
+        });
+        if (this.fireworkParticles.length === 0) {
+          this.fireworkActive = false;
+        }
+      }
+      update() {
+        this.particles.forEach(p => {
+          p.x += p.vx;
+          p.y += p.vy;
+          p.z += p.vz;
+          if (p.x < 0 || p.x > window.innerWidth) p.vx *= -1;
+          if (p.y < 0 || p.y > window.innerHeight) p.vy *= -1;
+          if (p.z < -500 || p.z > 500) p.vz *= -1;
+          p.element.style.left = p.x + 'px';
+          p.element.style.top = p.y + 'px';
+          p.element.style.transform = `translateZ(${p.z}px) rotate(${p.z}deg)`;
+          p.element.style.opacity = (500 + p.z) / 1000;
+          const alpha = Math.sin(Date.now() / 1000) * 0.3 + 0.7;
+          const glow = Math.sin(Date.now() / 500 + p.z) * 10 + 20;
+          p.element.style.textShadow = `0 0 ${glow}px ${p.color}, 0 0 ${glow * 1.5}px ${p.color}`;
+        });
+        this.updateFireworks();
+      }
+    }
+    class Typewriter {
+      constructor(element, text, speed = 100, onComplete = null) {
+        this.element = element;
+        this.text = text;
+        this.speed = speed;
+        this.cursor = document.createElement('span');
+        this.cursor.classList.add('cursor');
+        this.currentChar = 0;
+        this.typing = false;
+        this.onComplete = onComplete;
+      }
+      start() {
+        if (this.typing) return;
+        this.typing = true;
+        this.element.textContent = '';
+        this.element.appendChild(this.cursor);
+        this.type();
+      }
+      type() {
+        if (this.currentChar < this.text.length) {
+          this.element.insertBefore(document.createTextNode(this.text[this.currentChar]), this.cursor);
+          this.currentChar++;
+          setTimeout(() => this.type(), this.speed);
+        } else {
+          this.cursor.remove();
+          this.typing = false;
+          if (this.onComplete) {
+            this.onComplete();
+          }
+        }
+      }
+    }
+    const vertexShaderSource = `
+  attribute vec4 position;
+  void main() {
+    gl_Position = position;
+  }`;
+    const fragmentShaderSource = `
+  precision highp float;
+  uniform float time;
+  uniform vec2 resolution;
+  uniform float progress;
+
+  #define PI 3.14159265359
+  #define MAX_STEPS 256
+  #define MAX_DIST 100.0
+  #define SURF_DIST 0.0005
+
+  float fbm(vec3 p) {
+    float value = 0.0;
+    float amplitude = 0.5;
+    float frequency = 1.0;
+    float lacunarity = 2.2;
+    float persistence = 0.55;
+
+    for(int i = 0; i < 8; i++) {
+        value += amplitude * (
+            sin(p.x * frequency + time * 0.7) *
+            cos(p.y * frequency + time * 0.5) *
+            sin(p.z * frequency + time * 0.3) *
+            sin(length(p) * frequency * 1.5)
+        );
+
+        p = abs(p);
+        p.xy = vec2(p.x + p.y, p.y - p.x);
+        p *= 1.3;
+
+        frequency *= lacunarity;
+        amplitude *= persistence;
+    }
+    return value * 0.5;
+  }
+
+  float sdSphere(vec3 p, float r) {
+    float base = length(p) - r;
+    float dist = abs(base);
+    if(dist < 0.8) {
+        float fractal = fbm(p * 3.5 + time * 0.4);
+        float pattern = sin(p.x * 15.0 + time) *
+                        cos(p.y * 15.0 + time) *
+                        sin(p.z * 15.0 + time);
+
+        return base - (
+            fractal * 0.4 +
+            pattern * 0.2 +
+            sin(length(p) * 10.0) * 0.1
+        ) * (0.8 - dist);
+    }
+    return base;
+  }
+
+  float sdTorus(vec3 p, vec2 t) {
+    vec2 q = vec2(length(p.xz) - t.x, p.y);
+    return length(q) - t.y;
+  }
+
+  float sdBox(vec3 p, vec3 b) {
+    vec3 q = abs(p) - b;
+    return length(max(q,0.0)) + min(max(q.x,max(q.y,q.z)),0.0);
+  }
+
+  vec3 rotateY(vec3 p, float angle) {
+    float c = cos(angle);
+    float s = sin(angle);
+    return vec3(c*p.x - s*p.z, p.y, s*p.x + c*p.z);
+  }
+
+  vec3 rotateX(vec3 p, float angle) {
+    float c = cos(angle);
+    float s = sin(angle);
+    return vec3(p.x, c*p.y - s*p.z, s*p.y + c*p.z);
+  }
+
+  float map(vec3 p) {
+    p = rotateY(p, time * 0.5);
+    p = rotateX(p, sin(time * 0.3) * 0.5);
+
+    float ring = sdTorus(p, vec2(4.0 + sin(time) * 0.5, 0.5));
+
+    float spheres = MAX_DIST;
+    for(int i = 0; i < 16; i++) {
+      float angle = float(i) * PI * 2.0 / 16.0 + time;
+      vec3 offset = vec3(
+        cos(angle) * 4.0,
+        sin(time * 2.0 + float(i)) * 0.8,
+        sin(angle) * 4.0
+      );
+      spheres = min(spheres, sdSphere(p - offset, 0.3 + 0.1 * sin(time * 3.0 + float(i))));
+    }
+
+    vec3 boxPos = p;
+    boxPos = rotateY(boxPos, time * 2.0);
+    float boxes = sdBox(boxPos, vec3(1.0 + 0.3 * sin(time * 3.0)));
+
+    float center = sdSphere(p, 2.0 + sin(time * 2.0) * 0.3);
+
+    return min(min(min(ring, spheres), boxes), center) * 0.8;
+  }
+
+  vec3 calcNormal(vec3 p) {
+    vec2 e = vec2(0.001, 0.0);
+    return normalize(vec3(
+      map(p + e.xyy) - map(p - e.xyy),
+      map(p + e.yxy) - map(p - e.yxy),
+      map(p + e.yyx) - map(p - e.yyx)
+    ));
+  }
+
+  float softShadow(vec3 ro, vec3 rd, float mint, float maxt, float k) {
+    float res = 1.0;
+    float ph = 1e20;
+    float t = mint;
+
+    for(int i = 0; i < 32; i++) {
+      float h = map(ro + rd * t);
+      float y = h*h/(2.0*ph);
+      float d = sqrt(h*h-y*y);
+      res = min(res, k*d/max(0.0,t-y));
+      ph = h;
+      t += h * 0.5;
+      if(res < 0.001 || t > maxt) break;
+    }
+    return clamp(res, 0.0, 1.0);
+  }
+
+  float calcAO(vec3 p, vec3 n) {
+    float occ = 0.0;
+    float sca = 1.0;
+    for(int i = 0; i < 5; i++) {
+      float h = 0.01 + 0.12 * float(i)/4.0;
+      float d = map(p + h*n);
+      occ += (h-d)*sca;
+      sca *= 0.95;
+      if(occ > 0.35) break;
+    }
+    return clamp(1.0 - 3.0*occ, 0.0, 1.0);
+  }
+
+  float raymarch(vec3 ro, vec3 rd) {
+    float dO = 0.0;
+
+    for(int i = 0; i < MAX_STEPS; i++) {
+      vec3 p = ro + rd * dO;
+      float dS = map(p);
+      dO += dS;
+      if(dS < SURF_DIST || dO > MAX_DIST) break;
+    }
+
+    return dO;
+  }
+
+  vec3 render(vec3 ro, vec3 rd) {
+    float d = raymarch(ro, rd);
+    vec3 col = vec3(0.0);
+
+    if(d < MAX_DIST) {
+        vec3 p = ro + rd * d;
+        vec3 n = calcNormal(p);
+        vec3 lightPos = vec3(2.0 * sin(time), 4.0, -3.0 * cos(time));
+        vec3 l = normalize(lightPos - p);
+        vec3 r = reflect(-l, n);
+        vec3 h = normalize(l - rd);
+
+        float diff = max(0.0, dot(n, l));
+        float spec = pow(max(0.0, dot(r, -rd)), 64.0);
+        float fresnel = pow(1.0 - max(0.0, dot(n, -rd)), 5.0);
+
+        float shadow = softShadow(p, l, 0.02, 2.5, 32.0);
+        float ao = calcAO(p, n);
+
+        float sphereDist = length(p) - 2.0;
+        vec3 baseColor;
+
+        if(abs(sphereDist) < 0.5) {
+            float pulse = sin(time * 2.0) * 0.5 + 0.5;
+            baseColor = mix(
+                vec3(1.0, 0.2, 0.8),
+                vec3(0.2, 0.9, 1.0),
+                fbm(p * 5.0 + time * 0.3) * 0.7 + 0.3
+            );
+
+            baseColor *= (1.0 +
+                sin(p.x * 10.0) * 0.2 +
+                cos(p.y * 10.0) * 0.2 +
+                sin(p.z * 10.0) * 0.2
+            );
+
+            baseColor += vec3(0.3, 0.1, 0.4) * pulse;
+        } else {
+            baseColor = mix(
+                vec3(0.2, 0.8, 1.0),
+                vec3(1.0, 0.4, 0.1),
+                sin(p.x * 2.0 + time) * 0.5 + 0.5
+            );
+        }
+
+        vec3 ambient = baseColor * 0.05;
+        vec3 diffuse = baseColor * diff * shadow;
+        vec3 specular = vec3(0.8, 0.9, 1.0) * spec * shadow;
+        vec3 rim = vec3(0.3, 0.6, 1.0) * fresnel;
+
+        col = (ambient + diffuse + specular + rim) * ao;
+
+        float fogFactor = 1.0 - exp(-d * 0.08);
+        vec3 fogColor = mix(
+            vec3(0.1, 0.2, 0.3),
+            vec3(0.2, 0.3, 0.4),
+            sin(time * 0.5) * 0.5 + 0.5
+        );
+        col = mix(col, fogColor, fogFactor);
+    }
+
+    float glowIntensity = sin(progress * PI * 2.0) * 0.3;
+    col += vec3(0.1, 0.2, 0.3) * glowIntensity;
+
+    col = col / (1.0 + col);
+    col = pow(col, vec3(0.4545));
+    col = mix(col, col * (1.0 + sin(time * 0.5) * 0.1), 0.2);
+
+    return col;
+  }
+
+  void main() {
+    vec2 uv = (gl_FragCoord.xy - 0.5 * resolution.xy) / resolution.y;
+
+    vec3 ro = vec3(0.0, 0.0, 8.0 + sin(time * 0.5));
+    vec3 rd = normalize(vec3(uv, -1.0));
+
+    vec3 col = render(ro, rd);
+
+    gl_FragColor = vec4(col, 1.0);
+  }
+`;
+    let gl;
+    let program;
+    let time;
+    let timeLocation;
+    let resolutionLocation;
+    let progressLocation;
+    let startTime;
+    let animationDuration = 8000;
+    let particleSystem;
+    let shadersReady = false;
+    let counterDelay = 3000;
+
+    function precompileShaders() {
+      return new Promise((resolve, reject) => {
+        try {
+          const vertexShader = gl.createShader(gl.VERTEX_SHADER);
+          gl.shaderSource(vertexShader, vertexShaderSource);
+          gl.compileShader(vertexShader);
+          if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) {
+            throw new Error('Vertex shader compile error: ' + gl.getShaderInfoLog(vertexShader));
+          }
+          const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
+          gl.shaderSource(fragmentShader, fragmentShaderSource);
+          gl.compileShader(fragmentShader);
+          if (!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) {
+            throw new Error('Fragment shader compile error: ' + gl.getShaderInfoLog(fragmentShader));
+          }
+          const program = gl.createProgram();
+          gl.attachShader(program, vertexShader);
+          gl.attachShader(program, fragmentShader);
+          gl.linkProgram(program);
+          if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+            throw new Error('Program link error: ' + gl.getProgramInfoLog(program));
+          }
+          resolve({
+            program,
+            vertexShader,
+            fragmentShader
+          });
+        } catch (err) {
+          reject(err);
+        }
+      });
+    }
+    async function initGL() {
+      const scanlines = document.querySelector('.scanlines');
+      scanlines.style.display = shadersReady ? 'block' : 'none';
+      window.typewriterStarted = false;
+      particleSystem = new ASCIIParticleSystem();
+      const canvas = document.getElementById('glCanvas');
+      gl = canvas.getContext('webgl', {
+        alpha: false,
+        depth: false,
+        stencil: false,
+        antialias: true,
+        premultipliedAlpha: false,
+        preserveDrawingBuffer: false,
+        powerPreference: 'high-performance'
+      });
+      if (!gl) {
+        console.error('WebGL not supported');
+        return;
+      }
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      gl.viewport(0, 0, canvas.width, canvas.height);
+      gl.getExtension('OES_standard_derivatives');
+      gl.getExtension('OES_texture_float');
+      try {
+        const shaders = await precompileShaders();
+        program = shaders.program;
+        const vertices = new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]);
+        const vertexBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+        const position = gl.getAttribLocation(program, 'position');
+        gl.enableVertexAttribArray(position);
+        gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
+        timeLocation = gl.getUniformLocation(program, 'time');
+        resolutionLocation = gl.getUniformLocation(program, 'resolution');
+        progressLocation = gl.getUniformLocation(program, 'progress');
+        shadersReady = true;
+        document.getElementById('counter').style.opacity = '1';
+        startTime = Date.now();
+        animate();
+      } catch (err) {
+        console.error('Shader initialization failed:', err);
+      }
+    }
+
+    function animate() {
+      const currentTime = Date.now();
+      time = (currentTime - startTime) / 1000;
+      const progress = Math.min((currentTime - startTime - counterDelay) / animationDuration, 1.0);
+      gl.clearColor(0.0, 0.0, 0.0, 1.0);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      gl.useProgram(program);
+      gl.uniform1f(timeLocation, time);
+      gl.uniform2f(resolutionLocation, gl.canvas.width, gl.canvas.height);
+      gl.uniform1f(progressLocation, progress);
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+      if (shadersReady && document.querySelector('.scanlines').style.display === 'none') {
+        document.querySelector('.scanlines').style.display = 'block';
+      }
+      particleSystem.update();
+      if (shadersReady) {
+        const easedProgress = progress > 0 ? 1 - Math.pow(1 - progress, 5) : 0;
+        const counter = Math.floor(easedProgress * 100);
+        if (progress > 0) {
+          document.getElementById('counter').textContent = counter;
+        }
+        if (progress >= 1) {
+          const thanksElement = document.getElementById('thanks');
+          thanksElement.classList.add('show');
+          if (counter === 100 && !window.typewriterStarted) {
+            window.typewriterStarted = true;
+            thanksElement.textContent = '';
+            const typewriter = new Typewriter(thanksElement, 'THANK YOU SO MUCH !!!', 100, () => {
+              const credits = document.getElementById('credits');
+              credits.style.opacity = '1';
+              particleSystem.triggerFireworks();
+            });
+            typewriter.start();
+          }
+        }
+      }
+      requestAnimationFrame(animate);
+    }
+    window.addEventListener('load', async () => {
+      try {
+        await initGL();
+      } catch (err) {
+        console.error('Demo initialization failed:', err);
+      }
+    });
+    window.addEventListener('resize', () => {
+      gl.canvas.width = window.innerWidth;
+      gl.canvas.height = window.innerHeight;
+      gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+    });
+  </script>
+</body>
+
+</html>

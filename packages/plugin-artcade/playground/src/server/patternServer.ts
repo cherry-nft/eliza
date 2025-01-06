@@ -267,9 +267,56 @@ router.post("/search/similar", async (req, res) => {
             searchPattern = pattern;
         } else if (html) {
             // Create a temporary pattern for search
-            searchPattern = {
+            const htmlFilename =
+                html.match(/\/([^/]+\.html)/)?.[1] || "search-pattern";
+
+            // Extract semantic features from the HTML for room_id
+            const features = {
+                // Core functionality
+                canvas: html.includes("canvas"),
+                events: html.includes("addEventListener"),
+                animation:
+                    html.includes("animation") || html.includes("@keyframes"),
+                touch: html.includes("touch"),
+                audio: html.includes("audio") || html.includes("AudioContext"),
+
+                // Visual aspects
+                flex: html.includes("flex"),
+                grid: html.includes("grid"),
+                transforms: html.includes("transform"),
+                transitions: html.includes("transition"),
+                filters: html.includes("filter"),
+
+                // Interaction patterns
+                click: html.includes("click"),
+                drag: html.includes("drag"),
+                hover: html.includes("hover"),
+                keyboard: html.includes("keydown") || html.includes("keyup"),
+                gestures: html.includes("gesture") || html.includes("swipe"),
+            };
+
+            // Build semantic room_id from detected features
+            const featureDescriptions = Object.entries(features)
+                .filter(([_, present]) => present)
+                .map(([feature]) => feature)
+                .join("-");
+
+            // Analyze pattern to determine potential types
+            const typeSignals = {
+                animation: features.animation || features.transitions,
+                layout: features.flex || features.grid,
+                interaction:
+                    features.events ||
+                    features.click ||
+                    features.drag ||
+                    features.keyboard,
+                style: features.transforms || features.filters,
+                game_mechanic:
+                    features.canvas && (features.keyboard || features.touch),
+            };
+
+            const basePattern = {
                 id: "temp-search",
-                type: type || "game_mechanic",
                 pattern_name: "Temporary Search Pattern",
                 content: {
                     html,
@@ -281,6 +328,43 @@ router.post("/search/similar", async (req, res) => {
                 created_at: new Date(),
                 last_used: new Date(),
                 embedding: [],
+                room_id: `detected_features-${featureDescriptions}-semantic_analysis`,
+                user_id: htmlFilename,
+                agent_id: html,
+            };
+
+            // If no type provided, infer the most likely type based on signals
+            const inferredType =
+                type ||
+                (() => {
+                    // Count signals for each type
+                    const signalCounts = Object.entries(typeSignals)
+                        .filter(([_, present]) => present)
+                        .map(([type]) => type) as Array<GamePattern["type"]>;
+
+                    if (signalCounts.length === 0) {
+                        // If no strong signals, randomly choose to avoid bias
+                        const allTypes: GamePattern["type"][] = [
+                            "animation",
+                            "layout",
+                            "interaction",
+                            "style",
+                            "game_mechanic",
+                        ];
+                        return allTypes[
+                            Math.floor(Math.random() * allTypes.length)
+                        ];
+                    }
+
+                    // Randomly select from detected types to avoid bias
+                    return signalCounts[
+                        Math.floor(Math.random() * signalCounts.length)
+                    ];
+                })();
+
+            searchPattern = {
+                ...basePattern,
+                type: inferredType as GamePattern["type"],
             };
         } else {
             throw new Error("Invalid request: missing both patternId and html");

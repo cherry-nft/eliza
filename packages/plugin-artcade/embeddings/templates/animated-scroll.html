@@ -1,0 +1,633 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <title>Consolidated Single File</title>
+        <style>
+            @import url("https://fonts.googleapis.com/css2?family=Geist:wght@100..900&display=swap");
+            @import url("https://unpkg.com/normalize.css") layer(normalize);
+
+            @layer normalize, base, demo, stick, effect, srollbar;
+
+            @layer scrollbar {
+                @property --scroller {
+                    initial-value: 0;
+                    syntax: "<number>";
+                    inherits: true;
+                }
+                @property --chroma {
+                    initial-value: 0;
+                    syntax: "<number>";
+                    inherits: true;
+                }
+
+                [data-sync-scrollbar="false"] {
+                    scrollbar-color: light-dark(black, white) #0000;
+                }
+
+                [data-sync-scrollbar="true"] {
+                    scrollbar-color: oklch(
+                            var(--lightness) var(--chroma) var(--scroller)
+                        )
+                        #0000;
+                }
+
+                @supports (animation-timeline: scroll()) and
+                    (animation-range: 0% 100%) {
+                    [data-sync-scrollbar="true"] {
+                        timeline-scope: --list;
+                        scrollbar-color: oklch(
+                                var(--lightness) var(--chroma, 0)
+                                    var(--scroller)
+                            )
+                            #0000;
+                        animation-name: change, chroma-on, chroma-off;
+                        animation-fill-mode: both;
+                        animation-timing-function: linear;
+                        animation-range:
+                            entry 50% exit 50%,
+                            entry 40% entry 50%,
+                            exit 30% exit 40%;
+                        animation-timeline: --list;
+                        ul {
+                            view-timeline: --list;
+                        }
+                    }
+                }
+
+                @keyframes change {
+                    to {
+                        --scroller: var(--end);
+                    }
+                }
+                @keyframes chroma-on {
+                    to {
+                        --chroma: 0.3;
+                    }
+                }
+                @keyframes chroma-off {
+                    to {
+                        --chroma: 0;
+                    }
+                }
+            }
+
+            @layer effect {
+                :root {
+                    --start: 0;
+                    --end: 360;
+                    --lightness: 65%;
+                    --base-chroma: 0.3;
+                }
+                [data-theme="dark"] {
+                    --lightness: 75%;
+                }
+                [data-theme="light"] {
+                    --lightness: 65%;
+                }
+                @media (prefers-color-scheme: dark) {
+                    :root {
+                        --lightness: 75%;
+                    }
+                }
+                ul {
+                    --step: calc(
+                        (var(--end) - var(--start)) / (var(--count) - 1)
+                    );
+                }
+                li:not(:last-of-type) {
+                    color: oklch(
+                        var(--lightness) var(--base-chroma)
+                            calc(var(--start) + (var(--step) * var(--i)))
+                    );
+                }
+
+                @supports (animation-timeline: scroll()) and
+                    (animation-range: 0% 100%) {
+                    li {
+                        opacity: 0.2;
+                        animation-name: brighten;
+                        &:first-of-type {
+                            opacity: 1;
+                            animation-name: dim;
+                        }
+                        &:last-of-type {
+                            opacity: 0.2;
+                            animation-name: bright;
+                        }
+                        animation-fill-mode: both;
+                        animation-timing-function: linear;
+                        animation-range: cover calc(50% - 1lh) calc(50% + 1lh);
+                        animation-timeline: view();
+                    }
+
+                    @keyframes dim {
+                        0%,
+                        50% {
+                            opacity: 1;
+                        }
+                        100% {
+                            opacity: 0.2;
+                        }
+                    }
+
+                    @keyframes bright {
+                        0% {
+                            opacity: 0.2;
+                        }
+                        50%,
+                        100% {
+                            opacity: 1;
+                        }
+                    }
+
+                    @keyframes brighten {
+                        0%,
+                        100% {
+                            opacity: 0.2;
+                        }
+                        50% {
+                            opacity: 1;
+                            filter: brightness(1.2);
+                        }
+                    }
+                }
+            }
+
+            @layer stick {
+                section:first-of-type {
+                    --font-level: 6;
+                    --font-size-min: 20;
+                    display: flex;
+                    line-height: 1.25;
+                    width: 100%;
+                    padding-left: 2rem;
+                }
+                @media (min-width: 768px) {
+                    section:first-of-type {
+                        padding-left: 5rem;
+                    }
+                }
+                section:last-of-type {
+                    min-height: 100svh;
+                    display: flex;
+                    place-items: center;
+                    width: 100%;
+                    justify-content: center;
+
+                    h2 {
+                        --font-level: 6;
+                        --font-size-min: 20;
+                    }
+                }
+                main {
+                    width: 100%;
+                }
+                section:first-of-type h2 {
+                    position: sticky;
+                    top: calc(50% - 0.5lh);
+                    font-size: inherit;
+                    margin: 0;
+                    display: inline-block;
+                    height: fit-content;
+                    font-weight: 600;
+                }
+                ul {
+                    font-weight: 600;
+                    padding-inline: 0;
+                    margin: 0;
+                    list-style-type: none;
+                }
+                html {
+                    scroll-snap-type: y proximity;
+                }
+                li {
+                    scroll-snap-align: center;
+                }
+                h2,
+                li:last-of-type {
+                    background: linear-gradient(
+                        canvasText 50%,
+                        color-mix(in oklch, canvas, canvasText 25%)
+                    );
+                    background-clip: text;
+                    color: #0000;
+                }
+            }
+
+            @layer demo {
+                header {
+                    min-height: 100svh;
+                    display: flex;
+                    place-items: center;
+                    width: 100%;
+                    padding-inline: 2rem;
+                }
+                @media (min-width: 768px) {
+                    header {
+                        padding-inline: 5rem;
+                    }
+                }
+
+                footer {
+                    padding-block: 2rem;
+                    opacity: 0.5;
+                }
+
+                h1 {
+                    --font-size-min: 24;
+                    --font-level: 8;
+                    text-wrap: pretty;
+                    line-height: 0.8;
+                    margin: 0;
+                    background: linear-gradient(
+                        canvasText 60%,
+                        color-mix(in oklch, canvas, canvasText)
+                    );
+                    background-clip: text;
+                    color: #0000;
+                }
+            }
+
+            @layer base {
+                :root {
+                    --font-size-min: 14;
+                    --font-size-max: 20;
+                    --font-ratio-min: 1.1;
+                    --font-ratio-max: 1.33;
+                    --font-width-min: 375;
+                    --font-width-max: 1500;
+                }
+
+                html {
+                    color-scheme: light dark;
+                }
+                [data-theme="light"] {
+                    color-scheme: light only;
+                }
+                [data-theme="dark"] {
+                    color-scheme: dark only;
+                }
+
+                :where(.fluid) {
+                    --fluid-min: calc(
+                        var(--font-size-min) *
+                            pow(var(--font-ratio-min), var(--font-level, 0))
+                    );
+                    --fluid-max: calc(
+                        var(--font-size-max) *
+                            pow(var(--font-ratio-max), var(--font-level, 0))
+                    );
+                    --fluid-preferred: calc(
+                        (var(--fluid-max) - var(--fluid-min)) /
+                            (var(--font-width-max) - var(--font-width-min))
+                    );
+                    --fluid-type: clamp(
+                        (var(--fluid-min) / 16) * 1rem,
+                        ((var(--fluid-min) / 16) * 1rem) -
+                            (
+                                (
+                                        (
+                                                var(--fluid-preferred) *
+                                                    var(--font-width-min)
+                                            ) /
+                                            16
+                                    ) *
+                                    1rem
+                            ) +
+                            (
+                                var(--fluid-preferred) *
+                                    var(--variable-unit, 100vi)
+                            ),
+                        (var(--fluid-max) / 16) * 1rem
+                    );
+                    font-size: var(--fluid-type);
+                }
+
+                *,
+                *:after,
+                *:before {
+                    box-sizing: border-box;
+                }
+
+                body {
+                    display: grid;
+                    place-items: center;
+                    background: light-dark(white, black);
+                    min-height: 100svh;
+                    font-family: "Geist", "SF Pro Text", "SF Pro Icons",
+                        "AOS Icons", "Helvetica Neue", Helvetica, Arial,
+                        sans-serif, system-ui;
+                }
+
+                body::before {
+                    --size: 45px;
+                    --line: color-mix(in hsl, canvasText, transparent 70%);
+                    content: "";
+                    height: 100svh;
+                    width: 100vw;
+                    position: fixed;
+                    background:
+                        linear-gradient(
+                                90deg,
+                                var(--line) 1px,
+                                transparent 1px var(--size)
+                            )
+                            50% 50% / var(--size) var(--size),
+                        linear-gradient(
+                                var(--line) 1px,
+                                transparent 1px var(--size)
+                            )
+                            50% 50% / var(--size) var(--size);
+                    mask: linear-gradient(-20deg, transparent 50%, white);
+                    top: 0;
+                    transform-style: flat;
+                    pointer-events: none;
+                    z-index: -1;
+                }
+
+                .bear-link {
+                    color: canvasText;
+                    position: fixed;
+                    top: 1rem;
+                    left: 1rem;
+                    width: 48px;
+                    aspect-ratio: 1;
+                    display: grid;
+                    place-items: center;
+                    opacity: 0.8;
+                }
+
+                :where(.x-link, .bear-link):is(:hover, :focus-visible) {
+                    opacity: 1;
+                }
+
+                .bear-link svg {
+                    width: 75%;
+                }
+
+                /* Utilities */
+                .sr-only {
+                    position: absolute;
+                    width: 1px;
+                    height: 1px;
+                    padding: 0;
+                    margin: -1px;
+                    overflow: hidden;
+                    clip: rect(0, 0, 0, 0);
+                    white-space: nowrap;
+                    border-width: 0;
+                }
+            }
+
+            div.tp-dfwv {
+                position: fixed;
+            }
+        </style>
+    </head>
+    <body>
+        <header>
+            <h1 class="fluid">you can<br />scroll.</h1>
+        </header>
+        <main>
+            <section class="content fluid">
+                <h2>
+                    <span aria-hidden="true">you can&nbsp;</span>
+                    <span class="sr-only">you can ship things.</span>
+                </h2>
+                <ul aria-hidden="true" style="--count: 22">
+                    <li style="--i: 0">design.</li>
+                    <li style="--i: 1">prototype.</li>
+                    <li style="--i: 2">solve.</li>
+                    <li style="--i: 3">build.</li>
+                    <li style="--i: 4">develop.</li>
+                    <li style="--i: 5">debug.</li>
+                    <li style="--i: 6">learn.</li>
+                    <li style="--i: 7">cook.</li>
+                    <li style="--i: 8">ship.</li>
+                    <li style="--i: 9">prompt.</li>
+                    <li style="--i: 10">collaborate.</li>
+                    <li style="--i: 11">create.</li>
+                    <li style="--i: 12">inspire.</li>
+                    <li style="--i: 13">follow.</li>
+                    <li style="--i: 14">innovate.</li>
+                    <li style="--i: 15">test.</li>
+                    <li style="--i: 16">optimize.</li>
+                    <li style="--i: 17">teach.</li>
+                    <li style="--i: 18">visualize.</li>
+                    <li style="--i: 19">transform.</li>
+                    <li style="--i: 20">scale.</li>
+                    <li style="--i: 21">do it.</li>
+                </ul>
+            </section>
+            <section>
+                <h2 class="fluid">fin.</h2>
+            </section>
+        </main>
+        <footer>ʕ⊙ᴥ⊙ʔ jh3yy &copy; 2024</footer>
+
+        <a
+            class="bear-link"
+            href="https://twitter.com/intent/follow?screen_name=jh3yy"
+            target="_blank"
+            rel="noreferrer noopener"
+        >
+            <svg
+                class="w-9"
+                viewBox="0 0 969 955"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+            >
+                <circle
+                    cx="161.191"
+                    cy="320.191"
+                    r="133.191"
+                    stroke="currentColor"
+                    stroke-width="20"
+                ></circle>
+                <circle
+                    cx="806.809"
+                    cy="320.191"
+                    r="133.191"
+                    stroke="currentColor"
+                    stroke-width="20"
+                ></circle>
+                <circle
+                    cx="695.019"
+                    cy="587.733"
+                    r="31.4016"
+                    fill="currentColor"
+                ></circle>
+                <circle
+                    cx="272.981"
+                    cy="587.733"
+                    r="31.4016"
+                    fill="currentColor"
+                ></circle>
+                <path
+                    d="M564.388 712.083C564.388 743.994 526.035 779.911 483.372 779.911C440.709 779.911 402.356 743.994 402.356 712.083C402.356 680.173 440.709 664.353 483.372 664.353C526.035 664.353 564.388 680.173 564.388 712.083Z"
+                    fill="currentColor"
+                ></path>
+                <rect
+                    x="310.42"
+                    y="448.31"
+                    width="343.468"
+                    height="51.4986"
+                    fill="#FF1E1E"
+                ></rect>
+                <path
+                    fill-rule="evenodd"
+                    clip-rule="evenodd"
+                    d="M745.643 288.24C815.368 344.185 854.539 432.623 854.539 511.741H614.938V454.652C614.938 433.113 597.477 415.652 575.938 415.652H388.37C366.831 415.652 349.37 433.113 349.37 454.652V511.741L110.949 511.741C110.949 432.623 150.12 344.185 219.845 288.24C289.57 232.295 384.138 200.865 482.744 200.865C581.35 200.865 675.918 232.295 745.643 288.24Z"
+                    fill="currentColor"
+                ></path>
+            </svg>
+        </a>
+
+        <script type="module">
+            import { Pane } from "https://cdn.skypack.dev/tweakpane@4.0.4";
+            import gsap from "https://cdn.skypack.dev/gsap@3.12.0";
+            import ScrollTrigger from "https://cdn.skypack.dev/gsap@3.12.0/ScrollTrigger";
+
+            const config = {
+                theme: "dark",
+                start: gsap.utils.random(0, 100, 1),
+                end: gsap.utils.random(900, 1000, 1),
+                scroll: true,
+            };
+
+            const ctrl = new Pane({
+                title: "Config",
+                expanded: true,
+            });
+
+            const update = () => {
+                document.documentElement.dataset.theme = config.theme;
+                document.documentElement.dataset.syncScrollbar = config.scroll;
+                document.documentElement.style.setProperty(
+                    "--start",
+                    config.start
+                );
+                document.documentElement.style.setProperty(
+                    "--scroller",
+                    config.start
+                );
+                document.documentElement.style.setProperty("--end", config.end);
+            };
+
+            const sync = (event) => {
+                if (
+                    !document.startViewTransition ||
+                    event.target.controller.view.labelElement.innerText !==
+                        "Theme"
+                )
+                    return update();
+                document.startViewTransition(() => update());
+            };
+
+            ctrl.addBinding(config, "start", {
+                label: "Hue Start",
+                min: 0,
+                max: 1000,
+                step: 1,
+            });
+            ctrl.addBinding(config, "end", {
+                label: "Hue End",
+                min: 0,
+                max: 1000,
+                step: 1,
+            });
+            ctrl.addBinding(config, "scroll", {
+                label: "Scrollbar",
+            });
+            ctrl.addBinding(config, "theme", {
+                label: "Theme",
+                options: {
+                    System: "system",
+                    Light: "light",
+                    Dark: "dark",
+                },
+            });
+
+            ctrl.on("change", sync);
+            update();
+
+            // backfill the scroll functionality with GSAP
+            if (
+                !CSS.supports(
+                    "(animation-timeline: scroll()) and (animation-range: 0% 100%)"
+                )
+            ) {
+                gsap.registerPlugin(ScrollTrigger);
+                const items = gsap.utils.toArray("ul li");
+                for (let i = 0; i < items.length; i++) {
+                    const item = items[i];
+                    gsap.set(item, { opacity: i !== 0 ? 0.2 : 1 });
+                    gsap.timeline({
+                        scrollTrigger: {
+                            scrub: 0.25,
+                            trigger: item,
+                            start: "center center+=4lh",
+                            end: "center center-=4lh",
+                        },
+                    })
+                        .to(item, {
+                            opacity: 1,
+                            ease: "none",
+                            duration: 0.1,
+                        })
+                        .to(item, {
+                            opacity: i !== items.length - 1 ? 0.2 : 1,
+                            ease: "none",
+                            duration: 0.1,
+                        });
+                }
+                // register scrollbar changer
+                gsap.fromTo(
+                    document.documentElement,
+                    { "--scroller": config.start },
+                    {
+                        "--scroller": config.end,
+                        ease: "none",
+                        scrollTrigger: {
+                            scrub: 0.1,
+                            trigger: "ul",
+                            start: "top center-=1lh",
+                            end: "bottom center+=1lh",
+                        },
+                    }
+                );
+                gsap.fromTo(
+                    document.documentElement,
+                    { "--chroma": 0 },
+                    {
+                        "--chroma": 0.3,
+                        duration: 0.1,
+                        ease: "none",
+                        scrollTrigger: {
+                            scrub: 0.2,
+                            trigger: "ul",
+                            start: "top center-=2lh",
+                            end: "top center",
+                        },
+                    }
+                );
+                gsap.fromTo(
+                    document.documentElement,
+                    { "--chroma": 0.3 },
+                    {
+                        "--chroma": 0,
+                        duration: 0.1,
+                        ease: "none",
+                        scrollTrigger: {
+                            scrub: 0.2,
+                            trigger: "ul",
+                            start: "bottom center+=2lh",
+                            end: "bottom center+=1lh",
+                        },
+                    }
+                );
+            }
+        </script>
+    </body>
+</html>

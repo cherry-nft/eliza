@@ -3,7 +3,7 @@ import { PatternData } from "./test-insert-example";
 export const gravitySimulatorPatterns = [
     {
         type: "layout",
-        pattern_name: "gravity-simulator-layout",
+        pattern_name: "Gravity Simulator Layout",
         content: {
             html: `<canvas id="pulsarCanvas"></canvas>
 <button id="fullscreenButton">Full Screen</button>
@@ -127,7 +127,7 @@ canvas {
     },
     {
         type: "game_mechanic",
-        pattern_name: "particle-gravity-physics",
+        pattern_name: "Particle Gravity Physics",
         content: {
             js: `const G = 6.67430e-11; // Gravitational constant
 const SCALE_FACTOR = 1e9; // Scale factor to make gravity more noticeable
@@ -255,7 +255,7 @@ Particle.prototype.update = function() {
     },
     {
         type: "animation",
-        pattern_name: "gravity-well-visualization",
+        pattern_name: "Gravity Well Visualization",
         content: {
             js: `function drawParticle() {
     ctx.globalAlpha = 1;
@@ -361,7 +361,7 @@ function animate() {
     },
     {
         type: "interaction",
-        pattern_name: "gravity-well-controls",
+        pattern_name: "Gravity Well Controls",
         content: {
             js: `function handleStart(event) {
     event.preventDefault();

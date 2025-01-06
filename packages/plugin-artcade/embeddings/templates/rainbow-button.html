@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <title>Rainbow Creator Button</title>
+        <style>
+            :root {
+                /* vars */
+                --h: 252;
+                --s: 85%;
+                --bg: hsl(var(--h), 85%, 22%);
+                --link: hsl(var(--h), 70%, 60%);
+                --linkh: hsl(150, 70%, 40%);
+                --spring-easing: linear(
+                    0,
+                    0.0015 0.4%,
+                    0.0093 1%,
+                    0.0352,
+                    0.0751 3.01%,
+                    0.1377 4.21%,
+                    0.2811 6.42%,
+                    0.7023 12.23%,
+                    0.8275 14.24%,
+                    0.9232,
+                    1.0011,
+                    1.0611,
+                    1.1039 21.46%,
+                    1.1208,
+                    1.1333 23.46%,
+                    1.1428 24.67%,
+                    1.1475,
+                    1.1462,
+                    1.1402,
+                    1.1304,
+                    1.1179 31.68%,
+                    1.0476 38.3%,
+                    1.017 41.71%,
+                    1.0032 43.72%,
+                    0.9935 45.52%,
+                    0.9857,
+                    0.9809 49.53%,
+                    0.9782 52.34%,
+                    0.9793 55.35%,
+                    0.9971 67.78%,
+                    1.0025 74.8%,
+                    1.0031 81.42%,
+                    0.9997 99.87%
+                );
+                --spring-duration: 0.9s;
+            }
+
+            @font-face {
+                font-family: "pkmn";
+                font-style: normal;
+                font-weight: 400;
+                font-display: swap;
+                src:
+                    url("https://assets.codepen.io/13471/Pokemon-DPPt.woff2")
+                        format("woff2"),
+                    url("https://assets.codepen.io/13471/pokemon-DPPt.woff")
+                        format("woff");
+            }
+
+            html,
+            body {
+                margin: 0;
+                padding: 0;
+            }
+
+            body {
+                background-image: linear-gradient(
+                    180deg,
+                    hsl(var(--h), var(--s), 90%),
+                    hsl(var(--h), var(--s), 80%)
+                );
+                min-height: 100vh;
+                display: grid;
+                place-content: center;
+            }
+
+            #app {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: space-between;
+                min-height: 90vh;
+            }
+
+            .btn {
+                font-family: "pkmn", sans-serif;
+                text-transform: none;
+                font-size: clamp(20px, 4vw, 7vh);
+                display: inline-flex;
+                width: auto;
+                padding: 0.5em;
+                border-radius: 0.875em;
+                box-shadow:
+                    inset 0 0px 0px 0.5px rgba(0, 0, 0, 0.2),
+                    rgba(0, 0, 0, 0.03) 0px 0.25em 0.3em -1px,
+                    rgba(0, 0, 0, 0.02) 0px 0.15em 0.25em -1px;
+                position: relative;
+                background: transparent;
+                outline: none;
+                border: none;
+                transform: scale(1);
+                z-index: 1;
+                transition:
+                    transform var(--spring-duration) var(--spring-easing),
+                    border 0.6s ease-out,
+                    box-shadow 0.3s ease-out,
+                    background 0.3s ease-out;
+            }
+
+            .btn span {
+                background: #3a3a3a;
+                background-image: linear-gradient(#434343, #2a2a2a);
+                padding: 1em 1.5em;
+                border-radius: 0.5em;
+                position: relative;
+                isolation: isolate;
+                box-shadow:
+                    rgba(0, 0, 0, 0.2) 0px 0.25em 0.3em -1px,
+                    rgba(0, 0, 0, 0.12) 0px 0.15em 0.25em -1px;
+                z-index: 1;
+            }
+            .btn span::before {
+                content: "";
+                position: absolute;
+                inset: 0.5em 0.75em;
+                background-image: linear-gradient(#2e2e2e, #474747);
+                border-radius: 4em;
+                z-index: -1;
+            }
+
+            .btn:hover {
+                opacity: 1;
+            }
+            .btn:focus,
+            .btn.active {
+                border-color: white;
+            }
+            .btn:active,
+            .btn.active {
+                transform: scale(0.975);
+                transition:
+                    transform 0.05s ease-out,
+                    border 0.6s ease-out,
+                    box-shadow 0.3s ease-out,
+                    background 0.3s ease-out;
+            }
+
+            .btn::before {
+                content: "";
+                position: absolute;
+                inset: 0em;
+                background-image: conic-gradient(
+                    from var(--mask) at 50% 50%,
+                    #22ffff 0%,
+                    #3c64ff 11%,
+                    #c03afc 22%,
+                    #ff54e8 33%,
+                    #ff5959 44%,
+                    #ff9a07ff 55%,
+                    #feff07ff 66%,
+                    #58ff07ff 77%,
+                    #07ff77ff 88%,
+                    #22ffff 100%
+                );
+                filter: blur(0.5em);
+                z-index: -2;
+                opacity: 0.4;
+                scale: 0.96 0.9;
+                border-radius: 0.75em;
+                transition: all 0.25s ease;
+            }
+            .btn:after {
+                z-index: -1;
+                content: "";
+                position: absolute;
+                inset: 0;
+                background: rgba(255, 255, 255, 0.2);
+                box-shadow:
+                    inset 0 1px 0px 0px rgba(255, 255, 255, 0.3),
+                    inset 0 -1px 0px 0px rgba(255, 255, 255, 0.6);
+                border-radius: 0.875em;
+                transition: all 0.25s ease;
+            }
+
+            .btn:hover::before,
+            .btn:focus::before {
+                opacity: 0.6;
+                scale: 1;
+                filter: blur(1em);
+            }
+            .btn:focus::before,
+            .btn.active::before {
+                animation: 2s ease-in-out pulse infinite both;
+            }
+            .btn:hover::after,
+            .btn:focus::after,
+            .btn.active::after {
+                background: rgba(255, 255, 255, 0.5);
+                backdrop-filter: blur(30px);
+                box-shadow:
+                    inset 0 1px 0px 0px rgba(255, 255, 255, 0.66),
+                    inset 0 -1px 0px 0px rgba(255, 255, 255, 0.5);
+            }
+
+            @property --mask {
+                syntax: "<angle>";
+                inherits: false;
+                initial-value: 30deg;
+            }
+
+            @keyframes pulse {
+                0%,
+                100% {
+                    opacity: 0.6;
+                    scale: 1;
+                    --mask: 30deg;
+                }
+                70% {
+                    --mask: 390deg;
+                }
+                85% {
+                    opacity: 0.4;
+                    scale: 0.96 0.9;
+                }
+                100% {
+                    --mask: 390deg;
+                }
+            }
+
+            .arrow {
+                position: absolute;
+                left: 50%;
+                top: 50%;
+                z-index: 2;
+                fill: white;
+                color: white;
+                width: 40px;
+                height: 40px;
+                stroke: black;
+                stroke-width: 20;
+                translate: 20px 20px;
+                filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.5))
+                    drop-shadow(0 4px 10px rgba(0, 0, 0, 0.25));
+                animation: arrow 3s ease both;
+            }
+            @keyframes arrow {
+                0% {
+                    opacity: 0;
+                    translate: 90px 60px;
+                }
+                35%,
+                49% {
+                    scale: 1;
+                    translate: 20px 20px;
+                    opacity: 1;
+                }
+                38% {
+                    scale: 0.75;
+                    translate: 22px 22px;
+                }
+                73% {
+                    translate: 28px 10px;
+                    opacity: 1;
+                }
+                100% {
+                    translate: 60px -90px;
+                    opacity: 0;
+                }
+            }
+
+            /* Social Icon styling */
+            .social-icon {
+                position: fixed;
+                bottom: 1em;
+                width: 2.5em;
+                height: 2.5em;
+                border-radius: 50%;
+                display: grid;
+                place-items: center;
+                text-decoration: none;
+                color: #222;
+                font-size: 0.75rem;
+                font-weight: bold;
+                background: #fff;
+                box-shadow: 0 3px 5px rgba(0, 0, 0, 0.2);
+                z-index: 10;
+            }
+            .codepen {
+                left: 1em;
+            }
+            .twitter {
+                left: 3.8em;
+            }
+            .github {
+                left: 6.6em;
+            }
+            .social-icon svg {
+                width: 60%;
+                height: 60%;
+                fill: currentColor;
+            }
+        </style>
+    </head>
+    <body>
+        <main id="app">
+            <h2>Rainbow Creator Button</h2>
+            <button class="btn">
+                <span>+ Add to Cart</span>
+            </button>
+        </main>
+
+        <svg
+            class="arrow"
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 320 512"
+        >
+            <path
+                d="M0 55.2L0 426c0 12.2 9.9 22 22 22c6.3 0 12.4-2.7 16.6-7.5L121.2 346l58.1 116.3c7.9 15.8 27.1 22.2 42.9 14.3s22.2-27.1 14.3-42.9L179.8 320l118.1 0c12.2 0 22.1-9.9 22.1-22.1c0-6.3-2.7-12.3-7.4-16.5L38.6 37.9C34.3 34.1 28.9 32 23.2 32C10.4 32 0 42.4 0 55.2z"
+            />
+        </svg>
+
+        <script>
+            const btn = document.querySelector(".btn");
+            setTimeout(() => {
+                btn.classList.add("active");
+            }, 1000);
+            setTimeout(() => {
+                btn.classList.remove("active");
+            }, 3000);
+        </script>
+    </body>
+</html>

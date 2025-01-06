@@ -32,18 +32,38 @@ export class ClaudeService implements PatternServiceInterface {
     private lastUsedPatterns: GamePattern[] = []; // Properly typed array
     private readonly PROMPT_TEMPLATE = `# System Prompt: Artcade [In Production]
 
-You are an expert web developer tasked with creating an interactive HTML experience. Your PRIMARY DIRECTIVE is to EXACTLY COPY the provided game mechanics code, only making minimal necessary adjustments. First, analyze this prompt:
+You are an expert web developer tasked with creating interactive HTML experiences. Your PRIMARY DIRECTIVE is to use the provided patterns as proven building blocks, adapting them to match the specific requirements. First, analyze this prompt:
 
 "{{user_prompt}}"
 
-CRITICAL INSTRUCTION - PATTERN REUSE AND COMBINATION:
-1. You MUST copy and combine ALL function implementations from the provided patterns
-2. DO NOT rewrite or simplify the mechanics - use them exactly as provided
-3. When combining patterns, merge their state and update loops
-4. Preserve all helper functions and state variables from each pattern
-5. Maintain the exact same logic flow and complexity from each pattern
-6. IMPORTANT: If multiple game mechanics are provided, you MUST implement ALL of them
-7. Use the game loop to coordinate updates between different mechanics
+CRITICAL INSTRUCTION - PROVEN PATTERNS AS BUILDING BLOCKS:
+
+These patterns are your foundation - they are PROVEN IN PRODUCTION and KNOWN TO WORK.
+They demonstrate best practices for:
+- Responsive layouts that adapt to any screen
+- Smooth animations and transitions
+- Accessible interactive elements
+- Optimized performance
+- Clean, maintainable code structure
+
+BUT THEY ARE MALLEABLE! You should:
+1. Use their core mechanics and structure
+2. But freely modify and adapt:
+   - Change colors, sizes, and visual styles
+   - Adjust grid/flex layouts to fit needs
+   - Replace icons and images
+   - Modify scoring and game rules
+   - Tweak animation timings
+   - Adapt interaction patterns
+
+The key is to preserve what makes them WORK:
+1. Keep the core functionality intact
+2. Maintain accessibility features
+3. Preserve responsive behavior
+4. Retain performance optimizations
+5. Follow the established code patterns
+
+Think of them as PROVEN TEMPLATES, not rigid structures. They show you HOW to build something that works, but you can adapt WHAT you build to match requirements.
 
 Here are the patterns you MUST incorporate:
 {{pattern_examples}}
@@ -219,11 +239,19 @@ Before returning, verify that your response includes ALL required fields and fol
                 (a, b) => b.effectiveness_score - a.effectiveness_score
             );
 
+            // Map patterns to their scores from the search results
+            const patternScores = new Map(
+                relevantPatterns.map((pattern) => [
+                    pattern.id,
+                    pattern.effectiveness_score,
+                ])
+            );
+
             console.log(
                 "[ClaudeService] Using patterns:",
                 sortedPatterns.map((p) => ({
                     type: p.type,
-                    score: p.effectiveness_score,
+                    score: patternScores.get(p.id) || 0,
                     name: p.pattern_name,
                 }))
             );
@@ -323,43 +351,83 @@ Before returning, verify that your response includes ALL required fields and fol
             sortedPatterns
                 .map(
                     (pattern) => `
-            ${pattern.type === "game_mechanic" ? "!!! CRITICAL GAME MECHANIC - YOU MUST USE THIS CODE !!!" : "Supporting Pattern"}
+            ${pattern.type === "game_mechanic" ? "!!! CRITICAL GAME MECHANIC - YOU MUST USE THIS CODE !!!" : "Production-Grade Pattern"}
             Pattern: ${pattern.pattern_name} (${pattern.type})
             Effectiveness Score: ${pattern.effectiveness_score}
 
-            Core Functionality to Preserve:
-            ${
-                pattern.content.js
-                    ? `
-            JavaScript (COPY THIS EXACTLY):
-            \`\`\`javascript
-            ${pattern.content.js}
-            \`\`\`
-            `
-                    : ""
+            This pattern demonstrates production-grade implementation of:
+            - ${
+                pattern.type === "layout"
+                    ? "Responsive layouts that adapt to any screen size and content"
+                    : pattern.type === "animation"
+                      ? "Smooth animations with proper timing and performance"
+                      : pattern.type === "interaction"
+                        ? "Accessible interactive elements with proper event handling"
+                        : pattern.type === "game_mechanic"
+                          ? "Core game mechanics with physics and state management"
+                          : "Interactive components with best practices"
             }
 
-            Required Structure:
-            \`\`\`html
-            ${pattern.content.html}
-            \`\`\`
+            Key Features to Preserve:
+            - Core functionality and mechanics
+            - Accessibility features (ARIA, keyboard nav)
+            - Responsive behavior
+            - Performance optimizations
+            - Clean code structure
 
-            ${
-                pattern.content.css
-                    ? `
-            Essential Styling:
-            \`\`\`css
-            ${pattern.content.css}
-            \`\`\`
-            `
-                    : ""
-            }
+            But Feel Free to Modify:
+            - Visual styles and theming
+            - Layout and positioning
+            - Content and assets
+            - Timing and speeds
+            - Game rules and scoring
+            - Number of elements
 
-            Integration Requirements:
-            1. Copy and adapt the core mechanics code
-            2. Preserve the physics and collision detection logic
-            3. Maintain the same function signatures
-            4. Only modify variable names if absolutely necessary
+            The pattern shows you HOW to build it right - you decide WHAT to build with it.
+
+            IMPORTANT: Copy the EXACT implementation from this pattern, including ALL HTML, CSS, and JavaScript.
+            DO NOT use comments or placeholders - the code must be complete and functional.
+
+            Here is the pattern to copy:
+
+            <!DOCTYPE html>
+            <html lang="en">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Responsive Card Grid</title>
+                <style>
+                ${pattern.content.css || ""}
+                </style>
+            </head>
+            <body>
+                ${pattern.content.html || ""}
+                <script>
+                ${pattern.content.js || ""}
+                </script>
+            </body>
+            </html>
+
+            CRITICAL: Your response must include the COMPLETE implementation above.
+            DO NOT use <!-- --> comments or // TODO markers.
+            The HTML, CSS, and JavaScript must be copied exactly as shown.
+
+            IMPLEMENTATION NOTES:
+
+            Study this pattern carefully. It shows you:
+            - How to structure the code for maintainability
+            - How to handle user interactions properly
+            - How to ensure responsive behavior
+            - How to optimize performance
+            - How to maintain accessibility
+
+            Remember:
+            1. NO placeholder comments or TODOs
+            2. NO incomplete implementations
+            3. Keep the core mechanics intact
+            4. But adapt everything else to your needs
+
+            The code below is your foundation - build on it to create something amazing!
             `
                 )
                 .join("\n\n=== NEXT PATTERN ===\n\n")
@@ -538,23 +606,63 @@ Before returning, verify that your response includes ALL required fields and fol
                 .replace(/\s*([{};,])/g, "$1") // Remove space before punctuation
                 .trim();
 
-            // Extract core game mechanics with more flexible matching
-            const mechanicPatterns = {
-                collision:
-                    /function\s+\w*(?:collision|hit|contact)\w*\s*\([^{]*\{[^}]*\}/g,
-                movement:
-                    /(?:moveForward|moveBackward|moveLeft|moveRight|velocity|direction|controls\.(?:moveRight|moveForward))/g,
-                shooting:
-                    /function\s+\w*(?:shoot|fire|launch|projectile)\w*\s*\([^{]*\{[^}]*\}/g,
-                gameLoop:
-                    /function\s+\w*(?:loop|update|tick|frame)\w*\s*\([^{]*\{[^}]*requestAnimationFrame[^}]*\}/g,
-                physics:
-                    /(?:velocity|speed|acceleration|direction|angle|force)\s*[=:]/g,
-                input: /(?:addEventListener|on(?:key|mouse|click|touch))/g,
-            };
+            // Extract patterns based on type
+            const patterns =
+                pattern.type === "game_mechanic"
+                    ? {
+                          collision:
+                              /function\s+\w*(?:collision|hit|contact)\w*\s*\([^{]*\{[^}]*\}/g,
+                          movement:
+                              /(?:moveForward|moveBackward|moveLeft|moveRight|velocity|direction|controls\.(?:moveRight|moveForward))/g,
+                          shooting:
+                              /function\s+\w*(?:shoot|fire|launch|projectile)\w*\s*\([^{]*\{[^}]*\}/g,
+                          gameLoop:
+                              /function\s+\w*(?:loop|update|tick|frame)\w*\s*\([^{]*\{[^}]*requestAnimationFrame[^}]*\}/g,
+                          physics:
+                              /(?:velocity|speed|acceleration|direction|angle|force)\s*[=:]/g,
+                          input: /(?:addEventListener|on(?:key|mouse|click|touch))/g,
+                      }
+                    : pattern.type === "layout"
+                      ? {
+                            grid: /display:\s*grid|grid-template|grid-area|grid-column|grid-row/g,
+                            flex: /display:\s*flex|flex-direction|justify-content|align-items/g,
+                            responsive:
+                                /media\s*queries|@media|min-width|max-width/g,
+                            positioning:
+                                /position:\s*(?:relative|absolute|fixed|sticky)/g,
+                            container: /container|wrapper|layout|section/g,
+                        }
+                      : pattern.type === "animation"
+                        ? {
+                              keyframes:
+                                  /@keyframes\s+[a-zA-Z-_0-9]+\s*{[^}]*}/g,
+                              transition: /transition:\s*[^;]+/g,
+                              transform: /transform:\s*[^;]+/g,
+                              animation: /animation:\s*[^;]+/g,
+                              timing: /ease|linear|cubic-bezier|steps/g,
+                          }
+                        : pattern.type === "interaction"
+                          ? {
+                                event: /addEventListener\(['"](?:click|mouseover|focus|blur|change|submit)['"]/g,
+                                state: /(?:let|const|var)\s+\w+State|useState|setState/g,
+                                handler:
+                                    /function\s+handle[A-Z]\w+|on[A-Z]\w+\s*=/g,
+                                validation:
+                                    /validate|isValid|checkForm|required/g,
+                                feedback:
+                                    /error|success|message|notification|alert/g,
+                            }
+                          : {
+                                // Default patterns for any other type
+                                structure:
+                                    /class="[^"]+"|id="[^"]+"|data-[a-zA-Z-]+="\w+"/g,
+                                style: /style="[^"]+"|className="[^"]+"/g,
+                                behavior:
+                                    /function\s+\w+\s*\([^)]*\)\s*{[^}]*}/g,
+                            };
 
-            // Extract mechanics using each pattern
-            Object.entries(mechanicPatterns).forEach(([type, regex]) => {
+            // Extract patterns based on type
+            Object.entries(patterns).forEach(([type, regex]) => {
                 let match: RegExpExecArray | null;
                 const matches = new Set(); // Track unique matches
                 while ((match = regex.exec(normalizedJs)) !== null) {
@@ -563,7 +671,7 @@ Before returning, verify that your response includes ALL required fields and fol
                         snippets.push({
                             type: "js",
                             snippet: match[0],
-                            context: `${type} mechanic`,
+                            context: `${type} ${pattern.type}`,
                         });
                     }
                 }
@@ -676,12 +784,69 @@ Before returning, verify that your response includes ALL required fields and fol
         const checks = this.lastUsedPatterns.map((pattern) => {
             const snippets = this.getDistinctiveSnippets(pattern);
             const foundSnippets = snippets.filter((s) => {
-                // Normalize both strings to handle whitespace variations
-                const normalizedSnippet = s.snippet.replace(/\s+/g, " ").trim();
-                const normalizedResponse = response.html
+                // Use regex to extract content since we're in Node environment
+                const extractedHtml =
+                    response.html.match(/<body[^>]*>([\s\S]*)<\/body>/i)?.[1] ||
+                    "";
+                const extractedCss =
+                    response.html.match(
+                        /<style[^>]*>([\s\S]*)<\/style>/i
+                    )?.[1] || "";
+                const extractedJs = (
+                    response.html.match(/<script[^>]*>([\s\S]*)<\/script>/gi) ||
+                    []
+                )
+                    .map((script) => script.replace(/<\/?script[^>]*>/gi, ""))
+                    .join("\n");
+
+                // Normalize both strings to handle whitespace and minor variations
+                const normalizedSnippet = s.snippet
                     .replace(/\s+/g, " ")
+                    .replace(/['"]/g, "") // Remove quotes as they might vary
+                    .replace(/\b(var|let|const)\b/g, "") // Ignore declaration keywords
                     .trim();
-                return normalizedResponse.includes(normalizedSnippet);
+
+                // Choose the right content to check based on snippet type
+                const contentToCheck =
+                    s.type === "html"
+                        ? extractedHtml
+                        : s.type === "css"
+                          ? extractedCss
+                          : extractedJs;
+
+                const normalizedContent = contentToCheck
+                    .replace(/\s+/g, " ")
+                    .replace(/['"]/g, "")
+                    .replace(/\b(var|let|const)\b/g, "")
+                    .trim();
+
+                // For CSS/HTML, do direct includes
+                if (s.type === "css" || s.type === "html") {
+                    return normalizedContent.includes(normalizedSnippet);
+                }
+
+                // For JS, be more flexible with function/class implementations
+                const jsPatterns = {
+                    class: /class\s+(\w+)/,
+                    function: /function\s+(\w+)/,
+                    method: /(\w+)\s*\([^)]*\)\s*{/,
+                };
+
+                // If it's a structural pattern (class/function definition)
+                for (const [type, pattern] of Object.entries(jsPatterns)) {
+                    const snippetMatch = normalizedSnippet.match(pattern);
+                    if (snippetMatch) {
+                        // Look for similar structure rather than exact match
+                        const responsePattern = new RegExp(
+                            pattern.source.replace("\\w+", "\\w+"),
+                            "g"
+                        );
+                        return responsePattern.test(normalizedContent);
+                    }
+                }
+
+                // Fallback to direct includes for other JS patterns
+                return normalizedContent.includes(normalizedSnippet);
             });
 
             return {
@@ -749,7 +914,7 @@ Before returning, verify that your response includes ALL required fields and fol
                     "X-Title": "Cursor",
                 },
                 body: JSON.stringify(requestBody),
-                signal: AbortSignal.timeout(60000),
+                signal: AbortSignal.timeout(180000), // 3 minutes
             });
 
             console.log(
@@ -794,6 +959,9 @@ Before returning, verify that your response includes ALL required fields and fol
                 );
 
                 pattern = JSON.parse(cleanContent);
+
+                // No validation - let Claude be creative with the patterns
+
                 console.log(
                     "[ClaudeService] Successfully parsed JSON response"
                 );

@@ -1,0 +1,2938 @@
+<html><head><base href="none">
+<style>
+  /* Style section remains identical */
+  body {
+    margin: 0;
+    overflow: hidden;
+    background: linear-gradient(#1a1a1a, #4a4a4a);
+  }
+
+  .game-container {
+    width: 100vw;
+    height: 100vh;
+    position: relative;
+  }
+
+  .character {
+    position: absolute;
+    width: 64px;
+    height: 64px;
+    transform-origin: bottom center;
+    bottom: 50px;
+  }
+
+  #player2 {
+    width: 64px;  
+    height: 64px; 
+  }
+
+  .character img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    image-rendering: pixelated;
+    position: absolute;
+    bottom: 0;
+  }
+
+  .character[data-character="tails"] img {
+    width: 130px;
+    height: 130px;
+    bottom: -30px;
+  }
+
+  .character[data-character="sonic"] img {
+    width: 72px; 
+    height: 72px;
+    bottom: 0;
+    position: absolute;
+  }
+
+  .character[data-character="sonic"] img[src*="sonic-rolling.gif"],
+  .character[data-character="sonic"] img[src*="16_bit_sonic_by_nathanmarino_d4nscn2.png"] {
+    width: 72px;
+    height: 72px;
+    bottom: 0;
+  }
+
+  .character[data-character="wario"] img {
+    width: 80px;
+    height: 80px;
+    bottom: 0;
+    position: absolute;
+  }
+
+  .character[data-character="knuckles"] img {
+    width: 72px;
+    height: 72px;
+    bottom: 0;
+    position: absolute;
+  }
+
+  .character[data-character="amy"] img {
+    width: 72px;
+    height: 72px;
+    bottom: 0;
+    position: absolute;
+  }
+
+  .character[data-character="waluigi"] img {
+    width: 80px;
+    height: 80px;
+    bottom: 0;
+    position: absolute;
+  }
+
+  .character[data-character="toad"] img {
+    width: 64px;
+    height: 64px;
+    bottom: 0;
+    position: absolute;
+  }
+
+  .character[data-character="rouge"] img {
+    width: 72px;
+    height: 72px;
+    bottom: 0;
+    position: absolute;
+  }
+
+  .character[data-character="koopa"] img {
+    width: 64px;
+    height: 64px;
+    bottom: 0;
+    position: absolute;
+  }
+
+  .character[data-character="goomba"] img {
+    width: 64px;
+    height: 64px;
+    bottom: 0;
+    position: absolute;
+  }
+
+  .health-bar {
+    position: absolute;
+    top: 20px;
+    width: 200px;
+    height: 20px;
+    background: #333;
+    border: 2px solid #fff;
+  }
+
+  #player1-health {
+    left: 20px;
+  }
+
+  #player2-health {
+    right: 20px;
+  }
+
+  .health-fill {
+    height: 100%;
+    background: #ff3333;
+    transition: width 0.3s;
+  }
+
+  .health-text {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 14px;
+    color: white;
+    z-index: 1;
+    text-shadow: 1px 1px 1px #000;
+    white-space: nowrap;
+  }
+
+  .platform {
+    position: absolute;
+    bottom: 0;
+    width: 100%;
+    height: 50px;
+    background: linear-gradient(#4a4a4a, #2a2a2a);
+  }
+
+  .controls {
+    position: absolute;
+    bottom: 20px;
+    color: white;
+    font-family: Arial;
+    padding: 10px;
+  }
+
+  .hit-effect {
+    position: absolute;
+    pointer-events: none;
+    animation: hitFlash 0.3s forwards;
+    z-index: 1000;
+  }
+
+  @keyframes hitFlash {
+    0% { transform: scale(1); opacity: 1; }
+    100% { transform: scale(2); opacity: 0; }
+  }
+
+  .hitbox {
+    position: absolute;
+    border: 1px solid rgba(255, 0, 0, 0.3);
+    pointer-events: none;
+    display: none;
+  }
+  
+  .shield-effect {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border: 3px solid #00ff00;
+    border-radius: 50%;
+    pointer-events: none;
+    opacity: 0.5;
+    display: none;
+    transition: transform 0.2s ease-out; 
+  }
+
+  .character-grid {
+    max-height: 400px;
+    overflow-y: auto;
+    padding-right: 10px;
+  }
+
+  .character-grid::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .character-grid::-webkit-scrollbar-track {
+    background: rgba(0,0,0,0.1);
+    border-radius: 4px;
+  }
+
+  .character-grid::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.3);
+    border-radius: 4px;
+  }
+
+  .character-grid::-webkit-scrollbar-thumb:hover {
+    background: rgba(255,255,255,0.5);
+  }
+  
+  .ai-level-select {
+    display: flex;
+    gap: 10px;
+    margin: 10px 0;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .ai-level-btn {
+    padding: 5px 10px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    opacity: 0.7;
+  }
+
+  .ai-level-btn.selected {
+    opacity: 1;
+    font-weight: bold;
+    outline: 2px solid white;
+  }
+
+  .ai-level-btn.easy { background: #4CAF50; }
+  .ai-level-btn.normal { background: #FFC107; }
+  .ai-level-btn.hard { background: #F44336; }
+  .ai-level-btn.insane { background: #9C27B0; }
+  .ai-level-btn.nightmare { background: #9400D3; }
+  .ai-level-btn.godly { background: #FFD700; }
+  
+  /* Add styles for win animation sprites */
+  .winner-sprite img {
+    image-rendering: pixelated;
+  }
+  
+  /* Add after existing character data-character rules */
+  .character[data-character="sanic"] img {
+    width: 72px;
+    height: 72px;
+    bottom: 0;
+    position: absolute;
+  }
+  /* Add after existing character data-character rules */
+  .character[data-character="silver"] img {
+    width: 72px;
+    height: 72px;
+    bottom: 0;
+    position: absolute;
+  }
+  
+  /* Add after other character data-character rules */
+  .character[data-character="mayro"] img {
+    width: 64px;
+    height: 64px;
+    bottom: 0;
+    position: absolute;
+  }
+  
+  /* Add after existing character data-character rules */
+  .character[data-character="shedew"] img {
+    width: 72px;
+    height: 72px;
+    bottom: 0;
+    position: absolute;
+  }
+  
+  /* Add after existing character data-character rules */
+  .character[data-character="theghostnoobterrorsanic"] img {
+    width: 72px;
+    height: 72px;
+    bottom: 0;
+    position: absolute;
+  }
+  
+  /* Add after other character data-character rules */
+  .character[data-character="luggy"] img {
+    width: 64px;
+    height: 64px;
+    bottom: 0;  
+    position: absolute;
+  }
+
+  .character[data-character="mayro3d"] img {
+    width: 64px;
+    height: 64px;
+    bottom: 0;
+    position: absolute;
+  }
+  
+  /* Add after existing character data-character rules */
+  .character[data-character="taels"] img {
+    width: 72px;
+    height: 72px;
+    bottom: 0;
+    position: absolute;
+  }
+  
+  /* Add after other character data-character rules */
+  .character[data-character="wayro"] img {
+    width: 64px;
+    height: 64px;
+    bottom: 0;
+    position: absolute;
+  }
+  
+  /* Add after other character data-character rules */
+  .character[data-character="ugandanknuckles"] img {
+    width: 72px;
+    height: 72px; 
+    bottom: 0;
+    position: absolute;
+  }
+  
+  /* Add after other character data-character rules */
+  .character[data-character="waluggy"] img {
+    width: 64px;
+    height: 64px;
+    bottom: 0;
+    position: absolute;
+  }
+  
+  /* Add after other character data-character rules */
+  .character[data-character="sankinc"] img {
+    width: 72px;
+    height: 72px;
+    bottom: 0;
+    position: absolute;
+  }
+
+  .character[data-character="trails"] img {
+    width: 72px;
+    height: 72px;
+    bottom: 0;
+    position: absolute;
+  }
+
+  .character[data-character="shedoe"] img {
+    width: 72px;
+    height: 72px;
+    bottom: 0;
+    position: absolute;
+  }
+
+  .character[data-character="kneecles"] img {
+    width: 72px;
+    height: 72px;
+    bottom: 0;
+    position: absolute;
+  }
+  
+  /* Add this CSS rule after other character data-character rules */
+  .character[data-character="weegee"] img {
+    width: 85px !important;  
+    height: 85px !important; 
+    bottom: 0;
+    position: absolute;
+  }
+  
+  /* Add after last character data-character rule */
+  .character[data-character="weegeeReuploadPopgamer06"] img {
+    width: 85px !important;
+    height: 85px !important;
+    bottom: 0;
+    position: absolute;
+  }
+  
+  /* Add after last character CSS rule */
+  .character[data-character="sakincremake"] img {
+    width: 72px;
+    height: 72px;
+    bottom: 0;
+    position: absolute;
+  }
+  /* Add after existing character data-character rules */
+  .character[data-character="eggman"] img {
+    width: 72px;
+    height: 72px;
+    bottom: 0;
+    position: absolute;
+  }
+  
+  /* Add this after other character CSS rules */
+  .character[data-character="bowser"] img {
+    width: 80px;
+    height: 80px;
+    bottom: 0;
+    position: absolute;
+  }
+  
+  /* Add after existing character data-character rules */
+  .character[data-character="malleo"] img {
+    width: 85px !important;
+    height: 85px !important;
+    bottom: 0;
+    position: absolute;
+  }
+  
+  /* Add after other character data-character rules */
+  .character[data-character="bigthecat"] img {
+    width: 80px;
+    height: 80px;
+    bottom: 0;
+    position: absolute;
+  }
+  
+  /* Add after other character rules */
+  .character[data-character="spiny"] img {
+    width: 64px;
+    height: 64px;
+    bottom: 0;
+    position: absolute;
+  }
+  
+  #settings-button {
+    position: fixed;  
+    bottom: 20px;
+    right: 20px;
+    z-index: 1001;
+    padding: 10px 20px;
+  }
+  #credits-button {
+    position: fixed;  
+    bottom: 20px;
+    left: 20px;
+    z-index: 1001;
+    padding: 10px 20px;
+    display: block;
+  }
+  /* Add after existing styles */
+  .stats-container {
+    color: white;
+    font-size: 12px;
+    margin-top: 5px;
+    text-align: left;
+    padding: 5px;
+    background: rgba(0,0,0,0.5);
+    border-radius: 4px;
+  }
+
+  .stat-bar {
+    width: 100%;
+    height: 8px;
+    background: #333;
+    margin: 2px 0;
+    border-radius: 4px;
+  }
+
+  .stat-fill {
+    height: 100%;
+    border-radius: 4px;
+  }
+
+  .power-fill { background: #ff4444; }
+  .speed-fill { background: #44ff44; }
+  .weight-fill { background: #4444ff; }
+  .jump-fill { background: #ffff44; }
+  .smartness-fill { background: #aa44ff; }
+  
+  /* Add after other styles */
+  #ideas-button {
+    position: fixed;
+    bottom: 20px;
+    right: 150px; 
+    z-index: 1001;
+    padding: 10px 20px;
+    display: block;
+  }
+
+  #ideas-panel {
+    display: none;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0,0,0,0.9);
+    padding: 20px;
+    border-radius: 10px;
+    z-index: 2000;
+    color: white;
+    font-family: Arial;
+    max-width: 600px;
+  }
+
+  .contributor {
+    display: flex;
+    align-items: center;
+    margin: 10px 0;
+    gap: 15px;
+  }
+
+  .contributor img {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+  }
+
+  .mobile-controls {
+    display: none;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 150px;
+    background: rgba(0,0,0,0.5);
+    z-index: 1000;
+  }
+
+  .mobile-controls.active {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px;
+  }
+
+  .control-group {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .mobile-btn {
+    width: 60px;
+    height: 60px;
+    background: rgba(255,255,255,0.2);
+    border: 2px solid white;
+    border-radius: 50%;
+    color: white;
+    font-size: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    touch-action: manipulation;
+    user-select: none;
+  }
+
+  .mobile-btn:active {
+    background: rgba(255,255,255,0.4);
+  }
+  
+  /* Add after other character data-character rules */
+  .character[data-character="yoshi"] img {
+    width: 64px;
+    height: 64px;
+    bottom: 0;
+    position: absolute;
+  }
+
+  .character[data-character="motobug"] img {
+    width: 64px;
+    height: 64px;
+    bottom: 0;
+    position: absolute;
+  }
+  
+  /* Add after other styles */
+  #create-character-button {
+    position: fixed;
+    bottom: 20px; 
+    right: 300px;  
+    z-index: 1001;
+    padding: 10px 20px;
+    background: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+
+  #character-creator {
+    display: none;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0,0,0,0.9);
+    padding: 20px;
+    border-radius: 10px;
+    z-index: 2000;
+    color: white;
+    font-family: Arial;
+    max-width: 600px;
+    max-height: 90vh;
+    overflow-y: auto;
+    width: 90%;
+  }
+
+  #character-creator h2 {
+    color: white;
+    margin-top: 0;
+    text-align: center;
+  }
+
+  #character-creator .creator-form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  #character-creator label {
+    color: white;
+    display: block;
+    margin: 5px 0;
+    font-size: 14px;
+  }
+
+  #character-creator input[type="text"],
+  #character-creator input[type="number"],
+  #character-creator select {
+    width: 100%;
+    padding: 8px;
+    margin: 2px 0;
+    background: rgba(255,255,255,0.9);
+    border: none;
+    border-radius: 4px;
+    font-size: 14px;
+  }
+
+  #character-creator .sprite-preview {
+    border: 2px dashed white;
+    margin: 15px auto;
+    padding: 10px;
+    text-align: center;
+    background: rgba(255,255,255,0.1);
+  }
+
+  #character-creator .sprite-preview img {
+    max-width: 100%;
+    max-height: 200px;
+    object-fit: contain;
+  }
+
+  #character-creator button {
+    background: #4CAF50;
+    color: white;
+    border: none;
+    padding: 12px 20px;
+    margin: 5px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background 0.3s;
+  }
+
+  #character-creator button:hover {
+    background: #45a049;
+  }
+  
+  /* Add after other character data-character rules */
+  .character[data-character="walleo"] img {
+    width: 85px !important;
+    height: 85px !important;
+    bottom: 0;
+    position: absolute;
+  }
+
+  .character[data-character="waweegee"] img {
+    width: 85px !important;
+    height: 85px !important;
+    bottom: 0;
+    position: absolute;
+  }
+</style>
+</head>
+<body>
+<button id="create-character-button">Create Character</button>
+<div id="character-creator">
+  <h2>Create Custom Character</h2>
+  <div class="creator-form">
+    <label>Character Name: 
+      <input type="text" id="char-name" placeholder="Enter character name">
+    </label>
+    
+    <label>Sprite URLs:</label>
+    <label>Idle: 
+      <input type="text" id="sprite-idle" placeholder="Enter idle sprite URL">
+    </label>
+    <label>Walk: 
+      <input type="text" id="sprite-walk" placeholder="Enter walk sprite URL">
+    </label>  
+    <label>Jump: 
+      <input type="text" id="sprite-jump" placeholder="Enter jump sprite URL">
+    </label>
+    <label>Attack: 
+      <input type="text" id="sprite-attack" placeholder="Enter attack sprite URL">
+    </label>
+    <label>Hit: 
+      <input type="text" id="sprite-hit" placeholder="Enter hit sprite URL">
+    </label>
+    <label>Win: 
+      <input type="text" id="sprite-win" placeholder="Enter win sprite URL">
+    </label>
+
+    <label>Power (1-15): 
+      <input type="number" id="char-power" min="1" max="15" value="10">
+    </label>
+    <label>Speed (1-5): 
+      <input type="number" id="char-speed" min="1" max="5" step="0.1" value="3.0">
+    </label>
+    <label>Weight (0.5-1.5): 
+      <input type="number" id="char-weight" min="0.5" max="1.5" step="0.1" value="1.0">
+    </label>
+    <label>Jump Power (5-15): 
+      <input type="number" id="char-jump" min="5" max="15" value="10">
+    </label>
+    <label>Size: 
+      <select id="char-size">
+        <option value="64">Small (64x64)</option>
+        <option value="72">Medium (72x72)</option>
+        <option value="80">Large (80x80)</option>
+        <option value="85">Extra Large (85x85)</option>
+      </select>
+    </label>
+
+    <div class="sprite-preview">
+      <img id="sprite-preview-img" alt="Sprite preview">
+    </div>
+
+    <button id="save-character">Create Character</button>
+    <button id="close-creator">Cancel</button>
+  </div>
+</div>
+<div id="character-select" style="position: absolute; width: 100%; height: 100vh; background: rgba(0,0,0,0.9); z-index: 1000; display: flex; flex-direction: column; overflow: hidden;">
+  <h1 style="color: white; text-align: center;">Character Select</h1>
+  
+  <div style="display: flex; justify-content: space-around; flex: 1; overflow: hidden;">
+    <!-- Mario Characters -->
+    <div style="background: rgba(255,0,0,0.2); padding: 20px; border-radius: 10px; height: 100%; display: flex; flex-direction: column;">
+      <h2 style="color: white; text-align: center;">Mario Characters</h2>
+      <div class="character-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; max-height: 400px; overflow-y: auto;">
+        <div class="character-option" data-character="mario" style="cursor: pointer; text-align: center;">
+          <img src="ddxppzn-7bdd25c6-550b-40bc-8cb4-72a3cdc37438.gif" style="width: 100px; height: 100px; object-fit: contain;">
+          <p style="color: white;">Mario</p>
+          <div class="stats-container">
+            <div>Power: <div class="stat-bar"><div class="stat-fill power-fill" style="width: 0%"></div></div></div>
+            <div>Speed: <div class="stat-bar"><div class="stat-fill speed-fill" style="width: 0%"></div></div></div>
+            <div>Weight: <div class="stat-bar"><div class="stat-fill weight-fill" style="width: 0%"></div></div></div>
+            <div>Jump: <div class="stat-bar"><div class="stat-fill jump-fill" style="width: 0%"></div></div></div>
+            <div>Smartness: <div class="stat-bar"><div class="stat-fill smartness-fill" style="width: 0%"></div></div></div>
+          </div>
+        </div>
+        <div class="character-option" data-character="luigi" style="cursor: pointer; text-align: center;">
+          <img src="ddxxls8-51ece259-b89f-4ede-a4dd-3639c360ee4e.gif" style="width: 100px; height: 100px; object-fit: contain;"> 
+          <p style="color: white;">Luigi</p>
+          <div class="stats-container">
+            <div>Power: <div class="stat-bar"><div class="stat-fill power-fill" style="width: 0%"></div></div></div>
+            <div>Speed: <div class="stat-bar"><div class="stat-fill speed-fill" style="width: 0%"></div></div></div>
+            <div>Weight: <div class="stat-bar"><div class="stat-fill weight-fill" style="width: 0%"></div></div></div>
+            <div>Jump: <div class="stat-bar"><div class="stat-fill jump-fill" style="width: 0%"></div></div></div>
+            <div>Smartness: <div class="stat-bar"><div class="stat-fill smartness-fill" style="width: 0%"></div></div></div>
+          </div>
+        </div>
+        <div class="character-option" data-character="wario" style="cursor: pointer; text-align: center;">
+          <img src="tumblr_mlm1svFiko1rrftcdo1_500 (1).webp" style="width: 100px; height: 100px; object-fit: contain;">
+          <p style="color: white;">Wario</p>
+          <div class="stats-container">
+            <div>Power: <div class="stat-bar"><div class="stat-fill power-fill" style="width: 0%"></div></div></div>
+            <div>Speed: <div class="stat-bar"><div class="stat-fill speed-fill" style="width: 0%"></div></div></div>
+            <div>Weight: <div class="stat-bar"><div class="stat-fill weight-fill" style="width: 0%"></div></div></div>
+            <div>Jump: <div class="stat-bar"><div class="stat-fill jump-fill" style="width: 0%"></div></div></div>
+            <div>Smartness: <div class="stat-bar"><div class="stat-fill smartness-fill" style="width: 0%"></div></div></div>
+          </div>
+        </div>
+        <div class="character-option" data-character="waluigi" style="cursor: pointer; text-align: center;">
+          <img src="waluigiIdle.webp" style="width: 100px; height: 100px; object-fit: contain;">
+          <p style="color: white;">Waluigi</p>
+          <div class="stats-container">
+            <div>Power: <div class="stat-bar"><div class="stat-fill power-fill" style="width: 0%"></div></div></div>
+            <div>Speed: <div class="stat-bar"><div class="stat-fill speed-fill" style="width: 0%"></div></div></div>
+            <div>Weight: <div class="stat-bar"><div class="stat-fill weight-fill" style="width: 0%"></div></div></div>
+            <div>Jump: <div class="stat-bar"><div class="stat-fill jump-fill" style="width: 0%"></div></div></div>
+            <div>Smartness: <div class="stat-bar"><div class="stat-fill smartness-fill" style="width: 0%"></div></div></div>
+          </div>
+        </div>
+        <div class="character-option" data-character="toad" style="cursor: pointer; text-align: center;">
+          <img src="Toad_Idle (1).webp" style="width: 100px; height: 100px; object-fit: contain;">
+          <p style="color: white;">Toad</p>
+          <div class="stats-container">
+            <div>Power: <div class="stat-bar"><div class="stat-fill power-fill" style="width: 0%"></div></div></div>
+            <div>Speed: <div class="stat-bar"><div class="stat-fill speed-fill" style="width: 0%"></div></div></div>
+            <div>Weight: <div class="stat-bar"><div class="stat-fill weight-fill" style="width: 0%"></div></div></div>
+            <div>Jump: <div class="stat-bar"><div class="stat-fill jump-fill" style="width: 0%"></div></div></div>
+            <div>Smartness: <div class="stat-bar"><div class="stat-fill smartness-fill" style="width: 0%"></div></div></div>
+          </div>
+        </div>
+        <div class="character-option" data-character="koopa" style="cursor: pointer; text-align: center;">
+          <img src="Koopa Idle.webp" style="width: 100px; height: 100px; object-fit: contain;">
+          <p style="color: white;">Koopa</p>
+          <div class="stats-container">
+            <div>Power: <div class="stat-bar"><div class="stat-fill power-fill" style="width: 0%"></div></div></div>
+            <div>Speed: <div class="stat-bar"><div class="stat-fill speed-fill" style="width: 0%"></div></div></div>
+            <div>Weight: <div class="stat-bar"><div class="stat-fill weight-fill" style="width: 0%"></div></div></div>
+            <div>Jump: <div class="stat-bar"><div class="stat-fill jump-fill" style="width: 0%"></div></div></div>
+            <div>Smartness: <div class="stat-bar"><div class="stat-fill smartness-fill" style="width: 0%"></div></div></div>
+          </div>
+        </div>
+        <div class="character-option" data-character="goomba" style="cursor: pointer; text-align: center;">
+          <img src="goomba idle.webp" style="width: 100px; height: 100px; object-fit: contain;">
+          <p style="color: white;">Goomba</p>
+          <div class="stats-container">
+            <div>Power: <div class="stat-bar"><div class="stat-fill power-fill" style="width: 0%"></div></div></div>
+            <div>Speed: <div class="stat-bar"><div class="stat-fill speed-fill" style="width: 0%"></div></div></div>
+            <div>Weight: <div class="stat-bar"><div class="stat-fill weight-fill" style="width: 0%"></div></div></div>
+            <div>Jump: <div class="stat-bar"><div class="stat-fill jump-fill" style="width: 0%"></div></div></div>
+            <div>Smartness: <div class="stat-bar"><div class="stat-fill smartness-fill" style="width: 0%"></div></div></div>
+          </div>
+        </div>
+        <div class="character-option" data-character="bowser" style="cursor: pointer; text-align: center;">
+          <img src="Bowser Idle.webp" style="width: 100px; height: 100px; object-fit: contain;">
+          <p style="color: white;">Bowser</p>
+          <div class="stats-container">
+            <div>Power: <div class="stat-bar"><div class="stat-fill power-fill" style="width: 0%"></div></div></div>
+            <div>Speed: <div class="stat-bar"><div class="stat-fill speed-fill" style="width: 0%"></div></div></div>
+            <div>Weight: <div class="stat-bar"><div class="stat-fill weight-fill" style="width: 0%"></div></div></div>
+            <div>Jump: <div class="stat-bar"><div class="stat-fill jump-fill" style="width: 0%"></div></div></div>
+            <div>Smartness: <div class="stat-bar"><div class="stat-fill smartness-fill" style="width: 0%"></div></div></div>
+          </div>
+        </div>
+        <div class="character-option" data-character="spiny" style="cursor: pointer; text-align: center;">
+          <img src="spiny hurt (1).webp" style="width: 100px; height: 100px; object-fit: contain;">
+          <p style="color: white;">Spiny</p>
+          <div class="stats-container">
+            <div>Power: <div class="stat-bar"><div class="stat-fill power-fill" style="width: 0%"></div></div></div>
+            <div>Speed: <div class="stat-bar"><div class="stat-fill speed-fill" style="width: 0%"></div></div></div>
+            <div>Weight: <div class="stat-bar"><div class="stat-fill weight-fill" style="width: 0%"></div></div></div>
+            <div>Jump: <div class="stat-bar"><div class="stat-fill jump-fill" style="width: 0%"></div></div></div>
+            <div>Smartness: <div class="stat-bar"><div class="stat-fill smartness-fill" style="width: 0%"></div></div></div>
+          </div>
+        </div>
+        <div class="character-option" data-character="yoshi" style="cursor: pointer; text-align: center;">
+          <img src="Yoshi idle.gif" style="width: 100px; height: 100px; object-fit: contain;">
+          <p style="color: white;">Yoshi</p>
+          <div class="stats-container">
+            <div>Power: <div class="stat-bar"><div class="stat-fill power-fill" style="width: 0%"></div></div></div>
+            <div>Speed: <div class="stat-bar"><div class="stat-fill speed-fill" style="width: 0%"></div></div></div>
+            <div>Weight: <div class="stat-bar"><div class="stat-fill weight-fill" style="width: 0%"></div></div></div>
+            <div>Jump: <div class="stat-bar"><div class="stat-fill jump-fill" style="width: 0%"></div></div></div>
+            <div>Smartness: <div class="stat-bar"><div class="stat-fill smartness-fill" style="width: 0%"></div></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Sonic Characters -->
+    <div style="background: rgba(0,0,255,0.2); padding: 20px; border-radius: 10px; height: 100%; display: flex; flex-direction: column;">
+      <h2 style="color: white; text-align: center;">Sonic Characters</h2>
+      <div class="character-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; max-height: 400px; overflow-y: auto;">
+        <div class="character-option" data-character="sonic" style="cursor: pointer; text-align: center;">
+          <img src="dhb55yz-56742888-dfb3-4fae-8980-78152da5597e.gif" style="width: 100px; height: 100px; object-fit: contain;">
+          <p style="color: white;">Sonic</p>
+          <div class="stats-container">
+            <div>Power: <div class="stat-bar"><div class="stat-fill power-fill" style="width: 0%"></div></div></div>
+            <div>Speed: <div class="stat-bar"><div class="stat-fill speed-fill" style="width: 0%"></div></div></div>
+            <div>Weight: <div class="stat-bar"><div class="stat-fill weight-fill" style="width: 0%"></div></div></div>
+            <div>Jump: <div class="stat-bar"><div class="stat-fill jump-fill" style="width: 0%"></div></div></div>
+            <div>Smartness: <div class="stat-bar"><div class="stat-fill smartness-fill" style="width: 0%"></div></div></div>
+          </div>
+        </div>
+        <div class="character-option" data-character="tails" style="cursor: pointer; text-align: center;">
+          <img src="dg4op94-73bcd03d-f105-4801-8ec6-224ac81fe406.gif" style="width: 100px; height: 100px; object-fit: contain;">
+          <p style="color: white;">Tails</p>
+          <div class="stats-container">
+            <div>Power: <div class="stat-bar"><div class="stat-fill power-fill" style="width: 0%"></div></div></div>
+            <div>Speed: <div class="stat-bar"><div class="stat-fill speed-fill" style="width: 0%"></div></div></div>
+            <div>Weight: <div class="stat-bar"><div class="stat-fill weight-fill" style="width: 0%"></div></div></div>
+            <div>Jump: <div class="stat-bar"><div class="stat-fill jump-fill" style="width: 0%"></div></div></div>
+            <div>Smartness: <div class="stat-bar"><div class="stat-fill smartness-fill" style="width: 0%"></div></div></div>
+          </div>
+        </div>
+        <div class="character-option" data-character="knuckles" style="cursor: pointer; text-align: center;">
+          <img src="di6hd62-4bec48a2-63c0-44da-90bf-781e4b76d77d.gif" style="width: 100px; height: 100px; object-fit: contain;">
+          <p style="color: white;">Knuckles</p>
+          <div class="stats-container">
+            <div>Power: <div class="stat-bar"><div class="stat-fill power-fill" style="width: 0%"></div></div></div>
+            <div>Speed: <div class="stat-bar"><div class="stat-fill speed-fill" style="width: 0%"></div></div></div>
+            <div>Weight: <div class="stat-bar"><div class="stat-fill weight-fill" style="width: 0%"></div></div></div>
+            <div>Jump: <div class="stat-bar"><div class="stat-fill jump-fill" style="width: 0%"></div></div></div>
+            <div>Smartness: <div class="stat-bar"><div class="stat-fill smartness-fill" style="width: 0%"></div></div></div>
+          </div>
+        </div>
+        <div class="character-option" data-character="shadow" style="cursor: pointer; text-align: center;">
+          <img src="dc2n7bp-c4f0ea9f-cdb4-44cf-9ba7-68a24791cbe8.gif" style="width: 100px; height: 100px; object-fit: contain;">
+          <p style="color: white;">Shadow</p>
+          <div class="stats-container">
+            <div>Power: <div class="stat-bar"><div class="stat-fill power-fill" style="width: 0%"></div></div></div>
+            <div>Speed: <div class="stat-bar"><div class="stat-fill speed-fill" style="width: 0%"></div></div></div>
+            <div>Weight: <div class="stat-bar"><div class="stat-fill weight-fill" style="width: 0%"></div></div></div>
+            <div>Jump: <div class="stat-bar"><div class="stat-fill jump-fill" style="width: 0%"></div></div></div>
+            <div>Smartness: <div class="stat-bar"><div class="stat-fill smartness-fill" style="width: 0%"></div></div></div>
+          </div>
+        </div>
+        <div class="character-option" data-character="amy" style="cursor: pointer; text-align: center;">
+          <img src="amyidle (1).gif" style="width: 100px; height: 100px; object-fit: contain;">
+          <p style="color: white;">Amy Rose</p>
+          <div class="stats-container">
+            <div>Power: <div class="stat-bar"><div class="stat-fill power-fill" style="width: 0%"></div></div></div>
+            <div>Speed: <div class="stat-bar"><div class="stat-fill speed-fill" style="width: 0%"></div></div></div>
+            <div>Weight: <div class="stat-bar"><div class="stat-fill weight-fill" style="width: 0%"></div></div></div>
+            <div>Jump: <div class="stat-bar"><div class="stat-fill jump-fill" style="width: 0%"></div></div></div>
+            <div>Smartness: <div class="stat-bar"><div class="stat-fill smartness-fill" style="width: 0%"></div></div></div>
+          </div>
+        </div>
+        <div class="character-option" data-character="rouge" style="cursor: pointer; text-align: center;">
+          <img src="Rouge Idle.gif" style="width: 100px; height: 100px; object-fit: contain;">
+          <p style="color: white;">Rouge</p>
+          <div class="stats-container">
+            <div>Power: <div class="stat-bar"><div class="stat-fill power-fill" style="width: 0%"></div></div></div>
+            <div>Speed: <div class="stat-bar"><div class="stat-fill speed-fill" style="width: 0%"></div></div></div>
+            <div>Weight: <div class="stat-bar"><div class="stat-fill weight-fill" style="width: 0%"></div></div></div>
+            <div>Jump: <div class="stat-bar"><div class="stat-fill jump-fill" style="width: 0%"></div></div></div>
+            <div>Smartness: <div class="stat-bar"><div class="stat-fill smartness-fill" style="width: 0%"></div></div></div>
+          </div>
+        </div>
+        <div class="character-option" data-character="silver" style="cursor: pointer; text-align: center;">
+          <img src="Sliver idle.webp" style="width: 100px; height: 100px; object-fit: contain;">
+          <p style="color: white;">Silver</p>
+          <div class="stats-container">
+            <div>Power: <div class="stat-bar"><div class="stat-fill power-fill" style="width: 0%"></div></div></div>
+            <div>Speed: <div class="stat-bar"><div class="stat-fill speed-fill" style="width: 0%"></div></div></div>
+            <div>Weight: <div class="stat-bar"><div class="stat-fill weight-fill" style="width: 0%"></div></div></div>
+            <div>Jump: <div class="stat-bar"><div class="stat-fill jump-fill" style="width: 0%"></div></div></div>
+            <div>Smartness: <div class="stat-bar"><div class="stat-fill smartness-fill" style="width: 0%"></div></div></div>
+          </div>
+        </div>
+        <div class="character-option" data-character="eggman" style="cursor: pointer; text-align: center;">
+          <img src="dr.eggman idle.gif" style="width: 100px; height: 100px; object-fit: contain;">
+          <p style="color: white;">Dr. Eggman</p>
+          <div class="stats-container">
+            <div>Power: <div class="stat-bar"><div class="stat-fill power-fill" style="width: 0%"></div></div></div>
+            <div>Speed: <div class="stat-bar"><div class="stat-fill speed-fill" style="width: 0%"></div></div></div>
+            <div>Weight: <div class="stat-bar"><div class="stat-fill weight-fill" style="width: 0%"></div></div></div>
+            <div>Jump: <div class="stat-bar"><div class="stat-fill jump-fill" style="width: 0%"></div></div></div>
+            <div>Smartness: <div class="stat-bar"><div class="stat-fill smartness-fill" style="width: 0%"></div></div></div>
+          </div>
+        </div>
+        <div class="character-option" data-character="bigthecat" style="cursor: pointer; text-align: center;">
+          <img src="Bigthecat idle.gif" style="width: 100px; height: 100px; object-fit: contain;">
+          <p style="color: white;">Big the Cat</p>
+          <div class="stats-container">
+            <div>Power: <div class="stat-bar"><div class="stat-fill power-fill" style="width: 0%"></div></div></div>
+            <div>Speed: <div class="stat-bar"><div class="stat-fill speed-fill" style="width: 0%"></div></div></div>
+            <div>Weight: <div class="stat-bar"><div class="stat-fill weight-fill" style="width: 0%"></div></div></div>
+            <div>Jump: <div class="stat-bar"><div class="stat-fill jump-fill" style="width: 0%"></div></div></div>
+            <div>Smartness: <div class="stat-bar"><div class="stat-fill smartness-fill" style="width: 0%"></div></div></div>
+          </div>
+        </div>
+        <div class="character-option" data-character="motobug" style="cursor: pointer; text-align: center;">
+          <img src="Motobug.gif" style="width: 100px; height: 100px; object-fit: contain;">
+          <p style="color: white;">Motobug</p>
+          <div class="stats-container">
+            <div>Power: <div class="stat-bar"><div class="stat-fill power-fill" style="width: 0%"></div></div></div>
+            <div>Speed: <div class="stat-bar"><div class="stat-fill speed-fill" style="width: 0%"></div></div></div>
+            <div>Weight: <div class="stat-bar"><div class="stat-fill weight-fill" style="width: 0%"></div></div></div>
+            <div>Jump: <div class="stat-bar"><div class="stat-fill jump-fill" style="width: 0%"></div></div></div>
+            <div>Smartness: <div class="stat-bar"><div class="stat-fill smartness-fill" style="width: 0%"></div></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Add after Mario and Sonic sections -->
+    <div style="background: rgba(128,0,128,0.2); padding: 20px; border-radius: 10px; height: 100%; display: flex; flex-direction: column;">
+      <h2 style="color: white; text-align: center;">Joke Characters</h2>
+      <div class="character-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; max-height: 400px; overflow-y: auto;">
+        <div class="character-option" data-character="sanic" style="cursor: pointer; text-align: center;">
+          <img src="Sanic Idle.webp" style="width: 100px; height: 100px; object-fit: contain;">
+          <p style="color: white;">Sanic</p>
+          <div class="stats-container">
+            <div>Power: <div class="stat-bar"><div class="stat-fill power-fill" style="width: 0%"></div></div></div>
+            <div>Speed: <div class="stat-bar"><div class="stat-fill speed-fill" style="width: 0%"></div></div></div>
+            <div>Weight: <div class="stat-bar"><div class="stat-fill weight-fill" style="width: 0%"></div></div></div>
+            <div>Jump: <div class="stat-bar"><div class="stat-fill jump-fill" style="width: 0%"></div></div></div>
+            <div>Smartness: <div class="stat-bar"><div class="stat-fill smartness-fill" style="width: 0%"></div></div></div>
+          </div>
+        </div>
+        <div class="character-option" data-character="mayro" style="cursor: pointer; text-align: center;">
+          <img src="Mayro.webp" style="width: 100px; height: 100px; object-fit: contain;">
+          <p style="color: white;">Mayro</p>
+          <div class="stats-container">
+            <div>Power: <div class="stat-bar"><div class="stat-fill power-fill" style="width: 0%"></div></div></div>
+            <div>Speed: <div class="stat-bar"><div class="stat-fill speed-fill" style="width: 0%"></div></div></div>
+            <div>Weight: <div class="stat-bar"><div class="stat-fill weight-fill" style="width: 0%"></div></div></div>
+            <div>Jump: <div class="stat-bar"><div class="stat-fill jump-fill" style="width: 0%"></div></div></div>
+            <div>Smartness: <div class="stat-bar"><div class="stat-fill smartness-fill" style="width: 0%"></div></div></div>
+          </div>
+        </div>
+        <div class="character-option" data-character="shedew" style="cursor: pointer; text-align: center;">
+          <img src="Shedew Idle.png" style="width: 100px; height: 100px; object-fit: contain;">
+          <p style="color: white;">Shedew</p>
+          <div class="stats-container">
+            <div>Power: <div class="stat-bar"><div class="stat-fill power-fill" style="width: 0%"></div></div></div>
+            <div>Speed: <div class="stat-bar"><div class="stat-fill speed-fill" style="width: 0%"></div></div></div>
+            <div>Weight: <div class="stat-bar"><div class="stat-fill weight-fill" style="width: 0%"></div></div></div>
+            <div>Jump: <div class="stat-bar"><div class="stat-fill jump-fill" style="width: 0%"></div></div></div>
+            <div>Smartness: <div class="stat-bar"><div class="stat-fill smartness-fill" style="width: 0%"></div></div></div>
+          </div>
+        </div>
+        <div class="character-option" data-character="theghostnoobterrorsanic" style="cursor: pointer; text-align: center;">
+          <img src="TheGhostNoobTerror Sanic Idle.png" style="width: 100px; height: 100px; object-fit: contain;">
+          <p style="color: white;">TheGhostNoobTerror Sanic</p>
+          <div class="stats-container">
+            <div>Power: <div class="stat-bar"><div class="stat-fill power-fill" style="width: 0%"></div></div></div>
+            <div>Speed: <div class="stat-bar"><div class="stat-fill speed-fill" style="width: 0%"></div></div></div>
+            <div>Weight: <div class="stat-bar"><div class="stat-fill weight-fill" style="width: 0%"></div></div></div>
+            <div>Jump: <div class="stat-bar"><div class="stat-fill jump-fill" style="width: 0%"></div></div></div>
+            <div>Smartness: <div class="stat-bar"><div class="stat-fill smartness-fill" style="width: 0%"></div></div></div>
+          </div>
+        </div>
+        <div class="character-option" data-character="luggy" style="cursor: pointer; text-align: center;">
+          <img src="Luggy.webp" style="width: 100px; height: 100px; object-fit: contain;">
+          <p style="color: white;">Luggy</p>
+          <div class="stats-container">
+            <div>Power: <div class="stat-bar"><div class="stat-fill power-fill" style="width: 0%"></div></div></div>
+            <div>Speed: <div class="stat-bar"><div class="stat-fill speed-fill" style="width: 0%"></div></div></div>
+            <div>Weight: <div class="stat-bar"><div class="stat-fill weight-fill" style="width: 0%"></div></div></div>
+            <div>Jump: <div class="stat-bar"><div class="stat-fill jump-fill" style="width: 0%"></div></div></div>
+            <div>Smartness: <div class="stat-bar"><div class="stat-fill smartness-fill" style="width: 0%"></div></div></div>
+          </div>
+        </div>
+        <div class="character-option" data-character="mayro3d" style="cursor: pointer; text-align: center;">
+          <img src="Mayro 3d (1).webp" style="width: 100px; height: 100px; object-fit: contain;">
+          <p style="color: white;">Mayro 3D</p>
+          <div class="stats-container">
+            <div>Power: <div class="stat-bar"><div class="stat-fill power-fill" style="width: 0%"></div></div></div>
+            <div>Speed: <div class="stat-bar"><div class="stat-fill speed-fill" style="width: 0%"></div></div></div>
+            <div>Weight: <div class="stat-bar"><div class="stat-fill weight-fill" style="width: 0%"></div></div></div>
+            <div>Jump: <div class="stat-bar"><div class="stat-fill jump-fill" style="width: 0%"></div></div></div>
+            <div>Smartness: <div class="stat-bar"><div class="stat-fill smartness-fill" style="width: 0%"></div></div></div>
+          </div>
+        </div>
+        <div class="character-option" data-character="taels" style="cursor: pointer; text-align: center;">
+          <img src="Taels Idle.png" style="width: 100px; height: 100px; object-fit: contain;">
+          <p style="color: white;">Taels</p>
+          <div class="stats-container">
+            <div>Power: <div class="stat-bar"><div class="stat-fill power-fill" style="width: 0%"></div></div></div>
+            <div>Speed: <div class="stat-bar"><div class="stat-fill speed-fill" style="width: 0%"></div></div></div>
+            <div>Weight: <div class="stat-bar"><div class="stat-fill weight-fill" style="width: 0%"></div></div></div>
+            <div>Jump: <div class="stat-bar"><div class="stat-fill jump-fill" style="width: 0%"></div></div></div>
+            <div>Smartness: <div class="stat-bar"><div class="stat-fill smartness-fill" style="width: 0%"></div></div></div>
+          </div>
+        </div>
+        <div class="character-option" data-character="wayro" style="cursor: pointer; text-align: center;">
+          <img src="wayro idle.png" style="width: 100px; height: 100px; object-fit: contain;">
+          <p style="color: white;">Wayro</p>
+          <div class="stats-container">
+            <div>Power: <div class="stat-bar"><div class="stat-fill power-fill" style="width: 0%"></div></div></div>
+            <div>Speed: <div class="stat-bar"><div class="stat-fill speed-fill" style="width: 0%"></div></div></div>
+            <div>Weight: <div class="stat-bar"><div class="stat-fill weight-fill" style="width: 0%"></div></div></div>
+            <div>Jump: <div class="stat-bar"><div class="stat-fill jump-fill" style="width: 0%"></div></div></div>
+            <div>Smartness: <div class="stat-bar"><div class="stat-fill smartness-fill" style="width: 0%"></div></div></div>
+          </div>
+        </div>
+        <div class="character-option" data-character="ugandanknuckles" style="cursor: pointer; text-align: center;">
+          <img src="Ugandan Knuckles Idle (1).webp" style="width: 100px; height: 100px; object-fit: contain;">
+          <p style="color: white;">Ugandan Knuckles</p>
+          <div class="stats-container">
+            <div>Power: <div class="stat-bar"><div class="stat-fill power-fill" style="width: 0%"></div></div></div>
+            <div>Speed: <div class="stat-bar"><div class="stat-fill speed-fill" style="width: 0%"></div></div></div>
+            <div>Weight: <div class="stat-bar"><div class="stat-fill weight-fill" style="width: 0%"></div></div></div>
+            <div>Jump: <div class="stat-bar"><div class="stat-fill jump-fill" style="width: 0%"></div></div></div>
+            <div>Smartness: <div class="stat-bar"><div class="stat-fill smartness-fill" style="width: 0%"></div></div></div>
+          </div>
+        </div>
+        <div class="character-option" data-character="waluggy" style="cursor: pointer; text-align: center;">
+          <img src="waluggy idle.png" style="width: 100px; height: 100px; object-fit: contain;">
+          <p style="color: white;">Waluggy</p>
+          <div class="stats-container">
+            <div>Power: <div class="stat-bar"><div class="stat-fill power-fill" style="width: 0%"></div></div></div>
+            <div>Speed: <div class="stat-bar"><div class="stat-fill speed-fill" style="width: 0%"></div></div></div>
+            <div>Weight: <div class="stat-bar"><div class="stat-fill weight-fill" style="width: 0%"></div></div></div>
+            <div>Jump: <div class="stat-bar"><div class="stat-fill jump-fill" style="width: 0%"></div></div></div>
+            <div>Smartness: <div class="stat-bar"><div class="stat-fill smartness-fill" style="width: 0%"></div></div></div>
+          </div>
+        </div>
+        <div class="character-option" data-character="sankinc" style="cursor: pointer; text-align: center;">
+          <img src="sankinc (1).gif" style="width: 100px; height: 100px; object-fit: contain;">
+          <p style="color: white;">Sankinc</p>
+          <div class="stats-container">
+            <div>Power: <div class="stat-bar"><div class="stat-fill power-fill" style="width: 0%"></div></div></div>
+            <div>Speed: <div class="stat-bar"><div class="stat-fill speed-fill" style="width: 0%"></div></div></div>
+            <div>Weight: <div class="stat-bar"><div class="stat-fill weight-fill" style="width: 0%"></div></div></div>
+            <div>Jump: <div class="stat-bar"><div class="stat-fill jump-fill" style="width: 0%"></div></div></div>
+            <div>Smartness: <div class="stat-bar"><div class="stat-fill smartness-fill" style="width: 0%"></div></div></div>
+          </div>
+        </div>
+        <div class="character-option" data-character="trails" style="cursor: pointer; text-align: center;">
+          <img src="trails idle.webp" style="width: 100px; height: 100px; object-fit: contain;">
+          <p style="color: white;">Trails</p>
+          <div class="stats-container">
+            <div>Power: <div class="stat-bar"><div class="stat-fill power-fill" style="width: 0%"></div></div></div>
+            <div>Speed: <div class="stat-bar"><div class="stat-fill speed-fill" style="width: 0%"></div></div></div>
+            <div>Weight: <div class="stat-bar"><div class="stat-fill weight-fill" style="width: 0%"></div></div></div>
+            <div>Jump: <div class="stat-bar"><div class="stat-fill jump-fill" style="width: 0%"></div></div></div>
+            <div>Smartness: <div class="stat-bar"><div class="stat-fill smartness-fill" style="width: 0%"></div></div></div>
+          </div>
+        </div>
+        <div class="character-option" data-character="shedoe" style="cursor: pointer; text-align: center;">
+          <img src="shedoe (1).webp" style="width: 100px; height: 100px; object-fit: contain;">
+          <p style="color: white;">Shedoe</p>
+          <div class="stats-container">
+            <div>Power: <div class="stat-bar"><div class="stat-fill power-fill" style="width: 0%"></div></div></div>
+            <div>Speed: <div class="stat-bar"><div class="stat-fill speed-fill" style="width: 0%"></div></div></div>
+            <div>Weight: <div class="stat-bar"><div class="stat-fill weight-fill" style="width: 0%"></div></div></div>
+            <div>Jump: <div class="stat-bar"><div class="stat-fill jump-fill" style="width: 0%"></div></div></div>
+            <div>Smartness: <div class="stat-bar"><div class="stat-fill smartness-fill" style="width: 0%"></div></div></div>
+          </div>
+        </div>
+        <div class="character-option" data-character="kneecles" style="cursor: pointer; text-align: center;">
+          <img src="kneecles (1).jpg" style="width: 100px; height: 100px; object-fit: contain;">
+          <p style="color: white;">Kneecles</p>
+          <div class="stats-container">
+            <div>Power: <div class="stat-bar"><div class="stat-fill power-fill" style="width: 0%"></div></div></div>
+            <div>Speed: <div class="stat-bar"><div class="stat-fill speed-fill" style="width: 0%"></div></div></div>
+            <div>Weight: <div class="stat-bar"><div class="stat-fill weight-fill" style="width: 0%"></div></div></div>
+            <div>Jump: <div class="stat-bar"><div class="stat-fill jump-fill" style="width: 0%"></div></div></div>
+            <div>Smartness: <div class="stat-bar"><div class="stat-fill smartness-fill" style="width: 0%"></div></div></div>
+          </div>
+        </div>
+        <div class="character-option" data-character="weegee" style="cursor: pointer; text-align: center;">
+          <img src="weegee idle anim.gif" style="width: 100px; height: 100px; object-fit: contain;">
+          <p style="color: white;">Weegee</p>
+          <div class="stats-container">
+            <div>Power: <div class="stat-bar"><div class="stat-fill power-fill" style="width: 0%"></div></div></div>
+            <div>Speed: <div class="stat-bar"><div class="stat-fill speed-fill" style="width: 0%"></div></div></div>
+            <div>Weight: <div class="stat-bar"><div class="stat-fill weight-fill" style="width: 0%"></div></div></div>
+            <div>Jump: <div class="stat-bar"><div class="stat-fill jump-fill" style="width: 0%"></div></div></div>
+            <div>Smartness: <div class="stat-bar"><div class="stat-fill smartness-fill" style="width: 0%"></div></div></div>
+          </div>
+        </div>
+        <div class="character-option" data-character="weegeeReuploadPopgamer06" style="cursor: pointer; text-align: center;">
+          <img src="WeegeeReuploadPopgamer06 Idle.png" style="width: 100px; height: 100px; object-fit: contain;">
+          <p style="color: white;">WeegeeReuploadPopgamer06</p>
+          <div class="stats-container">
+            <div>Power: <div class="stat-bar"><div class="stat-fill power-fill" style="width: 0%"></div></div></div>
+            <div>Speed: <div class="stat-bar"><div class="stat-fill speed-fill" style="width: 0%"></div></div></div>
+            <div>Weight: <div class="stat-bar"><div class="stat-fill weight-fill" style="width: 0%"></div></div></div>
+            <div>Jump: <div class="stat-bar"><div class="stat-fill jump-fill" style="width: 0%"></div></div></div>
+            <div>Smartness: <div class="stat-bar"><div class="stat-fill smartness-fill" style="width: 0%"></div></div></div>
+          </div>
+        </div>
+        <div class="character-option" data-character="sakincremake" style="cursor: pointer; text-align: center;">
+          <img src="sankinc remake.jpg" style="width: 100px; height: 100px; object-fit: contain;">
+          <p style="color: white;">Sankinc Remake</p>
+          <div class="stats-container">
+            <div>Power: <div class="stat-bar"><div class="stat-fill power-fill" style="width: 0%"></div></div></div>
+            <div>Speed: <div class="stat-bar"><div class="stat-fill speed-fill" style="width: 0%"></div></div></div>
+            <div>Weight: <div class="stat-bar"><div class="stat-fill weight-fill" style="width: 0%"></div></div></div>
+            <div>Jump: <div class="stat-bar"><div class="stat-fill jump-fill" style="width: 0%"></div></div></div>
+            <div>Smartness: <div class="stat-bar"><div class="stat-fill smartness-fill" style="width: 0%"></div></div></div>
+          </div>
+        </div>
+        <div class="character-option" data-character="malleo" style="cursor: pointer; text-align: center;">
+          <img src="WeegeeReuploadPopgamer06 Idle.png" style="width: 100px; height: 100px; object-fit: contain;">
+          <p style="color: white;">Malleo</p>
+          <div class="stats-container">
+            <div>Power: <div class="stat-bar"><div class="stat-fill power-fill" style="width: 0%"></div></div></div>
+            <div>Speed: <div class="stat-bar"><div class="stat-fill speed-fill" style="width: 0%"></div></div></div>
+            <div>Weight: <div class="stat-bar"><div class="stat-fill weight-fill" style="width: 0%"></div></div></div>
+            <div>Jump: <div class="stat-bar"><div class="stat-fill jump-fill" style="width: 0%"></div></div></div>
+            <div>Smartness: <div class="stat-bar"><div class="stat-fill smartness-fill" style="width: 0%"></div></div></div>
+          </div>
+        </div>
+        <div class="character-option" data-character="walleo" style="cursor: pointer; text-align: center;">
+          <img src="Walleo.webp" style="width: 100px; height: 100px; object-fit: contain;">
+          <p style="color: white;">Walleo</p>
+          <div class="stats-container">
+            <div>Power: <div class="stat-bar"><div class="stat-fill power-fill" style="width: 0%"></div></div></div>
+            <div>Speed: <div class="stat-bar"><div class="stat-fill speed-fill" style="width: 0%"></div></div></div>
+            <div>Weight: <div class="stat-bar"><div class="stat-fill weight-fill" style="width: 0%"></div></div></div>
+            <div>Jump: <div class="stat-bar"><div class="stat-fill jump-fill" style="width: 0%"></div></div></div>
+            <div>Smartness: <div class="stat-bar"><div class="stat-fill smartness-fill" style="width: 0%"></div></div></div>
+          </div>
+        </div>
+        <div class="character-option" data-character="waweegee" style="cursor: pointer; text-align: center;">
+          <img src="Waweegee.webp" style="width: 100px; height: 100px; object-fit: contain;">
+          <p style="color: white;">Waweegee</p>
+          <div class="stats-container">
+            <div>Power: <div class="stat-bar"><div class="stat-fill power-fill" style="width: 0%"></div></div></div>
+            <div>Speed: <div class="stat-bar"><div class="stat-fill speed-fill" style="width: 0%"></div></div></div>
+            <div>Weight: <div class="stat-bar"><div class="stat-fill weight-fill" style="width: 0%"></div></div></div>
+            <div>Jump: <div class="stat-bar"><div class="stat-fill jump-fill" style="width: 0%"></div></div></div>
+            <div>Smartness: <div class="stat-bar"><div class="stat-fill smartness-fill" style="width: 0%"></div></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div style="text-align: center; padding: 20px;">
+    <p style="color: white;">Player 1: <span id="p1-selection">Not Selected</span></p>
+    <p style="color: white;">Player 2: <span id="p2-selection">Not Selected</span></p>
+    <button id="start-game" style="padding: 10px 20px; font-size: 18px; display: none;">Start Game!</button>
+  </div>
+  <div style="text-align: center; margin-top: 10px;">
+    <div id="p1-ai-levels" class="ai-level-select" style="display:none; justify-content: center;">
+      <span style="color:white">P1 Level:</span>
+      <button class="ai-level-btn easy selected" data-player="1" data-level="1">Easy</button>
+      <button class="ai-level-btn normal" data-player="1" data-level="2">Normal</button>
+      <button class="ai-level-btn hard" data-player="1" data-level="3">Hard</button>
+      <button class="ai-level-btn insane" data-player="1" data-level="4">Insane</button>
+      <button class="ai-level-btn nightmare" data-player="1" data-level="5">Nightmare</button>
+      <button class="ai-level-btn godly" data-player="1" data-level="6">Godly</button>
+    </div>
+    <div id="p2-ai-levels" class="ai-level-select" style="display:none; justify-content: center;">
+      <span style="color:white">P2 Level:</span>
+      <button class="ai-level-btn easy selected" data-player="2" data-level="1">Easy</button>
+      <button class="ai-level-btn normal" data-player="2" data-level="2">Normal</button>
+      <button class="ai-level-btn hard" data-player="2" data-level="3">Hard</button>
+      <button class="ai-level-btn insane" data-player="2" data-level="4">Insane</button>
+      <button class="ai-level-btn nightmare" data-player="2" data-level="5">Nightmare</button>
+      <button class="ai-level-btn godly" data-player="2" data-level="6">Godly</button>
+    </div>
+    <label style="color: white; margin-right: 20px;">
+      <input type="checkbox" id="p1-ai" style="margin-right: 5px;">Player 1 AI
+    </label>
+    <label style="color: white;">
+      <input type="checkbox" id="p2-ai" style="margin-right: 5px;">Player 2 AI
+    </label>
+    <button id="random-character" style="padding: 10px 20px; margin-top: 10px; background: linear-gradient(45deg, #ff0000, #0000ff); color: white; border: none; border-radius: 5px; cursor: pointer;">
+      Random Character
+    </button>
+  </div>
+</div>
+<button id="settings-button">Settings</button>
+<button id="credits-button" style="position: fixed; bottom: 20px; left: 20px; z-index: 1001; padding: 10px 20px; display: block;">Credits</button>
+<button id="ideas-button">Ideas Added</button>
+<div id="ideas-panel">
+  <h2 style="text-align: center;">Ideas from Remixes</h2>
+  <div class="contributor">
+    <img src="3ktBwMfZA65TbVxVX.png" alt="BurnB">
+    <div>
+      <strong>Nightmare and Godly Mode</strong> - BurnB
+    </div>
+  </div>
+  <div class="contributor">
+    <img src="default_avatar.png" alt="granddawn07810021">
+    <div>
+      <strong>Mobile Controls</strong> - granddawn07810021
+    </div>
+  </div>
+  <button id="close-ideas" style="display: block; margin: 20px auto; padding: 10px 20px;">Close</button>
+</div>
+<div class="game-container">
+  <div id="player1-health" class="health-bar">
+    <div class="health-fill" style="width: 100%"></div>
+    <div id="player1-health-text" class="health-text">100/100</div>
+  </div>
+  <div id="player2-health" class="health-bar">
+    <div class="health-fill" style="width: 100%"></div>
+    <div id="player2-health-text" class="health-text">100/100</div>
+  </div>
+  
+  <div id="player1" class="character">
+    <img src="ddxppzn-7bdd25c6-550b-40bc-8cb4-72a3cdc37438.gif" alt="Mario">
+    <div class="hitbox"></div>
+    <div class="shield-effect"></div>
+  </div>
+  <div id="player2" class="character">
+    <img src="dhb55yz-56742888-dfb3-4fae-8980-78152da5597e.gif" alt="Sonic">
+    <div class="hitbox"></div>
+    <div class="shield-effect"></div>
+  </div>
+  
+  <div class="platform"></div>
+  
+  <div class="controls">
+    Player 1: A/D to move, W to jump, S to block, Space to attack
+    <br>
+    Player 2: &#x2190;/&#x2192; to move, &#x2191; to jump, &#x2193; to block, Enter to attack
+  </div>
+  <div class="mobile-controls">
+    <!-- Player 1 Controls -->
+    <div class="control-group">
+      <div class="mobile-btn" id="p1-left">&#x2190;</div>
+      <div class="mobile-btn" id="p1-right">&#x2192;</div>
+      <div class="mobile-btn" id="p1-up">&#x2191;</div>
+      <div class="mobile-btn" id="p1-down">&#x2193;</div>
+      <div class="mobile-btn" id="p1-attack">A</div>
+    </div>
+    
+    <!-- Player 2 Controls -->
+    <div class="control-group">
+      <div class="mobile-btn" id="p2-left">&#x2190;</div>
+      <div class="mobile-btn" id="p2-right">&#x2192;</div>
+      <div class="mobile-btn" id="p2-up">&#x2191;</div>
+      <div class="mobile-btn" id="p2-down">&#x2193;</div>
+      <div class="mobile-btn" id="p2-attack">A</div>
+    </div>
+  </div>
+</div>
+
+<div id="win-screen" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 2000;">
+  <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; width: 100%;">
+    <h1 id="winner-text" style="color: white; font-size: 48px; margin-bottom: 30px; font-family: Arial;"></h1>
+    
+    <div style="display: flex; justify-content: center; align-items: center; gap: 100px; margin: 30px 0;">
+      <div style="text-align: center;">
+        <div style="color: gold; font-size: 32px; font-family: Arial; margin-bottom: 10px;">1st Place</div>
+        <div id="winner-sprite" class="winner-sprite" style="width: 128px; height: 128px;">
+          <img style="width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated;">
+        </div>
+      </div>
+      <div style="text-align: center;">
+        <div style="color: silver; font-size: 32px; font-family: Arial; margin-bottom: 10px;">2nd Place</div>
+        <div id="loser-sprite" style="width: 128px; height: 128px;">
+          <img style="width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated;">
+        </div>
+      </div>
+    </div>
+
+    <button id="return-to-select" style="padding: 15px 30px; font-size: 24px; cursor: pointer; background: #4CAF50; border: none; color: white; border-radius: 5px;">Return to Character Select</button>
+  </div>
+</div>
+<div id="settings-panel" style="display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.9); padding: 20px; border-radius: 10px; z-index: 2000;">
+  <h2 style="color: white; text-align: center;">Settings</h2>
+  <div style="display: flex; align-items: center; margin: 10px 0;">
+    <label style="color: white; margin-right: 10px;">
+      <input type="checkbox" id="sound-enabled" checked>
+      Enable Hit Sound Effects
+    </label>
+  </div>
+  <div style="display: flex; align-items: center; margin: 10px 0;">
+    <label style="color: white; margin-right: 10px;">
+      <input type="checkbox" id="miss-sound-enabled" checked>
+      Enable Miss Sound Effects  
+    </label>
+  </div>
+  <div style="display: flex; align-items: center; margin: 10px 0;">
+    <label style="color: white; margin-right: 10px;">
+      <input type="checkbox" id="music-enabled" checked>
+      Enable Music
+    </label>
+  </div>
+  <button id="close-settings" style="display: block; margin: 20px auto; padding: 10px 20px;">Close</button>
+</div>
+<div id="credits-panel" style="display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.9); padding: 20px; border-radius: 10px; z-index: 2000; color: white; font-family: Arial; max-width: 600px;">
+  <h2 style="text-align: center;">Credits</h2>
+  <p>
+    <strong>Sonic Characters:</strong> foxeygamer87sonic on Deviant Art, fg87sonicpixelart on Deviant Art, Zig Sonar
+  </p>
+  <p>
+    <strong>Mario Characters:</strong> Mario And Luigi Super Star, HugoSanchez2000, Supper Mario Broth Website, TransparentJiggly64 on Deviant Art.
+  </p>
+  <p>
+    <strong>Meme Characters:</strong> Sanik123alt on Deviant Art
+  </p>
+  <p>
+    <strong>Taels, Wayro and Waluggy:</strong> Me Inspired By EarthBoundFan235 on Deviant Art
+  </p>
+  <p>
+    <strong>Weegee Reupload and Malleo:</strong> Popgamer06 on Deviant Art
+  </p>
+  <p>
+    <strong>Most Stuff:</strong> Google
+  </p>
+  <p>
+    <strong>Sound Effects:</strong> https://pixabay.com/, websim
+  </p>
+  <button id="close-credits" style="display: block; margin: 20px auto; padding: 10px 20px;">Close</button>
+</div>
+<script>const characterData = {
+  mario: {
+    idle: "ddxppzn-7bdd25c6-550b-40bc-8cb4-72a3cdc37438.gif",
+    walk: "Mario HugoSanchez2000.gif",
+    jump: "SS_Jump_M.png",
+    attack: "ddxp6uo-085379f1-156a-4eeb-9bd7-e1809da54847.gif",
+    hit: "Mayo.png",
+    win: "mario win.gif",
+    width: 64,
+    height: 64
+  },
+  luigi: {
+    idle: "ddxxls8-51ece259-b89f-4ede-a4dd-3639c360ee4e.gif",
+    walk: "ddz9rnw-8a0b5b0f-7b51-4756-8f2e-ccad33dffb43.gif",
+    jump: "SS_Jump_L.png",
+    attack: "Poultergust_3000_MLSS.webp",
+    hit: "Luigi_Hurt_Superstar_Saga.png",
+    win: "luigi win.gif",
+    width: 64,
+    height: 64
+  },
+  wario: {
+    idle: "tumblr_mlm1svFiko1rrftcdo1_500 (1).webp",
+    walk: "tumblr_mlm2u46sfZ1rrftcdo1_500 (1).gif",
+    jump: "dd88fg1-f21f77f0-02a5-473b-8e5a-ecfb5bbbf7e4.png",
+    attack: "tumblr_mf3282Icvs1rrftcdo1_400.gif",
+    hit: "dboy2us-6a7db582-1eed-4ef3-a8c8-618ba41fbf21.gif",
+    win: "wario win.gif",
+    width: 80,
+    height: 80
+  },
+  waluigi: {
+    idle: "waluigiIdle.webp",
+    walk: "waluigi-walk.gif",
+    jump: "Waluigi_jump.webp",
+    attack: "waluigiattack.gif",
+    hit: "Waluigi_Hurt.webp",
+    win: "waluigi win.gif",
+    width: 80,
+    height: 80
+  },
+  sonic: {
+    idle: "dhb55yz-56742888-dfb3-4fae-8980-78152da5597e.gif",
+    walk: "dhca0m2-fd76b07d-f15f-4f15-b2a1-d0e7d77859a0.gif",
+    jump: "sonic-rolling.gif",
+    attack: "dh0g7nr-7e5ec41b-918e-42ed-8fcc-8ef640e3a752.gif",
+    hit: "16_bit_sonic_by_nathanmarino_d4nscn2.png",
+    win: "sonic win.gif",
+    width: 72,
+    height: 72
+  },
+  tails: {
+    idle: "dg4op94-73bcd03d-f105-4801-8ec6-224ac81fe406.gif",
+    walk: "dg8u847-b3b780ee-85d8-42e8-97aa-6ea8719a0357.gif",
+    jump: "dg4ocpv-2f762d72-e7b2-4ac0-b946-28ba2d22eba4.gif",
+    attack: "dg8u7r7-8820ba12-ee21-4633-a1b1-6551601c311d.gif",
+    hit: "dg4oq83-812ebd2c-0bd7-4e7a-9656-30868fc71db2.gif",
+    win: "tails win.gif",
+    width: 130,
+    height: 130
+  },
+  shadow: {
+    idle: "dc2n7bp-c4f0ea9f-cdb4-44cf-9ba7-68a24791cbe8.gif",
+    walk: "shadow.gif",
+    jump: "shadow-jump (1).png",
+    attack: "fearless-year-of-shadow-shadow-the-hedgehog.gif",
+    hit: "71yTvYZ1gOL._AC_UF1000,1000_QL80_.jpg",
+    win: "shadow win.gif",
+    width: 72,
+    height: 72
+  },
+  knuckles: {
+    idle: "di6hd62-4bec48a2-63c0-44da-90bf-781e4b76d77d.gif",
+    walk: "dh5zoxb-c2b06cf3-d746-4e3a-994c-ef0fecc4813e.gif",
+    jump: "dg9bg9i-30b953d7-edc1-4281-a945-ca01ee1dd616.gif",
+    attack: "d4aefea37afa41eaefabc9e3bd73646843d52d46_hq.gif",
+    hit: "Knuckles_SCU_new_render.webp",
+    win: "knuckles win.gif",
+    width: 72,
+    height: 72
+  },
+  amy: {
+    idle: "amyidle (1).gif",
+    walk: "amywalk (1).gif",
+    jump: "amy jump.gif",
+    attack: "amyattack (1).gif",
+    hit: "dfxpj1v-27f21bf1-4d29-4b55-9d23-.gif",
+    win: "amy win.gif",
+    width: 72,
+    height: 72
+  },
+  toad: {
+    idle: "Toad_Idle (1).webp",
+    walk: "Funi_Toad_Walk (1).webp",
+    jump: "toad jump.webp",
+    attack: "toad attack.gif",
+    hit: "toad hurt.webp",
+    win: "toad win.webp",
+    width: 64,
+    height: 64
+  },
+  rouge: {
+    idle: "Rouge Idle.gif",
+    walk: "Rouge Walk.gif",
+    jump: "Rouge Jump.png",
+    attack: "Rouge Attack.gif",
+    hit: "Rouge Hurt.gif",
+    win: "rouge win.webp",
+    width: 72,
+    height: 72
+  },
+  koopa: {
+    idle: "Koopa Idle.webp",
+    walk: "koopa walk.webp",
+    jump: "koopa jump.webp",
+    attack: "koopa attack.gif",
+    hit: "koopa hurt.webp",
+    win: "koopa win.webp",
+    width: 64,
+    height: 64
+  },
+  goomba: {
+    idle: "goomba idle.webp",
+    walk: "goomba walk.png",
+    jump: "goomba jump.png",
+    attack: "goomba attack.webp",
+    hit: "goomba hurt.png",
+    win: "goomba win.png",
+    width: 64,
+    height: 64
+  },
+  sanic: {
+    idle: "Sanic Idle.webp",
+    walk: "sanic walk.webp",
+    jump: "Sanic jump.webp",
+    attack: "sanic attack.jpg",
+    hit: "sanic hit.gif",
+    win: "sanic win.png",
+    width: 72,
+    height: 72
+  },
+  silver: {
+    idle: "Sliver idle.webp",
+    walk: "sliver walk.gif",
+    jump: "Silver jump.webp",
+    attack: "sliver attack.gif",
+    hit: "sliver hurt.jpg",
+    win: "sliver win.png",
+    width: 72,
+    height: 72
+  },
+  mayro: {
+    idle: "Mayro.webp",
+    walk: "Mayro.webp",
+    jump: "Mayro.webp",
+    attack: "Mayro.webp",
+    hit: "Mayro.webp",
+    win: "Mayro.webp",
+    width: 64,
+    height: 64
+  },
+  shedew: {
+    idle: "Shedew Idle.png",
+    walk: "Shedew walk.png",
+    jump: "Shedew jump.png",
+    attack: "Shedew attack.png",
+    hit: "Shedew hurt.png",
+    win: "shedew win.png",
+    width: 72,
+    height: 72
+  },
+  theghostnoobterrorsanic: {
+    idle: "TheGhostNoobTerror Sanic Idle.png",
+    walk: "TheGhostNoobTerror Sanic Walk.png",
+    jump: "TheGhostNoobTerror Sanic Jump.png",
+    attack: "TheGhostNoobTerror Sanic Attack.png",
+    hit: "TheGhostNoobTerror Sanic Hurt.png",
+    win: "TheGhostNoobTerror Sanic Win.png",
+    width: 72,
+    height: 72
+  },
+  luggy: {
+    idle: "Luggy.webp",
+    walk: "Luggy.webp",
+    jump: "Luggy.webp",
+    attack: "Luggy.webp",
+    hit: "Luggy.webp",
+    win: "Luggy.webp",
+    width: 64,
+    height: 64
+  },
+  mayro3d: {
+    idle: "Mayro 3d (1).webp",
+    walk: "Mayro 3d (1).webp",
+    jump: "Mayro 3d (1).webp",
+    attack: "Mayro 3d (1).webp",
+    hit: "Mayro 3d (1).webp",
+    win: "Mayro 3d (1).webp",
+    width: 64,
+    height: 64
+  },
+  taels: {
+    idle: "Taels Idle.png",
+    walk: "Taels Walk.png",
+    jump: "Taels Jump.png",
+    attack: "Taels Attack.png",
+    hit: "Taels Hurt.png",
+    win: "Taels Win.png",
+    width: 72,
+    height: 72
+  },
+  wayro: {
+    idle: "wayro idle.png",
+    walk: "wayro idle.png",
+    jump: "wayro idle.png",
+    attack: "wayro idle.png",
+    hit: "wayro idle.png",
+    win: "wayro idle.png",
+    width: 64,
+    height: 64
+  },
+  ugandanknuckles: {
+    idle: "Ugandan Knuckles Idle (1).webp",
+    walk: "Ugandan knuckles walk (1).gif",
+    jump: "Ugandan knuckles jump.gif",
+    attack: "Ugandan knuckles attack.gif",
+    hit: "Ugandan knuckles hurt.webp",
+    win: "Ugandan knuckles win (1).gif",
+    width: 72,
+    height: 72
+  },
+  waluggy: {
+    idle: "waluggy idle.png",
+    walk: "waluggy idle.png",
+    jump: "waluggy idle.png",
+    attack: "waluggy idle.png",
+    hit: "waluggy idle.png",
+    win: "waluggy idle.png",
+    width: 64,
+    height: 64
+  },
+  sankinc: {
+    idle: "sankinc (1).gif",
+    walk: "sankinc (1).gif",
+    jump: "sankinc (1).gif",
+    attack: "sankinc (1).gif",
+    hit: "sankinc (1).gif",
+    win: "sankinc (1).gif",
+    width: 72,
+    height: 72
+  },
+  trails: {
+    idle: "trails idle.webp",
+    walk: "trails idle.webp",
+    jump: "trails idle.webp",
+    attack: "trails idle.webp",
+    hit: "trails idle.webp",
+    win: "trails idle.webp",
+    width: 72,
+    height: 72
+  },
+  shedoe: {
+    idle: "shedoe (1).webp",
+    walk: "shedoe (1).webp",
+    jump: "shedoe (1).webp",
+    attack: "shedoe (1).webp",
+    hit: "shedoe (1).webp",
+    win: "shedoe (1).webp",
+    width: 72,
+    height: 72
+  },
+  kneecles: {
+    idle: "kneecles (1).jpg",
+    walk: "kneecles (1).jpg",
+    jump: "kneecles (1).jpg",
+    attack: "kneecles (1).jpg",
+    hit: "kneecles (1).jpg",
+    win: "kneecles (1).jpg",
+    width: 72,
+    height: 72
+  },
+  weegee: {
+    idle: "weegee idle anim.gif",
+    walk: "weegee walk.gif",
+    jump: "weegee jump.webp",
+    attack: "weegee attack.gif",
+    hit: "weegee hurt.jpg",
+    win: "weegee win.gif",
+    width: 85,
+    height: 85
+  },
+  weegeeReuploadPopgamer06: {
+    idle: "WeegeeReuploadPopgamer06 Idle.png",
+    walk: "WeegeeReuploadPopgamer06 walk.gif",
+    jump: "WeegeeReuploadPopgamer06 Jump.png",
+    attack: "WeegeeReuploadPopgamer06 Attack.png",
+    hit: "WeegeeReuploadPopgamer06 Hurt.png",
+    win: "WeegeeReuploadPopgamer06 Win.png",
+    width: 85,
+    height: 85
+  },
+  sakincremake: {
+    idle: "sankinc remake.jpg",
+    walk: "sankinc remake.jpg",
+    jump: "sankinc remake.jpg",
+    attack: "sankinc remake.jpg",
+    hit: "sankinc remake.jpg",
+    win: "sankinc remake.jpg",
+    width: 72,
+    height: 72
+  },
+  malleo: {
+    idle: "MalleoReuploadPopgamer06 Idle.png",
+    walk: "MalleoReuploadPopgamer06 Walk.gif",
+    jump: "MalleoReuploadPopgamer06 Jump.png",
+    attack: "MalleoReuploadPopgamer06 Attack.png",
+    hit: "MalleoReuploadPopgamer06 Hurt.png",
+    win: "MalleoReuploadPopgamer06 Win.png",
+    width: 85,
+    height: 85
+  },
+  bigthecat: {
+    idle: "Bigthecat idle.gif",
+    walk: "Bigthecat walk.gif",
+    jump: "Bigthecat jump.png",
+    attack: "Bigthecat attack.webp",
+    hit: "Bigthecat hurt.jpg",
+    win: "Bigthecat win.gif",
+    width: 80,
+    height: 80
+  },
+  spiny: {
+    idle: "spiny hurt (1).webp",
+    walk: "Spikey walk (1).webp",
+    jump: "spiny jump.jpeg",
+    attack: "spiny attack.gif",
+    hit: "spiny hurt.webp",
+    win: "spiny win.webp",
+    width: 64,
+    height: 64
+  },
+  yoshi: {
+    idle: "Yoshi idle.gif",
+    walk: "Yoshi walk.gif",
+    jump: "Yoshi Jump.gif",
+    attack: "Yoshi Attack.webp",
+    hit: "Yoshi Hurt.jpg",
+    win: "Yoshi win.gif",
+    width: 64,
+    height: 64
+  },
+  motobug: {
+    idle: "Motobug.gif",
+    walk: "Motobug.gif",
+    jump: "Motobug.gif",
+    attack: "Motobug.gif",
+    hit: "Motobug.gif",
+    win: "Motobug.gif",
+    width: 64,
+    height: 64
+  },
+  walleo: {
+    idle: "Walleo.webp",
+    walk: "Walleo.webp",
+    jump: "Walleo.webp",
+    attack: "Walleo.webp",
+    hit: "Walleo.webp",
+    win: "Walleo.webp",
+    width: 85,
+    height: 85
+  },
+  waweegee: {
+    idle: "Waweegee.webp",
+    walk: "Waweegee.webp",
+    jump: "Waweegee.webp",
+    attack: "Waweegee.webp",
+    hit: "Waweegee.webp",
+    win: "Waweegee.webp",
+    width: 85,
+    height: 85
+  }
+};
+let customCharacters = {};
+const characterStats = {
+  mario: {
+    power: 12,
+    speed: 3.5,
+    weight: 1.0,
+    jumpPower: 13,
+    smartness: 0.8
+  },
+  luigi: {
+    power: 10,
+    speed: 3.8,
+    weight: 0.9,
+    jumpPower: 14,
+    smartness: 0.8
+  },
+  wario: {
+    power: 15,
+    speed: 2.8,
+    weight: 1.2,
+    jumpPower: 11,
+    smartness: 0.8
+  },
+  waluigi: {
+    power: 11,
+    speed: 3.5,
+    weight: 0.9,
+    jumpPower: 13,
+    smartness: 0.8
+  },
+  toad: {
+    power: 8,
+    speed: 3.2,
+    weight: 0.8,
+    jumpPower: 12,
+    smartness: 0.8
+  },
+  koopa: {
+    power: 10,
+    speed: 3.0,
+    weight: 1.0,
+    jumpPower: 11,
+    smartness: 0.8
+  },
+  goomba: {
+    power: 8,
+    speed: 3.0,
+    weight: 0.8,
+    jumpPower: 11,
+    smartness: 0.8
+  },
+  bowser: {
+    power: 15,
+    speed: 2.5,
+    weight: 1.3,
+    jumpPower: 11,
+    smartness: 0.9
+  },
+  sonic: {
+    power: 8,
+    speed: 4.5,
+    weight: 0.8,
+    jumpPower: 14,
+    smartness: 1.0
+  },
+  tails: {
+    power: 7,
+    speed: 3.5,
+    weight: 0.7,
+    jumpPower: 12,
+    smartness: 1.1
+  },
+  knuckles: {
+    power: 14,
+    speed: 3.2,
+    weight: 1.1,
+    jumpPower: 12,
+    smartness: 0.9
+  },
+  shadow: {
+    power: 13,
+    speed: 4.0,
+    weight: 0.9,
+    jumpPower: 13,
+    smartness: 1.0
+  },
+  amy: {
+    power: 10,
+    speed: 3.3,
+    weight: 0.8,
+    jumpPower: 12,
+    smartness: 0.9
+  },
+  rouge: {
+    power: 9,
+    speed: 3.8,
+    weight: 0.8,
+    jumpPower: 13,
+    smartness: 1.0
+  },
+  silver: {
+    power: 11,
+    speed: 3.5,
+    weight: 0.9,
+    jumpPower: 13,
+    smartness: 1.0
+  },
+  eggman: {
+    power: 13,
+    speed: 2.8,
+    weight: 1.1,
+    jumpPower: 11,
+    smartness: 1.2
+  },
+  sanic: {
+    power: 9,
+    speed: 4.0,
+    weight: 0.8,
+    jumpPower: 13,
+    smartness: 0.6
+  },
+  mayro: {
+    power: 10,
+    speed: 3.5,
+    weight: 1.0,
+    jumpPower: 13,
+    smartness: 0.6
+  },
+  shedew: {
+    power: 13,
+    speed: 4.0,
+    weight: 0.9,
+    jumpPower: 13,
+    smartness: 0.7
+  },
+  theghostnoobterrorsanic: {
+    power: 9,
+    speed: 4.0,
+    weight: 0.8,
+    jumpPower: 13,
+    smartness: 0.6
+  },
+  luggy: {
+    power: 10,
+    speed: 3.8,
+    weight: 0.9,
+    jumpPower: 14,
+    smartness: 0.6
+  },
+  mayro3d: {
+    power: 12,
+    speed: 3.5,
+    weight: 1.0,
+    jumpPower: 13,
+    smartness: 0.6
+  },
+  taels: {
+    power: 7,
+    speed: 3.5,
+    weight: 0.7,
+    jumpPower: 12,
+    smartness: 0.6
+  },
+  wayro: {
+    power: 12,
+    speed: 3.5,
+    weight: 1.0,
+    jumpPower: 13,
+    smartness: 0.6
+  },
+  ugandanknuckles: {
+    power: 11,
+    speed: 3.2,
+    weight: 1.0,
+    jumpPower: 12,
+    smartness: 0.6
+  },
+  waluggy: {
+    power: 10,
+    speed: 3.8,
+    weight: 0.9,
+    jumpPower: 14,
+    smartness: 0.6
+  },
+  sankinc: {
+    power: 9,
+    speed: 4.0,
+    weight: 0.8,
+    jumpPower: 13,
+    smartness: 0.6
+  },
+  trails: {
+    power: 7,
+    speed: 3.5,
+    weight: 0.7,
+    jumpPower: 12,
+    smartness: 0.6
+  },
+  shedoe: {
+    power: 13,
+    speed: 4.0,
+    weight: 0.9,
+    jumpPower: 13,
+    smartness: 0.7
+  },
+  kneecles: {
+    power: 14,
+    speed: 3.2,
+    weight: 1.1,
+    jumpPower: 12,
+    smartness: 0.7
+  },
+  weegee: {
+    power: 12,
+    speed: 3.5,
+    weight: 1.1,
+    jumpPower: 12,
+    smartness: 0.6
+  },
+  weegeeReuploadPopgamer06: {
+    power: 12,
+    speed: 3.5,
+    weight: 1.1,
+    jumpPower: 12,
+    smartness: 0.6
+  },
+  sakincremake: {
+    power: 9,
+    speed: 4.0,
+    weight: 0.8,
+    jumpPower: 13,
+    smartness: 0.6
+  },
+  malleo: {
+    power: 12,
+    speed: 3.5,
+    weight: 1.1,
+    jumpPower: 12,
+    smartness: 0.6
+  },
+  bigthecat: {
+    power: 15,
+    speed: 2.5,
+    weight: 1.3,
+    jumpPower: 11,
+    smartness: 0.6
+  },
+  spiny: {
+    power: 9,
+    speed: 3.0,
+    weight: 0.9,
+    jumpPower: 11,
+    smartness: 0.8
+  },
+  yoshi: {
+    power: 11,
+    speed: 3.5,
+    weight: 1.0,
+    jumpPower: 14,
+    smartness: 0.8
+  },
+  motobug: {
+    power: 8,
+    speed: 3.0,
+    weight: 0.9,
+    jumpPower: 10,
+    smartness: 0.6
+  },
+  walleo: {
+    power: 12,
+    speed: 3.5,
+    weight: 1.1,
+    jumpPower: 12,
+    smartness: 0.6
+  },
+  waweegee: {
+    power: 12,
+    speed: 3.5,
+    weight: 1.1,
+    jumpPower: 12,
+    smartness: 0.6
+  }
+};
+function updateSpritePreview() {
+  const previewImg = document.getElementById('sprite-preview-img');
+  const idleUrl = document.getElementById('sprite-idle').value;
+  if (idleUrl) {
+    previewImg.src = idleUrl;
+  }
+}
+function createCustomCharacter() {
+  const name = document.getElementById('char-name').value.toLowerCase().replace(/[^a-z0-9]/g, '');
+  if (!name) {
+    alert('Please enter a valid character name');
+    return;
+  }
+  const size = parseInt(document.getElementById('char-size').value);
+  const characterSprites = {
+    idle: document.getElementById('sprite-idle').value,
+    walk: document.getElementById('sprite-walk').value,
+    jump: document.getElementById('sprite-jump').value,
+    attack: document.getElementById('sprite-attack').value,
+    hit: document.getElementById('sprite-hit').value,
+    win: document.getElementById('sprite-win').value,
+    width: size,
+    height: size
+  };
+  const stats = {
+    power: parseFloat(document.getElementById('char-power').value),
+    speed: parseFloat(document.getElementById('char-speed').value),
+    weight: parseFloat(document.getElementById('char-weight').value),
+    jumpPower: parseFloat(document.getElementById('char-jump').value),
+    smartness: 0.8
+  };
+  if (!characterSprites.idle || !characterSprites.walk || !characterSprites.jump || !characterSprites.attack || !characterSprites.hit || !characterSprites.win) {
+    alert('Please provide all sprite URLs');
+    return;
+  }
+  characterData[name] = characterSprites;
+  characterStats[name] = stats;
+  customCharacters[name] = true;
+  const charGrid = document.querySelector('.character-grid');
+  const charOption = document.createElement('div');
+  charOption.className = 'character-option';
+  charOption.dataset.character = name;
+  charOption.style.cursor = 'pointer';
+  charOption.style.textAlign = 'center';
+  charOption.innerHTML = `
+    <img src="${characterSprites.idle}" style="width: 100px; height: 100px; object-fit: contain;">
+    <p style="color: white;">${name}</p>
+    <div class="stats-container">
+      <div>Power: <div class="stat-bar"><div class="stat-fill power-fill" style="width: ${stats.power / 15 * 100}%"></div></div></div>
+      <div>Speed: <div class="stat-bar"><div class="stat-fill speed-fill" style="width: ${stats.speed / 4.5 * 100}%"></div></div></div>
+      <div>Weight: <div class="stat-bar"><div class="stat-fill weight-fill" style="width: ${stats.weight / 1.2 * 100}%"></div></div></div>
+      <div>Jump: <div class="stat-bar"><div class="stat-fill jump-fill" style="width: ${stats.jumpPower / 14 * 100}%"></div></div></div>
+      <div>Smartness: <div class="stat-bar"><div class="stat-fill smartness-fill" style="width: ${stats.smartness / 1.2 * 100}%"></div></div></div>
+    </div>
+  `;
+  charOption.addEventListener('click', e => {
+    const character = e.currentTarget.dataset.character;
+    if (!p1Selection) {
+      p1Selection = character;
+      document.getElementById('p1-selection').textContent = character.charAt(0).toUpperCase() + character.slice(1);
+      e.currentTarget.style.border = '2px solid red';
+    } else if (!p2Selection) {
+      p2Selection = character;
+      document.getElementById('p2-selection').textContent = character.charAt(0).toUpperCase() + character.slice(1);
+      e.currentTarget.style.border = '2px solid blue';
+      document.getElementById('start-game').style.display = 'inline-block';
+    }
+  });
+  charGrid.appendChild(charOption);
+  document.getElementById('character-creator').style.display = 'none';
+  document.getElementById('char-name').value = '';
+  document.getElementById('sprite-idle').value = '';
+  document.getElementById('sprite-walk').value = '';
+  document.getElementById('sprite-jump').value = '';
+  document.getElementById('sprite-attack').value = '';
+  document.getElementById('sprite-hit').value = '';
+  document.getElementById('sprite-win').value = '';
+}
+document.getElementById('create-character-button').addEventListener('click', () => {
+  document.getElementById('character-creator').style.display = 'block';
+});
+document.getElementById('close-creator').addEventListener('click', () => {
+  document.getElementById('character-creator').style.display = 'none';
+});
+document.getElementById('save-character').addEventListener('click', createCustomCharacter);
+document.getElementById('sprite-idle').addEventListener('input', updateSpritePreview);
+let p1Selection = null;
+let p2Selection = null;
+let p1AI = false;
+let p2AI = false;
+let lastAIActionTime1 = 0;
+let lastAIActionTime2 = 0;
+const AI_ACTION_DELAY = 500;
+const player1 = {
+  element: document.getElementById('player1'),
+  health: 100,
+  x: 0,
+  y: 0,
+  speedX: 0,
+  speedY: 0,
+  isJumping: false,
+  direction: 1,
+  width: 64,
+  height: 64,
+  attacking: false,
+  attackBox: {
+    width: 50,
+    height: 40,
+    offsetX: 25,
+    offsetY: 10
+  },
+  knockback: {
+    x: 0,
+    y: 0
+  },
+  isHit: false,
+  hitTimer: null,
+  currentState: 'idle',
+  character: null,
+  blocking: false,
+  blockCooldown: false,
+  blockTimer: null,
+  cooldownTimer: null,
+  shieldHealth: 100
+};
+const player2 = {
+  element: document.getElementById('player2'),
+  health: 100,
+  x: window.innerWidth - 200,
+  y: 0,
+  speedX: 0,
+  speedY: 0,
+  isJumping: false,
+  direction: -1,
+  width: 64,
+  height: 64,
+  attacking: false,
+  attackBox: {
+    width: 60,
+    height: 50,
+    offsetX: 30,
+    offsetY: 10
+  },
+  knockback: {
+    x: 0,
+    y: 0
+  },
+  isHit: false,
+  hitTimer: null,
+  currentState: 'idle',
+  character: null,
+  blocking: false,
+  blockCooldown: false,
+  blockTimer: null,
+  cooldownTimer: null,
+  shieldHealth: 100
+};
+const keys = {};
+const aiLevels = {
+  player1: 1,
+  player2: 1
+};
+const levelMultipliers = {
+  1: {
+    reactionTime: 1.2,
+    attackChance: 0.6,
+    blockChance: 0.3,
+    positioningAccuracy: 0.7,
+    dodgeChance: 0.3,
+    smartnessMultiplier: 0.5
+  },
+  2: {
+    reactionTime: 0.8,
+    attackChance: 0.75,
+    blockChance: 0.5,
+    positioningAccuracy: 0.85,
+    dodgeChance: 0.5,
+    smartnessMultiplier: 0.8
+  },
+  3: {
+    reactionTime: 0.5,
+    attackChance: 0.9,
+    blockChance: 0.6,
+    positioningAccuracy: 0.95,
+    dodgeChance: 0.7,
+    smartnessMultiplier: 1.0
+  },
+  4: {
+    reactionTime: 0.2,
+    attackChance: 1.0,
+    blockChance: 0.8,
+    positioningAccuracy: 1.0,
+    dodgeChance: 0.9,
+    smartnessMultiplier: 1.2
+  },
+  5: {
+    reactionTime: 0.1,
+    attackChance: 1.0,
+    blockChance: 0.9,
+    positioningAccuracy: 1.2,
+    dodgeChance: 0.95,
+    smartnessMultiplier: 1.5
+  },
+  6: {
+    reactionTime: 0.05,
+    attackChance: 1.2,
+    blockChance: 1.0,
+    positioningAccuracy: 1.5,
+    dodgeChance: 1.0,
+    smartnessMultiplier: 2.0
+  }
+};
+let gameActive = false;
+const punchSounds = [new Audio('36. Punch.mp3'), new Audio('punch-(sound-effect)-made-with-Voicemod-technology (1).mp3'), new Audio('punch-41105 (1).mp3')];
+let soundEnabled = true;
+const missSounds = [new Audio('block-6839.mp3'), new Audio('punch-2-37333.mp3')];
+let missEffectEnabled = true;
+let currentMusic = null;
+let musicEnabled = true;
+const selectScreenMusic = [new Audio('2-01 Time Attack-Competition.mp3'), new Audio('Overworld Theme - New Super Mario Bros. Wii.mp3')];
+const battleMusic = [new Audio('2-13 Metallic Madness Zone - Act 1.mp3'), new Audio('1-07 Green Hill Zone - Act 1.mp3'), new Audio('06. Chemical Plant Zone Act 1.mp3'), new Audio('Luigis Casino - New Super Mario Bros [TubeRipper.cc].ogg'), new Audio('Super Mario World OST - Super Mario Bros Remix.mp3'), new Audio('Super Mario 64 Remastered - Inside the Castle Walls.mp3')];
+let isMobile = false;
+function detectMobile() {
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+}
+function initMobileControls() {
+  if (!detectMobile()) return;
+  isMobile = true;
+  document.querySelector('.mobile-controls').classList.add('active');
+  document.querySelector('.controls').style.display = 'none';
+  document.getElementById('p1-left').addEventListener('touchstart', () => keys['a'] = true);
+  document.getElementById('p1-left').addEventListener('touchend', () => keys['a'] = false);
+  document.getElementById('p1-right').addEventListener('touchstart', () => keys['d'] = true);
+  document.getElementById('p1-right').addEventListener('touchend', () => keys['d'] = false);
+  document.getElementById('p1-up').addEventListener('touchstart', () => keys['w'] = true);
+  document.getElementById('p1-up').addEventListener('touchend', () => keys['w'] = false);
+  document.getElementById('p1-down').addEventListener('touchstart', () => keys['s'] = true);
+  document.getElementById('p1-down').addEventListener('touchend', () => keys['s'] = false);
+  document.getElementById('p1-attack').addEventListener('touchstart', () => keys[' '] = true);
+  document.getElementById('p1-attack').addEventListener('touchend', () => keys[' '] = false);
+  document.getElementById('p2-left').addEventListener('touchstart', () => keys['ArrowLeft'] = true);
+  document.getElementById('p2-left').addEventListener('touchend', () => keys['ArrowLeft'] = false);
+  document.getElementById('p2-right').addEventListener('touchstart', () => keys['ArrowRight'] = true);
+  document.getElementById('p2-right').addEventListener('touchend', () => keys['ArrowRight'] = false);
+  document.getElementById('p2-up').addEventListener('touchstart', () => keys['ArrowUp'] = true);
+  document.getElementById('p2-up').addEventListener('touchend', () => keys['ArrowUp'] = false);
+  document.getElementById('p2-down').addEventListener('touchstart', () => keys['ArrowDown'] = true);
+  document.getElementById('p2-down').addEventListener('touchend', () => keys['ArrowDown'] = false);
+  document.getElementById('p2-attack').addEventListener('touchstart', () => keys['Enter'] = true);
+  document.getElementById('p2-attack').addEventListener('touchend', () => keys['Enter'] = false);
+  document.querySelectorAll('.mobile-btn').forEach(btn => {
+    btn.addEventListener('touchstart', e => e.preventDefault());
+    btn.addEventListener('touchend', e => e.preventDefault());
+  });
+}
+document.addEventListener('keydown', e => {
+  if (!isMobile) keys[e.key] = true;
+});
+document.addEventListener('keyup', e => {
+  if (!isMobile) keys[e.key] = false;
+});
+document.querySelectorAll('.character-option').forEach(option => {
+  const character = option.dataset.character;
+  const stats = characterStats[character];
+  option.querySelector('.power-fill').style.width = `${stats.power / 15 * 100}%`;
+  option.querySelector('.speed-fill').style.width = `${stats.speed / 4.5 * 100}%`;
+  option.querySelector('.weight-fill').style.width = `${stats.weight / 1.2 * 100}%`;
+  option.querySelector('.jump-fill').style.width = `${stats.jumpPower / 14 * 100}%`;
+  option.querySelector('.smartness-fill').style.width = `${stats.smartness / 1.2 * 100}%`;
+  option.addEventListener('click', e => {
+    const character = e.currentTarget.dataset.character;
+    if (!p1Selection) {
+      p1Selection = character;
+      document.getElementById('p1-selection').textContent = character.charAt(0).toUpperCase() + character.slice(1);
+      e.currentTarget.style.border = '2px solid red';
+    } else if (!p2Selection) {
+      p2Selection = character;
+      document.getElementById('p2-selection').textContent = character.charAt(0).toUpperCase() + character.slice(1);
+      e.currentTarget.style.border = '2px solid blue';
+      document.getElementById('start-game').style.display = 'inline-block';
+    }
+  });
+});
+document.getElementById('start-game').addEventListener('click', () => {
+  if (currentMusic) {
+    currentMusic.pause();
+    currentMusic.currentTime = 0;
+  }
+  playBattleMusic();
+  if (p1Selection && p2Selection) {
+    document.getElementById('character-select').style.display = 'none';
+    p1AI = document.getElementById('p1-ai').checked;
+    p2AI = document.getElementById('p2-ai').checked;
+    initializeGame(p1Selection, p2Selection);
+  }
+});
+document.getElementById('p1-ai').addEventListener('change', e => {
+  p1AI = e.target.checked;
+  document.getElementById('p1-ai-levels').style.display = e.target.checked ? 'flex' : 'none';
+});
+document.getElementById('p2-ai').addEventListener('change', e => {
+  p2AI = e.target.checked;
+  document.getElementById('p2-ai-levels').style.display = e.target.checked ? 'flex' : 'none';
+});
+document.querySelectorAll('.ai-level-btn').forEach(btn => {
+  btn.addEventListener('click', e => {
+    const player = e.target.dataset.player;
+    const level = parseInt(e.target.dataset.level);
+    aiLevels[`player${player}`] = level;
+    document.querySelectorAll(`.ai-level-btn[data-player="${player}"]`).forEach(b => {
+      b.classList.remove('selected');
+    });
+    e.target.classList.add('selected');
+  });
+});
+document.getElementById('settings-button').addEventListener('click', () => {
+  document.getElementById('settings-panel').style.display = 'block';
+  document.getElementById('music-enabled').checked = musicEnabled;
+});
+document.getElementById('close-settings').addEventListener('click', () => {
+  document.getElementById('settings-panel').style.display = 'none';
+});
+document.getElementById('sound-enabled').addEventListener('change', e => {
+  soundEnabled = e.target.checked;
+});
+document.getElementById('miss-sound-enabled').addEventListener('change', e => {
+  missEffectEnabled = e.target.checked;
+});
+document.getElementById('music-enabled').addEventListener('change', e => {
+  musicEnabled = e.target.checked;
+  if (!musicEnabled && currentMusic) {
+    currentMusic.pause();
+    currentMusic.currentTime = 0;
+  } else if (musicEnabled) {
+    if (document.getElementById('character-select').style.display !== 'none') {
+      playSelectScreenMusic();
+    } else {
+      playBattleMusic();
+    }
+  }
+});
+document.getElementById('credits-button').addEventListener('click', () => {
+  document.getElementById('credits-panel').style.display = 'block';
+});
+document.getElementById('close-credits').addEventListener('click', () => {
+  document.getElementById('credits-panel').style.display = 'none';
+});
+document.getElementById('ideas-button').addEventListener('click', () => {
+  document.getElementById('ideas-panel').style.display = 'block';
+});
+document.getElementById('close-ideas').addEventListener('click', () => {
+  document.getElementById('ideas-panel').style.display = 'none';
+});
+function initializeGame(p1Char, p2Char) {
+  if (!gameActive) {
+    initMobileControls();
+  }
+  if (currentMusic) {
+    currentMusic.pause();
+    currentTime = 0;
+  }
+  playBattleMusic();
+  document.getElementById('credits-button').style.display = 'none';
+  document.getElementById('ideas-button').style.display = 'none';
+  if (gameActive) return;
+  gameActive = true;
+  player1.character = p1Char;
+  player2.character = p2Char;
+  player1.knockbackMultiplier = 1 / characterStats[p1Char].weight;
+  player2.knockbackMultiplier = 1 / characterStats[p2Char].weight;
+  player1.element.querySelector('img').src = characterData[p1Char].idle;
+  player1.width = characterData[p1Char].width;
+  player1.height = characterData[p1Char].height;
+  player2.element.querySelector('img').src = characterData[p2Char].idle;
+  player2.width = characterData[p2Char].width;
+  player2.height = characterData[p2Char].height;
+  player1.element.setAttribute('data-character', p1Char);
+  player2.element.setAttribute('data-character', p2Char);
+  player1.x = 100;
+  player2.x = window.innerWidth - 200;
+  gameLoop();
+}
+function updatePlayerSprite(player) {
+  const img = player.element.querySelector('img');
+  let newState = 'idle';
+  if (player.isHit) {
+    newState = 'hit';
+  } else if (player.isJumping) {
+    newState = 'jump';
+  } else if (player.attacking) {
+    newState = 'attack';
+  } else if (player.speedX !== 0) {
+    newState = 'walk';
+  }
+  if (newState !== player.currentState) {
+    player.currentState = newState;
+    img.src = characterData[player.character][newState];
+  }
+}
+function attack(attacker, target, upKey) {
+  if (!gameActive) return;
+  if (!checkCollision(attacker, target) && missEffectEnabled) {
+    const randomMissSound = missSounds[Math.floor(Math.random() * missSounds.length)];
+    randomMissSound.currentTime = 0;
+    randomMissSound.play();
+  }
+  if (target.blocking) {
+    target.shieldHealth -= 20;
+    const shieldElement = target.element.querySelector('.shield-effect');
+    const scale = target.shieldHealth / 100;
+    shieldElement.style.transform = `scale(${scale})`;
+    if (target.shieldHealth <= 0) {
+      endBlocking(target);
+    }
+    const hitEffectX = attacker.direction === 1 ? attacker.x + attacker.width + attacker.attackBox.offsetX : attacker.x - attacker.attackBox.offsetX;
+    createHitEffect(hitEffectX, attacker.y + attacker.height / 2);
+    return;
+  }
+  if (target.blocking) return;
+  if (attacker.blocking) return;
+  attacker.attacking = true;
+  const hitEffectX = attacker.direction === 1 ? attacker.x + attacker.width + attacker.attackBox.offsetX : attacker.x - attacker.attackBox.offsetX;
+  createHitEffect(hitEffectX, attacker.y + attacker.height / 2);
+  if (checkCollision(attacker, target)) {
+    const baseDamage = 10;
+    let damage = baseDamage * (characterStats[attacker.character].power / 10) * target.knockbackMultiplier;
+    target.health -= damage;
+    document.getElementById(target === player1 ? 'player1-health-text' : 'player2-health-text').textContent = `${target.health}/100`;
+    if (target.hitTimer) {
+      clearTimeout(target.hitTimer);
+    }
+    target.isHit = true;
+    target.hitTimer = setTimeout(() => {
+      target.isHit = false;
+    }, 1500);
+    if (soundEnabled) {
+      const randomSound = punchSounds[Math.floor(Math.random() * punchSounds.length)];
+      randomSound.currentTime = 0;
+      randomSound.play();
+    }
+    const knockbackBase = 8;
+    const knockbackPower = knockbackBase * (characterStats[attacker.character].power / 10) * characterStats[target.character].weight;
+    if (upKey) {
+      target.knockback.y = knockbackPower * 2;
+      target.knockback.x = knockbackPower * 0.5 * attacker.direction;
+    } else {
+      target.knockback.x = knockbackPower * 1.5 * attacker.direction;
+      target.knockback.y = knockbackPower * 0.5;
+    }
+    updateHealth(target === player1 ? 1 : 2, target.health);
+  }
+  setTimeout(() => {
+    attacker.attacking = false;
+  }, 300);
+}
+function checkCollision(attacker, defender) {
+  const attackerBox = {
+    x: attacker.direction === 1 ? attacker.x + attacker.width : attacker.x - attacker.attackBox.width,
+    y: attacker.y + attacker.attackBox.offsetY,
+    width: attacker.attackBox.width,
+    height: attacker.attackBox.height
+  };
+  const defenderBox = {
+    x: defender.x,
+    y: defender.y,
+    width: defender.width,
+    height: defender.height
+  };
+  return !(attackerBox.x + attackerBox.width < defenderBox.x || attackerBox.x > defenderBox.x + defenderBox.width || attackerBox.y + attackerBox.height < defenderBox.y || attackerBox.y > defenderBox.y + defenderBox.height);
+}
+function updateHealth(playerNum, health) {
+  const healthBar = document.querySelector(`#player${playerNum}-health .health-fill`);
+  const percentage = Math.max(0, Math.min(100, health / 100 * 100));
+  healthBar.style.width = `${percentage}%`;
+  if (health <= 0) {
+    showWinScreen(playerNum === 1 ? 2 : 1);
+    resetGame();
+    document.getElementById('character-select').style.display = 'flex';
+    p1Selection = null;
+    p2Selection = null;
+    document.getElementById('p1-selection').textContent = 'Not Selected';
+    document.getElementById('p2-selection').textContent = 'Not Selected';
+    document.getElementById('start-game').style.display = 'none';
+    document.querySelectorAll('.character-option').forEach(option => {
+      option.style.border = 'none';
+    });
+  }
+}
+function createHitEffect(x, y) {
+  const effect = document.createElement('div');
+  effect.className = 'hit-effect';
+  effect.style.left = `${x}px`;
+  effect.style.bottom = `${y + 50}px`;
+  effect.style.width = '50px';
+  effect.style.height = '50px';
+  effect.style.background = 'radial-gradient(circle, #fff, transparent)';
+  document.querySelector('.game-container').appendChild(effect);
+  setTimeout(() => effect.remove(), 300);
+}
+function resetGame() {
+  if (currentMusic) {
+    currentMusic.pause();
+    currentMusic.currentTime = 0;
+  }
+  gameActive = false;
+  player1.health = 100;
+  player2.health = 100;
+  document.getElementById('player1-health-text').textContent = '100/100';
+  document.getElementById('player2-health-text').textContent = '100/100';
+  player1.x = 100;
+  player2.x = window.innerWidth - 200;
+  player1.y = 0;
+  player2.y = 0;
+  player1.attacking = false;
+  player2.attacking = false;
+  player1.knockback = {
+    x: 0,
+    y: 0
+  };
+  player2.knockback = {
+    x: 0,
+    y: 0
+  };
+  player1.isHit = false;
+  if (player1.hitTimer) clearTimeout(player1.hitTimer);
+  player1.currentState = 'idle';
+  updateHealth(1, 100);
+  updateHealth(2, 100);
+  player1.blocking = false;
+  player1.blockCooldown = false;
+  if (player1.blockTimer) clearTimeout(player1.blockTimer);
+  if (player1.cooldownTimer) clearTimeout(player1.cooldownTimer);
+  player2.blocking = false;
+  player2.blockCooldown = false;
+  if (player2.blockTimer) clearTimeout(player2.blockTimer);
+  if (player2.cooldownTimer) clearTimeout(player2.cooldownTimer);
+  player1.element.querySelector('.shield-effect').style.display = 'none';
+  player2.element.querySelector('.shield-effect').style.display = 'none';
+  player1.shieldHealth = 100;
+  player2.shieldHealth = 100;
+  lastAIActionTime1 = 0;
+  lastAIActionTime2 = 0;
+  soundEnabled = document.getElementById('sound-enabled').checked;
+  missEffectEnabled = document.getElementById('miss-sound-enabled').checked;
+  document.getElementById('credits-button').style.display = 'block';
+  document.getElementById('ideas-button').style.display = 'block';
+  document.querySelectorAll('.character-option').forEach(option => {
+    option.style.border = 'none';
+  });
+}
+function showWinScreen(winner) {
+  if (currentMusic) {
+    currentMusic.pause();
+    currentMusic.currentTime = 0;
+  }
+  const winScreen = document.getElementById('win-screen');
+  const winnerText = document.getElementById('winner-text');
+  const winnerSprite = document.getElementById('winner-sprite').querySelector('img');
+  const loserSprite = document.getElementById('loser-sprite').querySelector('img');
+  const winningPlayer = winner === 1 ? player1 : player2;
+  const losingPlayer = winner === 1 ? player2 : player1;
+  winScreen.style.display = 'block';
+  winnerText.textContent = `Player ${winner} Wins!`;
+  winnerSprite.src = characterData[winningPlayer.character].win;
+  loserSprite.src = characterData[losingPlayer.character].hit;
+}
+document.getElementById('return-to-select').addEventListener('click', () => {
+  document.getElementById('win-screen').style.display = 'none';
+  resetGame();
+  document.getElementById('character-select').style.display = 'flex';
+  document.getElementById('credits-button').style.display = 'block';
+  document.getElementById('ideas-button').style.display = 'block';
+  p1Selection = null;
+  p2Selection = null;
+  document.getElementById('p1-selection').textContent = 'Not Selected';
+  document.getElementById('p2-selection').textContent = 'Not Selected';
+  document.getElementById('start-game').style.display = 'none';
+  document.querySelectorAll('.character-option').forEach(option => {
+    option.style.border = 'none';
+  });
+  if (currentMusic) {
+    currentMusic.pause();
+    currentMusic.currentTime = 0;
+  }
+  playSelectScreenMusic();
+});
+const aiState = {
+  player1: {
+    lastAction: '',
+    stuckCounter: 0,
+    lastPosition: 0
+  },
+  player2: {
+    lastAction: '',
+    stuckCounter: 0,
+    lastPosition: 0
+  }
+};
+function playSelectScreenMusic() {
+  if (currentMusic) {
+    currentMusic.pause();
+    currentMusic.currentTime = 0;
+  }
+  currentMusic = selectScreenMusic[Math.floor(Math.random() * selectScreenMusic.length)];
+  currentMusic.loop = true;
+  if (musicEnabled) {
+    currentMusic.play().catch(err => console.log('Error playing music:', err));
+  }
+}
+function playBattleMusic() {
+  if (currentMusic) {
+    currentMusic.pause();
+    currentMusic.currentTime = 0;
+  }
+  currentMusic = battleMusic[Math.floor(Math.random() * battleMusic.length)];
+  currentMusic.loop = true;
+  if (musicEnabled) {
+    currentMusic.play().catch(err => console.log('Error playing music:', err));
+  }
+}
+function pickRandomCharacter() {
+  const characters = Object.keys(characterData);
+  const randomChar = characters[Math.floor(Math.random() * characters.length)];
+  const charOption = document.querySelector(`.character-option[data-character="${randomChar}"]`);
+  if (!charOption) return;
+  if (!p1Selection) {
+    p1Selection = randomChar;
+    document.getElementById('p1-selection').textContent = randomChar.charAt(0).toUpperCase() + randomChar.slice(1);
+    charOption.style.border = '2px solid red';
+  } else if (!p2Selection) {
+    p2Selection = randomChar;
+    document.getElementById('p2-selection').textContent = randomChar.charAt(0).toUpperCase() + randomChar.slice(1);
+    charOption.style.border = '2px solid blue';
+    document.getElementById('start-game').style.display = 'inline-block';
+  }
+}
+document.getElementById('random-character').addEventListener('click', pickRandomCharacter);
+playSelectScreenMusic();
+function handleAI(player, opponent, isPlayer1) {
+  const now = Date.now();
+  const lastActionTime = isPlayer1 ? lastAIActionTime1 : lastAIActionTime2;
+  const level = isPlayer1 ? aiLevels.player1 : aiLevels.player2;
+  const multipliers = levelMultipliers[level];
+  const state = isPlayer1 ? aiState.player1 : aiState.player2;
+  const characterSmartness = characterStats[player.character].smartness;
+  const adjustedMultipliers = {
+    ...multipliers,
+    reactionTime: multipliers.reactionTime * (2 - characterSmartness * multipliers.smartnessMultiplier),
+    attackChance: multipliers.attackChance * (characterSmartness * multipliers.smartnessMultiplier),
+    blockChance: multipliers.blockChance * (characterSmartness * multipliers.smartnessMultiplier),
+    positioningAccuracy: multipliers.positioningAccuracy * (characterSmartness * multipliers.smartnessMultiplier),
+    dodgeChance: multipliers.dodgeChance * (characterSmartness * multipliers.smartnessMultiplier)
+  };
+  if (now - lastActionTime < AI_ACTION_DELAY * adjustedMultipliers.reactionTime) return;
+  if (Math.abs(player.x - state.lastPosition) < 5) {
+    state.stuckCounter++;
+  } else {
+    state.stuckCounter = 0;
+  }
+  state.lastPosition = player.x;
+  if (state.stuckCounter > 8) {
+    const randomAction = Math.random();
+    if (randomAction < 0.4) {
+      state.lastAction = 'attack';
+      if (isPlayer1) keys[' '] = true;else keys['Enter'] = true;
+    } else if (randomAction < 0.6) {
+      state.lastAction = 'jump';
+      if (isPlayer1) keys['w'] = true;else keys['ArrowUp'] = true;
+    } else if (randomAction < 0.8) {
+      state.lastAction = 'moveAway';
+      if (isPlayer1) {
+        keys['a'] = player.x > opponent.x;
+        keys['d'] = player.x < opponent.x;
+      } else {
+        keys['ArrowLeft'] = player.x > opponent.x;
+        keys['ArrowRight'] = player.x < opponent.x;
+      }
+    } else {
+      state.lastAction = 'block';
+      if (isPlayer1) keys['s'] = true;else keys['ArrowDown'] = true;
+    }
+    state.stuckCounter = 0;
+    if (isPlayer1) lastAIActionTime1 = now;else lastAIActionTime2 = now;
+    return;
+  }
+  if (isPlayer1) {
+    keys['a'] = false;
+    keys['d'] = false;
+    keys['w'] = false;
+    keys['s'] = false;
+    keys[' '] = false;
+  } else {
+    keys['ArrowLeft'] = false;
+    keys['ArrowRight'] = false;
+    keys['ArrowUp'] = false;
+    keys['ArrowDown'] = false;
+    keys['Enter'] = false;
+  }
+  const distanceToOpponent = Math.abs(player.x - opponent.x);
+  const heightDifference = Math.abs(player.y - opponent.y);
+  const isOnLeft = player.x < opponent.x;
+  const actionRoll = Math.random();
+  if (opponent.attacking && distanceToOpponent < 250) {
+    if (actionRoll < adjustedMultipliers.dodgeChance) {
+      if (isPlayer1) keys['w'] = true;else keys['ArrowUp'] = true;
+      state.lastAction = 'jump';
+    } else if (actionRoll < adjustedMultipliers.blockChance + adjustedMultipliers.dodgeChance) {
+      if (isPlayer1) keys['s'] = true;else keys['ArrowDown'] = true;
+      state.lastAction = 'block';
+    } else {
+      if (isPlayer1) keys[' '] = true;else keys['Enter'] = true;
+      state.lastAction = 'counter-attack';
+    }
+  }
+  const playerHitbox = player.element.querySelector('.hitbox');
+  const opponentElement = opponent.element;
+  const hitboxRect = playerHitbox.getBoundingClientRect();
+  const opponentRect = opponentElement.getBoundingClientRect();
+  const hasHitboxOverlap = !(hitboxRect.right < opponentRect.left || hitboxRect.left > opponentRect.right || hitboxRect.bottom < opponentRect.top || hitboxRect.top > opponentRect.bottom);
+  const optimalDistance = level >= 5 ? 100 : level === 4 ? 120 : 100 + (Math.random() * 40 - 20) * adjustedMultipliers.positioningAccuracy;
+  let targetDistance = optimalDistance;
+  if (hasHitboxOverlap) {
+    targetDistance = 80;
+  }
+  if (Math.abs(distanceToOpponent - targetDistance) > 20) {
+    if (distanceToOpponent > targetDistance) {
+      if (player.x < opponent.x) {
+        if (isPlayer1) keys['d'] = true;else keys['ArrowRight'] = true;
+      } else {
+        if (isPlayer1) keys['a'] = true;else keys['ArrowLeft'] = true;
+      }
+    } else {
+      if (player.x < opponent.x) {
+        if (isPlayer1) keys['a'] = true;else keys['ArrowLeft'] = true;
+      } else {
+        if (isPlayer1) keys['d'] = true;else keys['ArrowRight'] = true;
+      }
+    }
+    state.lastAction = 'position';
+  }
+  if ((opponent.y > player.y + 30 || Math.random() < 0.1) && !player.isJumping) {
+    if (isPlayer1) keys['w'] = true;else keys['ArrowUp'] = true;
+    state.lastAction = 'jump';
+  }
+  if (distanceToOpponent < 180 && heightDifference < 80) {
+    if (adjustedMultipliers.attackChance >= Math.random()) {
+      if (player.x < opponent.x) {
+        player.direction = 1;
+      } else {
+        player.direction = -1;
+      }
+      if (isPlayer1) {
+        keys[' '] = true;
+      } else {
+        keys['Enter'] = true;
+      }
+      state.lastAction = 'attack';
+    }
+  }
+  if ((opponent.attacking || distanceToOpponent < 80) && adjustedMultipliers.blockChance >= Math.random() && !player.blockCooldown) {
+    if (isPlayer1) keys['s'] = true;else keys['ArrowDown'] = true;
+    state.lastAction = 'block';
+  }
+  if (isPlayer1) lastAIActionTime1 = now;else lastAIActionTime2 = now;
+}
+function gameLoop() {
+  if (!gameActive) return;
+  if (p1AI) {
+    handleAI(player1, player2, true);
+  }
+  if (p2AI) {
+    handleAI(player2, player1, false);
+  }
+  updatePlayer(player1, true);
+  updatePlayer(player2, false);
+  requestAnimationFrame(gameLoop);
+}
+function updatePlayer(player, isPlayer1) {
+  const stats = characterStats[player.character];
+  if (!player.blocking) {
+    if (isPlayer1) {
+      if (keys['a'] && (!p1AI || !player.attacking)) {
+        player.speedX = -stats.speed;
+        player.direction = -1;
+      } else if (keys['d'] && (!p1AI || !player.attacking)) {
+        player.speedX = stats.speed;
+        player.direction = 1;
+      } else {
+        player.speedX = player.knockback.x;
+      }
+      if (keys['w']) {
+        if (!player.isJumping || player.character === 'tails' && player.y > 0) {
+          player.speedY = stats.jumpPower;
+          player.isJumping = true;
+        }
+      }
+    } else {
+      if (keys['ArrowLeft'] && (!p2AI || !player.attacking)) {
+        player.speedX = -stats.speed;
+        player.direction = -1;
+      } else if (keys['ArrowRight'] && (!p2AI || !player.attacking)) {
+        player.speedX = stats.speed;
+        player.direction = 1;
+      } else {
+        player.speedX = player.knockback.x;
+      }
+      if (keys['ArrowUp']) {
+        if (!player.isJumping || player.character === 'tails' && player.y > 0) {
+          player.speedY = stats.jumpPower;
+          player.isJumping = true;
+        }
+      }
+    }
+  } else {
+    player.speedX = 0;
+  }
+  if (player.knockback.x !== 0 || player.knockback.y !== 0) {
+    player.speedX += player.knockback.x;
+    player.speedY += player.knockback.y;
+    player.knockback.x *= 0.8;
+    player.knockback.y *= 0.8;
+    if (Math.abs(player.knockback.x) < 0.1) player.knockback.x = 0;
+    if (Math.abs(player.knockback.y) < 0.1) player.knockback.y = 0;
+  }
+  if (isPlayer1) {
+    if (keys[' '] && !player.attacking) {
+      attack(player, player2, keys['ArrowUp']);
+    }
+    if (keys['s'] && !player.blockCooldown) {
+      startBlocking(player);
+    }
+  } else {
+    if (keys['Enter'] && !player.attacking) {
+      attack(player, player1, keys['w']);
+    }
+    if (keys['ArrowDown'] && !player.blockCooldown) {
+      startBlocking(player);
+    }
+  }
+  player.speedY -= 0.5;
+  player.x += player.speedX;
+  player.y += player.speedY;
+  if (player.y < 0) {
+    player.y = 0;
+    player.speedY = 0;
+    player.isJumping = false;
+  }
+  if (player.x < 0) player.x = 0;
+  if (player.x > window.innerWidth - player.width) player.x = window.innerWidth - player.width;
+  player.element.style.transform = `translate(${player.x}px, ${-player.y}px) scaleX(${player.direction})`;
+  updateHitbox(player);
+  updatePlayerSprite(player);
+}
+function updateHitbox(player) {
+  const hitbox = player.element.querySelector('.hitbox');
+  if (player.attacking) {
+    hitbox.style.display = 'block';
+    hitbox.style.width = player.attackBox.width + 'px';
+    hitbox.style.height = player.attackBox.height + 'px';
+    if (player.direction === 1) {
+      hitbox.style.left = player.width + 'px';
+    } else {
+      hitbox.style.left = -player.attackBox.width + 'px';
+    }
+    hitbox.style.top = player.attackBox.offsetY + 'px';
+  } else {
+    hitbox.style.display = 'none';
+  }
+}
+function startBlocking(player) {
+  if (player.blocking || player.blockCooldown) return;
+  player.blocking = true;
+  player.shieldHealth = 100;
+  const shieldElement = player.element.querySelector('.shield-effect');
+  shieldElement.style.display = 'block';
+  shieldElement.style.transform = 'scale(1)';
+  player.blockTimer = setTimeout(() => {
+    endBlocking(player);
+  }, 3000);
+}
+function endBlocking(player) {
+  player.blocking = false;
+  player.blockCooldown = true;
+  player.shieldHealth = 100;
+  const shieldElement = player.element.querySelector('.shield-effect');
+  shieldElement.style.display = 'none';
+  shieldElement.style.transform = 'scale(1)';
+  if (player.blockTimer) {
+    clearTimeout(player.blockTimer);
+    player.blockTimer = null;
+  }
+  player.cooldownTimer = setTimeout(() => {
+    player.blockCooldown = false;
+  }, 4000);
+}
+initMobileControls();</script>
+</body></html>

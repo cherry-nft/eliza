@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <title>Side Dialog Demo</title>
+
+        <!-- External resources -->
+        <link
+            rel="stylesheet"
+            href="https://unpkg.com/open-props/normalize.min.css"
+            layer="support.demo"
+        />
+        <link
+            rel="stylesheet"
+            href="https://unpkg.com/open-props/buttons.min.css"
+            layer="support.demo"
+        />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0"
+            rel="stylesheet"
+            layer="support.demo"
+        />
+
+        <style>
+            @import url("https://unpkg.com/open-props")
+            layer(support.design-system);
+
+            dialog.slide-out {
+                --_duration: 0.5s;
+                --_card-inset: var(--size-5);
+
+                /* inner card can query the dialog for h/w */
+                container: dialog-panel / size;
+
+                transition:
+                    display var(--_duration) allow-discrete,
+                    overlay var(--_duration) allow-discrete;
+
+                padding: 0;
+                background: none;
+                box-shadow: none;
+
+                block-size: 100dvh;
+                max-block-size: 100%;
+                inline-size: min(var(--size-content-2), 80vw);
+
+                margin: 0;
+                margin-inline-end: auto;
+                overflow-y: hidden;
+
+                &::backdrop {
+                    transition: opacity var(--_duration) var(--ease-4);
+                    opacity: 0;
+                    background-color: light-dark(#0003, #0008);
+                }
+
+                > section {
+                    @media (prefers-reduced-motion: reduce) {
+                        transition: opacity var(--_duration) var(--ease-2);
+                        opacity: 0;
+                    }
+
+                    @media (prefers-reduced-motion: no-preference) {
+                        transition: translate var(--_duration)
+                            var(--ease-in-out-5);
+                        translate: calc((100% + var(--_card-inset)) * -1) 0;
+                    }
+
+                    block-size: calc(100% - (var(--_card-inset) * 2));
+                    margin-block: var(--_card-inset);
+                    margin-inline-start: var(--_card-inset);
+
+                    border-radius: var(--radius-3);
+                    background: light-dark(white, var(--surface-2));
+
+                    > header {
+                        display: flex;
+                        place-content: end;
+                        padding: var(--size-3);
+
+                        > button {
+                            --_bg: none;
+                            --_border: none;
+
+                            padding: var(--size-1);
+                            aspect-ratio: var(--ratio-square);
+                            border-radius: var(--radius-round);
+                            box-shadow: 0 0 0 var(--_highlight-size)
+                                var(--_highlight);
+                        }
+                    }
+                }
+
+                &[open] {
+                    &,
+                    &::backdrop {
+                        opacity: 1;
+                    }
+
+                    & > section {
+                        opacity: 1;
+                        translate: 0;
+                    }
+                }
+
+                @starting-style {
+                    &[open],
+                    &[open]::backdrop {
+                        opacity: 0;
+                    }
+                    &[open] > section {
+                        opacity: 0;
+                        translate: calc((100% + var(--_card-inset)) * -1) 0;
+                    }
+                }
+            }
+
+            @layer demo.cursor {
+                dialog {
+                    --cursor-light: url("data:image/svg+xml,%3Csvg id='cursor' xmlns='http://www.w3.org/2000/svg' fill='none' width='56' height='56' viewBox='0 0 56 56'%3E%3Cstyle%3E circle %7B fill: white; %7D path %7B stroke: black; %7D %3C/style%3E%3Ccircle cx='28' cy='28' r='27' shape-rendering='geometricPrecision'/%3E%3Cpath shape-rendering='geometricPrecision' d='m22.344 22.343 11.313 11.314m-11.313 0 11.313-11.313' stroke-width='2'/%3E%3C/svg%3E");
+
+                    --cursor-dark: url("data:image/svg+xml,%3Csvg id='cursor' xmlns='http://www.w3.org/2000/svg' fill='none' width='56' height='56' viewBox='0 0 56 56'%3E%3Cstyle%3E circle %7B fill: black; %7D path %7B stroke: white; %7D %3C/style%3E%3Ccircle cx='28' cy='28' r='27' shape-rendering='geometricPrecision'/%3E%3Cpath shape-rendering='geometricPrecision' d='m22.344 22.343 11.313 11.314m-11.313 0 11.313-11.313' stroke-width='2'/%3E%3C/svg%3E");
+
+                    /* assign light and dark variants */
+                    --adaptive-cursor: var(--cursor-dark);
+
+                    @media (prefers-color-scheme: dark) {
+                        --adaptive-cursor: var(--cursor-light);
+                    }
+
+                    &::backdrop {
+                        cursor:
+                            var(--adaptive-cursor) 28 28,
+                            auto;
+                    }
+                }
+            }
+
+            @layer support.demo {
+                body {
+                    display: grid;
+                    place-content: center;
+                    padding: var(--size-5);
+                    gap: var(--size-5);
+                }
+            }
+        </style>
+    </head>
+
+    <body>
+        <button onclick="demo.showModal()">Show Side Dialog</button>
+
+        <dialog id="demo" class="slide-out">
+            <section>
+                <header>
+                    <button
+                        title="Close"
+                        onclick="demo.close()"
+                        class="material-symbols-outlined"
+                    >
+                        close
+                    </button>
+                </header>
+            </section>
+        </dialog>
+
+        <script>
+            // add light dismiss
+            demo.addEventListener("click", ({ target: dialog }) => {
+                if (dialog.nodeName === "DIALOG") dialog.close("dismiss");
+            });
+        </script>
+    </body>
+</html>
