@@ -54,6 +54,7 @@
         "delete:webdaw": "tsx src/tests/test-webdaw-delete.ts",
         "update:effectiveness": "tsx src/tests/update-effectiveness.ts",
         "test:semantic-matching": "tsx src/tests/test-semantic-pattern-matching.ts",
-        "test:semantic-matching-v2": "tsx src/tests/test-semantic-pattern-matching-v2.ts"
+        "test:semantic-matching-v2": "tsx src/tests/test-semantic-pattern-matching-v2.ts",
+        "insert:air-hockey": "tsx src/tests/test-air-hockey-insert-patterns.ts"
     }
 }
