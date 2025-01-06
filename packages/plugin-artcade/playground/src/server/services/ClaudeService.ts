@@ -32,12 +32,25 @@ export class ClaudeService implements PatternServiceInterface {
     private lastUsedPatterns: GamePattern[] = []; // Properly typed array
     private readonly PROMPT_TEMPLATE = `# System Prompt: Artcade [In Production]
 
-You are an expert web developer tasked with creating an interactive HTML experience. First, analyze this prompt and break it down into components:
+You are an expert web developer tasked with creating an interactive HTML experience. Your PRIMARY DIRECTIVE is to EXACTLY COPY the provided game mechanics code, only making minimal necessary adjustments. First, analyze this prompt:
 
 "{{user_prompt}}"
 
-Here are some similar patterns for reference:
+CRITICAL INSTRUCTION - PATTERN REUSE:
+1. You MUST copy the complete function implementations from the provided patterns
+2. DO NOT rewrite or simplify the mechanics - use them exactly as provided
+3. Only rename variables if absolutely necessary for integration
+4. Preserve all helper functions and state variables
+5. Maintain the exact same logic flow and complexity
+
+Here are the patterns you MUST incorporate:
 {{pattern_examples}}
+
+VALIDATION REQUIREMENTS:
+1. Your implementation MUST include all functions from game_mechanic patterns
+2. Function bodies should match the patterns with minimal changes
+3. State machines and complex logic must be preserved
+4. All helper functions must be included
 
 Your response must be a single JSON object with this exact structure. ALL fields are REQUIRED:
 
@@ -231,18 +244,54 @@ Before returning, verify that your response includes ALL required fields and fol
     }
 
     private formatPatternExamples(patterns: GamePattern[]): string {
-        return patterns
+        // Sort game mechanics first
+        const sortedPatterns = [...patterns].sort((a, b) =>
+            a.type === "game_mechanic" ? -1 : b.type === "game_mechanic" ? 1 : 0
+        );
+
+        return sortedPatterns
             .map(
                 (pattern) => `
-            Here's a highly effective ${pattern.type} pattern (score: ${pattern.effectiveness_score}):
+            ${pattern.type === "game_mechanic" ? "!!! CRITICAL GAME MECHANIC - YOU MUST USE THIS CODE !!!" : "Supporting Pattern"}
+            Pattern: ${pattern.pattern_name} (${pattern.type})
+            Effectiveness Score: ${pattern.effectiveness_score}
+
+            Core Functionality to Preserve:
+            ${
+                pattern.content.js
+                    ? `
+            JavaScript (COPY THIS EXACTLY):
+            \`\`\`javascript
+            ${pattern.content.js}
+            \`\`\`
+            `
+                    : ""
+            }
+
+            Required Structure:
             \`\`\`html
             ${pattern.content.html}
             \`\`\`
-            ${pattern.content.css ? `\`\`\`css\n${pattern.content.css}\n\`\`\`` : ""}
-            ${pattern.content.js ? `\`\`\`javascript\n${pattern.content.js}\n\`\`\`` : ""}
-        `
+
+            ${
+                pattern.content.css
+                    ? `
+            Essential Styling:
+            \`\`\`css
+            ${pattern.content.css}
+            \`\`\`
+            `
+                    : ""
+            }
+
+            Integration Requirements:
+            1. Copy and adapt the core mechanics code
+            2. Preserve the physics and collision detection logic
+            3. Maintain the same function signatures
+            4. Only modify variable names if absolutely necessary
+            `
             )
-            .join("\n\n");
+            .join("\n\n=== NEXT PATTERN ===\n\n");
     }
 
     private extractPlanningInfo(content: string) {
@@ -410,31 +459,61 @@ Before returning, verify that your response includes ALL required fields and fol
         }[] = [];
 
         if (pattern.content.js) {
-            // Look for function declarations
-            const funcMatches = pattern.content.js.match(
-                /function\s+([a-zA-Z_$][0-9a-zA-Z_$]*)\s*\(/g
-            );
-            if (funcMatches) {
-                funcMatches.forEach((func) => {
-                    snippets.push({
-                        type: "js",
-                        snippet: func.trim(),
-                        context: "Function declaration",
-                    });
+            // First, normalize the code by removing whitespace and formatting variations
+            const normalizedJs = pattern.content.js
+                .replace(/\s+/g, " ") // Normalize whitespace
+                .replace(/([{};,])\s*/g, "$1") // Remove space after punctuation
+                .replace(/\s*([{};,])/g, "$1") // Remove space before punctuation
+                .trim();
+
+            // Extract core game mechanics (collisionDetection, moveAIPaddle, etc.)
+            const mechanicsRegex =
+                /function\s+(collisionDetection|moveAIPaddle|isPuckStuck|resetPuck)\s*\([^{]*\{[^}]*\}/g;
+            let match;
+            while ((match = mechanicsRegex.exec(normalizedJs)) !== null) {
+                const [fullMatch, funcName] = match;
+                snippets.push({
+                    type: "js",
+                    snippet: fullMatch,
+                    context: `Core mechanic: ${funcName}`,
                 });
             }
 
-            // Look for event listeners
-            const listenerMatches = pattern.content.js.match(
-                /addEventListener\(['"]([^'"]+)['"]/g
-            );
-            if (listenerMatches) {
-                listenerMatches.forEach((listener) => {
+            // Extract state variables and their initialization
+            const stateRegex =
+                /(?:let|const|var)\s+(puck|paddle|aiPaddle|goal|simulationSpeedMultiplier|aiState|aiWaitTime|puckStuckTime)\s*=/g;
+            while ((match = stateRegex.exec(normalizedJs)) !== null) {
+                const [fullMatch, varName] = match;
+                // Find the full variable declaration
+                const endIndex = normalizedJs.indexOf(";", match.index);
+                if (endIndex !== -1) {
                     snippets.push({
                         type: "js",
-                        snippet: listener.trim(),
-                        context: "Event listener",
+                        snippet: normalizedJs.slice(match.index, endIndex + 1),
+                        context: `State variable: ${varName}`,
                     });
+                }
+            }
+
+            // Extract core game loop structure
+            const gameLoopRegex =
+                /function\s+(?:gameLoop|update)\s*\([^{]*\{[^}]*requestAnimationFrame[^}]*\}/g;
+            while ((match = gameLoopRegex.exec(normalizedJs)) !== null) {
+                snippets.push({
+                    type: "js",
+                    snippet: match[0],
+                    context: "Game loop structure",
+                });
+            }
+
+            // Extract physics calculations
+            const physicsRegex =
+                /(?:Math\.(?:hypot|atan2|cos|sin|min|max|abs)\([^)]+\))/g;
+            while ((match = physicsRegex.exec(normalizedJs)) !== null) {
+                snippets.push({
+                    type: "js",
+                    snippet: match[0],
+                    context: "Physics calculation",
                 });
             }
         }
@@ -595,16 +674,30 @@ Before returning, verify that your response includes ALL required fields and fol
             console.log("[ClaudeService] Received response data");
 
             if (!data.choices?.[0]?.message?.content) {
-                throw new PatternGenerationError("Invalid API response format");
+                console.error(
+                    "[ClaudeService] Invalid response structure:",
+                    JSON.stringify(data, null, 2)
+                );
+                throw new PatternGenerationError(
+                    "Invalid API response format - missing content"
+                );
             }
 
             const content = data.choices[0].message.content;
+            console.log("[ClaudeService] Raw content length:", content.length);
             console.log("[ClaudeService] Processing Claude's response");
             console.log("[ClaudeService] Raw response:", content);
 
             let pattern: GeneratedPattern;
             try {
-                pattern = JSON.parse(content);
+                // Try to clean the content before parsing
+                const cleanContent = content.trim();
+                console.log(
+                    "[ClaudeService] Attempting to parse content:",
+                    cleanContent.substring(0, 200) + "..."
+                );
+
+                pattern = JSON.parse(cleanContent);
                 console.log(
                     "[ClaudeService] Successfully parsed JSON response"
                 );
@@ -613,6 +706,7 @@ Before returning, verify that your response includes ALL required fields and fol
                     "[ClaudeService] Failed to parse response:",
                     error
                 );
+                console.error("[ClaudeService] Full content:", content);
                 throw new PatternValidationError(
                     "Invalid response format from Claude",
                     [error instanceof Error ? error.message : String(error)]
