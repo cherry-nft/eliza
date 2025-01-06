@@ -57,6 +57,7 @@
         "test:semantic-matching-v2": "tsx src/tests/test-semantic-pattern-matching-v2.ts",
         "insert:air-hockey": "tsx src/tests/test-air-hockey-insert-patterns.ts",
         "insert:catnip-crusaders": "tsx src/tests/test-catnip-crusaders-insert-patterns.ts",
-        "insert:gigger-openland": "tsx src/tests/test-gigger-openland-insert-patterns.ts"
+        "insert:gigger-openland": "tsx src/tests/test-gigger-openland-insert-patterns.ts",
+        "insert:gravity-simulator": "tsx src/tests/test-gravity-simulator-insert-patterns.ts"
     }
 }
