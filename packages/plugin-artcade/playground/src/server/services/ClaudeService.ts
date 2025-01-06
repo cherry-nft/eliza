@@ -36,12 +36,14 @@ You are an expert web developer tasked with creating an interactive HTML experie
 
 "{{user_prompt}}"
 
-CRITICAL INSTRUCTION - PATTERN REUSE:
-1. You MUST copy the complete function implementations from the provided patterns
+CRITICAL INSTRUCTION - PATTERN REUSE AND COMBINATION:
+1. You MUST copy and combine ALL function implementations from the provided patterns
 2. DO NOT rewrite or simplify the mechanics - use them exactly as provided
-3. Only rename variables if absolutely necessary for integration
-4. Preserve all helper functions and state variables
-5. Maintain the exact same logic flow and complexity
+3. When combining patterns, merge their state and update loops
+4. Preserve all helper functions and state variables from each pattern
+5. Maintain the exact same logic flow and complexity from each pattern
+6. IMPORTANT: If multiple game mechanics are provided, you MUST implement ALL of them
+7. Use the game loop to coordinate updates between different mechanics
 
 Here are the patterns you MUST incorporate:
 {{pattern_examples}}
@@ -51,6 +53,10 @@ VALIDATION REQUIREMENTS:
 2. Function bodies should match the patterns with minimal changes
 3. State machines and complex logic must be preserved
 4. All helper functions must be included
+5. For 3D scenes:
+   - MUST add visible objects (floor, walls, etc.)
+   - MUST add basic lighting
+   - MUST set camera starting position
 
 Your response must be a single JSON object with this exact structure. ALL fields are REQUIRED:
 
@@ -123,6 +129,8 @@ IMPORTANT VALIDATION REQUIREMENTS:
 3. The 'plan' object MUST include ALL specified fields
 4. Do not include any explanation, markdown formatting, or additional text
 5. The response must be valid JSON that can be parsed directly
+6. When combining movement patterns:
+   - Never mix input handlers for the same keys
 
 Before returning, verify that your response includes ALL required fields and follows the exact structure specified above.`;
 
@@ -244,14 +252,77 @@ Before returning, verify that your response includes ALL required fields and fol
     }
 
     private formatPatternExamples(patterns: GamePattern[]): string {
-        // Sort game mechanics first
-        const sortedPatterns = [...patterns].sort((a, b) =>
-            a.type === "game_mechanic" ? -1 : b.type === "game_mechanic" ? 1 : 0
+        // Group patterns by type
+        const groupedPatterns = patterns.reduce(
+            (acc, pattern) => {
+                if (!acc[pattern.type]) {
+                    acc[pattern.type] = [];
+                }
+                acc[pattern.type].push(pattern);
+                return acc;
+            },
+            {} as Record<string, GamePattern[]>
         );
 
-        return sortedPatterns
-            .map(
-                (pattern) => `
+        // Present mechanics first, then other types
+        const orderedTypes = [
+            "game_mechanic",
+            "interaction",
+            "layout",
+            "animation",
+            "style",
+        ];
+
+        // Flatten patterns in the desired order
+        const sortedPatterns = orderedTypes
+            .flatMap((type) => groupedPatterns[type] || [])
+            .concat(
+                // Add any remaining types not in orderedTypes
+                patterns.filter((p) => !orderedTypes.includes(p.type))
+            );
+
+        // Add combination instructions for multiple mechanics
+        const mechanicsCount = groupedPatterns["game_mechanic"]?.length || 0;
+        const mechanics = groupedPatterns["game_mechanic"] || [];
+
+        // Create combination matrix showing how mechanics should interact
+        const combinationMatrix =
+            mechanics.length > 1
+                ? mechanics
+                      .map((m1, i) =>
+                          mechanics
+                              .slice(i + 1)
+                              .map(
+                                  (m2) =>
+                                      `${m1.pattern_name} + ${m2.pattern_name}:\n` +
+                                      `- Merge state: Combine ${m1.pattern_name}'s state with ${m2.pattern_name}'s state\n` +
+                                      `- Update loop: Both mechanics must update each frame\n` +
+                                      `- Collision: ${m1.pattern_name}'s objects must interact with ${m2.pattern_name}'s objects\n`
+                              )
+                      )
+                      .flat()
+                      .join("\n")
+                : "";
+
+        const combinationInstructions =
+            mechanicsCount > 1
+                ? `\n!!! CRITICAL - MULTIPLE MECHANICS MUST BE COMBINED !!!\n\n` +
+                  `Core Mechanics to Implement:\n${mechanics
+                      .map((p) => `- ${p.pattern_name}`)
+                      .join("\n")}\n\n` +
+                  `Required Interactions:\n${combinationMatrix}\n\n` +
+                  `Implementation Requirements:\n` +
+                  `1. ALL mechanics must be fully implemented\n` +
+                  `2. Mechanics must interact meaningfully\n` +
+                  `3. Game loop must update all mechanics\n` +
+                  `4. State must be properly merged\n\n`
+                : "";
+
+        return (
+            combinationInstructions +
+            sortedPatterns
+                .map(
+                    (pattern) => `
             ${pattern.type === "game_mechanic" ? "!!! CRITICAL GAME MECHANIC - YOU MUST USE THIS CODE !!!" : "Supporting Pattern"}
             Pattern: ${pattern.pattern_name} (${pattern.type})
             Effectiveness Score: ${pattern.effectiveness_score}
@@ -290,8 +361,9 @@ Before returning, verify that your response includes ALL required fields and fol
             3. Maintain the same function signatures
             4. Only modify variable names if absolutely necessary
             `
-            )
-            .join("\n\n=== NEXT PATTERN ===\n\n");
+                )
+                .join("\n\n=== NEXT PATTERN ===\n\n")
+        );
     }
 
     private extractPlanningInfo(content: string) {
@@ -466,56 +538,75 @@ Before returning, verify that your response includes ALL required fields and fol
                 .replace(/\s*([{};,])/g, "$1") // Remove space before punctuation
                 .trim();
 
-            // Extract core game mechanics (collisionDetection, moveAIPaddle, etc.)
-            const mechanicsRegex =
-                /function\s+(collisionDetection|moveAIPaddle|isPuckStuck|resetPuck)\s*\([^{]*\{[^}]*\}/g;
-            let match;
-            while ((match = mechanicsRegex.exec(normalizedJs)) !== null) {
-                const [fullMatch, funcName] = match;
-                snippets.push({
-                    type: "js",
-                    snippet: fullMatch,
-                    context: `Core mechanic: ${funcName}`,
-                });
-            }
+            // Extract core game mechanics with more flexible matching
+            const mechanicPatterns = {
+                collision:
+                    /function\s+\w*(?:collision|hit|contact)\w*\s*\([^{]*\{[^}]*\}/g,
+                movement:
+                    /(?:moveForward|moveBackward|moveLeft|moveRight|velocity|direction|controls\.(?:moveRight|moveForward))/g,
+                shooting:
+                    /function\s+\w*(?:shoot|fire|launch|projectile)\w*\s*\([^{]*\{[^}]*\}/g,
+                gameLoop:
+                    /function\s+\w*(?:loop|update|tick|frame)\w*\s*\([^{]*\{[^}]*requestAnimationFrame[^}]*\}/g,
+                physics:
+                    /(?:velocity|speed|acceleration|direction|angle|force)\s*[=:]/g,
+                input: /(?:addEventListener|on(?:key|mouse|click|touch))/g,
+            };
 
-            // Extract state variables and their initialization
-            const stateRegex =
-                /(?:let|const|var)\s+(puck|paddle|aiPaddle|goal|simulationSpeedMultiplier|aiState|aiWaitTime|puckStuckTime)\s*=/g;
-            while ((match = stateRegex.exec(normalizedJs)) !== null) {
-                const [fullMatch, varName] = match;
-                // Find the full variable declaration
-                const endIndex = normalizedJs.indexOf(";", match.index);
-                if (endIndex !== -1) {
-                    snippets.push({
-                        type: "js",
-                        snippet: normalizedJs.slice(match.index, endIndex + 1),
-                        context: `State variable: ${varName}`,
-                    });
+            // Extract mechanics using each pattern
+            Object.entries(mechanicPatterns).forEach(([type, regex]) => {
+                let match: RegExpExecArray | null;
+                const matches = new Set(); // Track unique matches
+                while ((match = regex.exec(normalizedJs)) !== null) {
+                    if (!matches.has(match[0])) {
+                        matches.add(match[0]);
+                        snippets.push({
+                            type: "js",
+                            snippet: match[0],
+                            context: `${type} mechanic`,
+                        });
+                    }
                 }
-            }
+            });
 
-            // Extract core game loop structure
-            const gameLoopRegex =
-                /function\s+(?:gameLoop|update)\s*\([^{]*\{[^}]*requestAnimationFrame[^}]*\}/g;
-            while ((match = gameLoopRegex.exec(normalizedJs)) !== null) {
+            // Extract state variables with more flexible matching
+            const statePattern = /(?:let|const|var)\s+(\w+)\s*=\s*{[^}]*}/g;
+            let stateMatch: RegExpExecArray | null;
+            while ((stateMatch = statePattern.exec(normalizedJs)) !== null) {
                 snippets.push({
                     type: "js",
-                    snippet: match[0],
-                    context: "Game loop structure",
+                    snippet: stateMatch[0],
+                    context: `State object: ${stateMatch[1]}`,
                 });
             }
 
-            // Extract physics calculations
-            const physicsRegex =
-                /(?:Math\.(?:hypot|atan2|cos|sin|min|max|abs)\([^)]+\))/g;
-            while ((match = physicsRegex.exec(normalizedJs)) !== null) {
-                snippets.push({
-                    type: "js",
-                    snippet: match[0],
-                    context: "Physics calculation",
-                });
-            }
+            // Look for key gameplay elements
+            const gameplayElements = {
+                score: /(?:score|points|lives)/g,
+                timing: /(?:time|timer|countdown|clock)/g,
+                position: /(?:position|x|y|coordinates)/g,
+                dimensions: /(?:width|height|radius|size)/g,
+            };
+
+            Object.entries(gameplayElements).forEach(([type, regex]) => {
+                let elementMatch: RegExpExecArray | null;
+                while ((elementMatch = regex.exec(normalizedJs)) !== null) {
+                    const endIndex = normalizedJs.indexOf(
+                        ";",
+                        elementMatch.index
+                    );
+                    if (endIndex !== -1) {
+                        snippets.push({
+                            type: "js",
+                            snippet: normalizedJs.slice(
+                                elementMatch.index,
+                                endIndex + 1
+                            ),
+                            context: `${type} element`,
+                        });
+                    }
+                }
+            });
         }
 
         if (pattern.content.css) {
@@ -584,9 +675,14 @@ Before returning, verify that your response includes ALL required fields and fol
     private checkPatternUsage(response: GeneratedPattern): PatternUsageCheck[] {
         const checks = this.lastUsedPatterns.map((pattern) => {
             const snippets = this.getDistinctiveSnippets(pattern);
-            const foundSnippets = snippets.filter((s) =>
-                response.html.includes(s.snippet)
-            );
+            const foundSnippets = snippets.filter((s) => {
+                // Normalize both strings to handle whitespace variations
+                const normalizedSnippet = s.snippet.replace(/\s+/g, " ").trim();
+                const normalizedResponse = response.html
+                    .replace(/\s+/g, " ")
+                    .trim();
+                return normalizedResponse.includes(normalizedSnippet);
+            });
 
             return {
                 patternId: pattern.id,
